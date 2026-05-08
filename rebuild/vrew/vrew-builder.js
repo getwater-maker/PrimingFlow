@@ -476,6 +476,26 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
     throw new Error(`template 첫 mp4 항목 (${FIXED_MP4_MEDIA_ID}) 누락 — vrew-template.json 손상`);
   }
 
+  // 사용자가 프리셋에서 지정한 자막 옵션을 기본값에 병합 (없으면 기본값 사용)
+  const _userCap = opts.captionStyle || {};
+  const captionAttrs = {
+    ...CAPTION_ATTRS,
+    ...(_userCap.size         ? { size: String(_userCap.size) }                : {}),
+    ...(_userCap.fontColor    ? { color: _userCap.fontColor }                  : {}),
+    ...(_userCap.outlineColor ? { 'outline-color': _userCap.outlineColor }     : {}),
+  };
+  const captionStyle = {
+    ...CAPTION_STYLE,
+    ...(_userCap.yOffset != null ? { yOffset: _userCap.yOffset } : {}),
+    ...(_userCap.width   != null ? { width:   _userCap.width   } : {}),
+    customAttributes: CAPTION_STYLE.customAttributes.map(a => {
+      if (a.attributeName === '--textbox-align' && _userCap.align) {
+        return { ...a, value: _userCap.align };
+      }
+      return { ...a };
+    }),
+  };
+
   const nowIso = new Date().toISOString();
   pj.projectId = uid();
   pj.comment = `4.0.1\t${nowIso}`;
@@ -746,14 +766,15 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
         captionMode: 'MANUAL',
         words: wordsArr,
         // captions 마다 style 직접 박아 자막 위치(yOffset 등) 영구 보존
+        // (사용자가 프리셋에서 변경한 size/align/yOffset/width/색상을 병합한 값 사용)
         captions: [
           {
-            text: [{ insert: vc.text + '\n', attributes: { ...CAPTION_ATTRS } }],
-            style: { ...CAPTION_STYLE, customAttributes: CAPTION_STYLE.customAttributes.map(a => ({ ...a })) },
+            text: [{ insert: vc.text + '\n', attributes: { ...captionAttrs } }],
+            style: { ...captionStyle, customAttributes: captionStyle.customAttributes.map(a => ({ ...a })) },
           },
           {
-            text: [{ insert: '\n', attributes: { ...CAPTION_ATTRS } }],
-            style: { ...CAPTION_STYLE, customAttributes: CAPTION_STYLE.customAttributes.map(a => ({ ...a })) },
+            text: [{ insert: '\n', attributes: { ...captionAttrs } }],
+            style: { ...captionStyle, customAttributes: captionStyle.customAttributes.map(a => ({ ...a })) },
           },
         ],
         assetIds: [...clipAssetIds],

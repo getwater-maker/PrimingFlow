@@ -1931,6 +1931,43 @@
 
       <!-- 영상 후처리 (vrew 빌드 시 적용 — 이미지/동영상 모드 무관 항상 적용) -->
       <div style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:8px;">
+
+        <!-- 본문 자막 — 크기/정렬/위치/너비/색상 (영상.vrew 검증 기준값) -->
+        <div style="margin-bottom:10px;">
+          <div style="font-weight:600; margin-bottom:6px;">📝 본문 자막</div>
+          <div style="display:flex; align-items:center; gap:5px; font-size:12px; flex-wrap:wrap;">
+            <span style="color:var(--text-soft); flex:none;">크기</span>
+            <input type="number" id="captionSize" value="100" min="50" max="200" step="5" style="width:50px; flex:none; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
+            <span style="color:var(--border); margin:0 2px;">|</span>
+            <span style="color:var(--text-soft); flex:none;">정렬</span>
+            <select id="captionAlign" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
+              <option value="start" selected>좌</option>
+              <option value="center">가운데</option>
+              <option value="end">우</option>
+            </select>
+            <span style="color:var(--border); margin:0 2px;">|</span>
+            <span style="color:var(--text-soft); flex:none;" title="화면 하단에서 위로 올리는 비율 (%, 음수 = 위로)">위치</span>
+            <input type="number" id="captionYOffset" value="-12.5" min="-50" max="0" step="2.5" style="width:55px; flex:none; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
+            <span style="color:var(--text-muted);">%</span>
+            <span style="color:var(--border); margin:0 2px;">|</span>
+            <span style="color:var(--text-soft); flex:none;">너비</span>
+            <input type="number" id="captionWidth" value="96" min="40" max="100" step="2" style="width:50px; flex:none; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
+            <span style="color:var(--text-muted);">%</span>
+            <span style="color:var(--border); margin:0 2px;">|</span>
+            <!-- 글자색 / 외곽선색 (A 미리보기) -->
+            <span title="글자색" style="position:relative; display:inline-block; width:30px; height:28px; flex:none;">
+              <input type="color" id="captionFontColor" value="#FFFFFF" style="position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; padding:0; border:0;"
+                oninput="document.getElementById('captionFontPreview').style.color=this.value">
+              <span id="captionFontPreview" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:bold; color:#FFFFFF; background:#888; border:1px solid var(--border); border-radius:4px; pointer-events:none; line-height:1;">A</span>
+            </span>
+            <span title="외곽선색" style="position:relative; display:inline-block; width:30px; height:28px; flex:none;">
+              <input type="color" id="captionOutlineColor" value="#000000" style="position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; padding:0; border:0;"
+                oninput="document.getElementById('captionOutlinePreview').style.webkitTextStroke='1.5px '+this.value">
+              <span id="captionOutlinePreview" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:bold; color:#FFFFFF; background:#fff; border:1px solid var(--border); border-radius:4px; pointer-events:none; line-height:1; -webkit-text-stroke:1.5px #000000;">A</span>
+            </span>
+          </div>
+        </div>
+
         <!-- AI 고지 문구 자막 -->
         <div style="padding-top:0; margin-top:0;">
           <label style="display:flex; align-items:center; gap:6px; width:auto;">
@@ -4433,6 +4470,40 @@ function _onAiNoticeStartModeChange() {
   }
 }
 
+// 본문 자막 옵션 수집 (vrew 빌드 시 buildVrew 에 전달 + 프리셋 저장)
+function collectCaptionStyleOpts() {
+  const size       = parseInt(document.getElementById('captionSize')?.value || '100', 10);
+  const align      = document.getElementById('captionAlign')?.value || 'start';
+  const yOffsetPct = parseFloat(document.getElementById('captionYOffset')?.value || '-12.5');
+  const widthPct   = parseFloat(document.getElementById('captionWidth')?.value || '96');
+  const fontColor    = document.getElementById('captionFontColor')?.value    || '#FFFFFF';
+  const outlineColor = document.getElementById('captionOutlineColor')?.value || '#000000';
+  return {
+    size: String(size),
+    fontColor,
+    outlineColor,
+    align,                       // 'start' | 'center' | 'end'
+    yOffset: yOffsetPct / 100,   // -12.5% → -0.125
+    width:   widthPct / 100,     // 96% → 0.96
+  };
+}
+
+// 프리셋에 저장된 본문 자막 옵션 → 폼 입력 복원 (+ A 미리보기 동기화)
+function applyCaptionStyleToForm(opt) {
+  const o = opt || {};
+  const set = (id, val) => { const el = document.getElementById(id); if (el != null && val !== undefined) el.value = val; };
+  if (o.size != null)         set('captionSize', String(parseInt(o.size, 10) || 100));
+  if (o.align)                set('captionAlign', o.align);
+  if (o.yOffset != null)      set('captionYOffset', (o.yOffset * 100).toFixed(1));
+  if (o.width != null)        set('captionWidth', Math.round(o.width * 100));
+  if (o.fontColor)            set('captionFontColor', o.fontColor);
+  if (o.outlineColor)         set('captionOutlineColor', o.outlineColor);
+  const fp = document.getElementById('captionFontPreview');
+  const op = document.getElementById('captionOutlinePreview');
+  if (fp && o.fontColor)    fp.style.color = o.fontColor;
+  if (op && o.outlineColor) op.style.webkitTextStroke = '1.5px ' + o.outlineColor;
+}
+
 // 프리셋에 저장된 AI 고지 옵션 → 폼 입력 필드 복원
 function applyAiNoticeToForm(opt) {
   const o = opt || {};
@@ -5205,6 +5276,8 @@ function openPresetModal(presetId) {
 
   // AI 고지 자막 폼 채우기 — 프리셋에 저장된 색상/시작/노출 복원
   applyAiNoticeToForm(p.aiNotice);
+  // 본문 자막 폼 채우기 — 프리셋에 저장된 크기/정렬/위치/너비/색상 복원
+  applyCaptionStyleToForm(p.captionStyle);
 
   // 이미지 스타일 셀렉트 채우기 + 저장된 styleId 복원
   if (typeof _refreshStyleSelectOptions === 'function') {
@@ -5506,6 +5579,11 @@ function _readPresetForm() {
   // AI 고지 자막 — 색상/시작/노출 등 프리셋에 영구 저장 (collectAiNoticeOpts 가 DOM 에서 값 수집)
   if (typeof collectAiNoticeOpts === 'function') {
     preset.aiNotice = collectAiNoticeOpts();
+  }
+
+  // 본문 자막 스타일 (크기/정렬/위치/너비/색상)
+  if (typeof collectCaptionStyleOpts === 'function') {
+    preset.captionStyle = collectCaptionStyleOpts();
   }
 
   // 이미지 생성 스타일 (프리셋별 다르게 운영 가능)
@@ -7424,6 +7502,7 @@ async function saveVrew(opts = {}) {
         kenburnsSpeed: selectedKenburnsSpeed || 'normal',
         aiNotice: collectAiNoticeOpts(),
         logo: collectLogoOpts(),
+        captionStyle: collectCaptionStyleOpts(),
         logger: (msg) => addLog(msg, 'info'),
       },
     });
