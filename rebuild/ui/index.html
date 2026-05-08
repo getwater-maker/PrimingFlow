@@ -2592,6 +2592,51 @@ function _getProjectOutputDir() {
   };
 })();
 
+/**
+ * 갤러리에서 이미지/비디오 파일 → 작업 목록의 특정 그룹에 첨부.
+ * 그룹 번호 입력 prompt 띄움. 비디오 확장자면 videoPath, 아니면 imagePath 로 분기.
+ * 디스크 파일은 이동하지 않음 — 그룹의 path 만 업데이트.
+ */
+function _attachGalleryFileToGroup(filePath, fileName) {
+  const proj = window._currentProject;
+  if (!proj || !proj.groups || proj.groups.length === 0) {
+    alert('먼저 대본을 분할하세요');
+    return;
+  }
+  // 빈 그룹 우선 안내
+  const emptyGroups = proj.groups.filter(g => !g.imagePath);
+  const hint = emptyGroups.length > 0
+    ? `\n빈 이미지 그룹: ${emptyGroups.slice(0, 10).map(g => g.num).join(', ')}${emptyGroups.length > 10 ? ` 외 ${emptyGroups.length - 10}개` : ''}`
+    : '\n(모든 그룹에 이미지 있음 — 덮어쓰기됩니다)';
+  const choice = prompt(
+    `"${fileName}" 을 어느 그룹에 첨부할까요?\n` +
+    `그룹 번호 입력 (1 ~ ${proj.groups.length})${hint}`,
+    String(emptyGroups[0]?.num || 1)
+  );
+  if (choice === null) return;
+  const num = parseInt(String(choice).trim(), 10);
+  if (isNaN(num) || num < 1 || num > proj.groups.length) {
+    alert(`유효하지 않은 그룹 번호 (1 ~ ${proj.groups.length})`);
+    return;
+  }
+  const g = proj.groups.find(grp => grp.num === num);
+  if (!g) { alert('그룹을 찾을 수 없습니다'); return; }
+
+  const isVideo = /\.(mp4|webm|mkv|mov)$/i.test(fileName);
+  if (isVideo) {
+    g.videoPath = filePath;
+    g.videoStatus = 'done';
+    g.videoSourceImage = g.imagePath || null;
+    addLog(`[갤러리→그룹] 그룹 ${g.num} ← ${fileName} 비디오 첨부 완료`, 'ok');
+  } else {
+    g.imagePath = filePath;
+    g.imageStatus = 'done';
+    addLog(`[갤러리→그룹] 그룹 ${g.num} ← ${fileName} 이미지 첨부 완료`, 'ok');
+  }
+  renderTaskList(proj);
+  // 갤러리 닫지 않음 — 사용자가 여러 이미지 연속 첨부 가능
+}
+
 // 갤러리 모달 열기/닫기
 function openGallery() {
   document.getElementById('galleryModal').style.display = 'flex';
@@ -2659,12 +2704,14 @@ function loadGallery(targetPath) {
   }
 
   // 이미지 항목 (미리보기)
+  const proj = window._currentProject;
+  const hasProject = proj && proj.groups && proj.groups.length > 0;
   for (const file of images) {
     const fullPath = pathm.join(galleryCurrentPath, file);
     const imgUrl = 'file:///' + encodeURI(fullPath.replace(/\\/g, '/'));
     const item = document.createElement('div');
     item.className = 'gallery-item';
-    item.style.cursor = 'pointer';
+    item.style.cssText = 'cursor:pointer; position:relative;';
     const img = document.createElement('img');
     img.src = imgUrl;
     img.loading = 'lazy';
@@ -2675,6 +2722,20 @@ function loadGallery(targetPath) {
     item.appendChild(cap);
     item.onclick = () => require('electron').shell.showItemInFolder(fullPath);
     item.ondblclick = () => require('electron').shell.openPath(fullPath);
+
+    // 프로젝트 분할돼있으면 "그룹 첨부" 버튼 우상단에 표시
+    if (hasProject) {
+      const attachBtn = document.createElement('button');
+      attachBtn.className = 'btn-sm';
+      attachBtn.textContent = '📎 그룹 첨부';
+      attachBtn.title = '이 이미지를 작업 목록의 특정 그룹에 첨부';
+      attachBtn.style.cssText = 'position:absolute; top:6px; right:6px; padding:4px 8px; font-size:11px; background:rgba(0,0,0,0.7); color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:600;';
+      attachBtn.onclick = (e) => {
+        e.stopPropagation();
+        _attachGalleryFileToGroup(fullPath, file);
+      };
+      item.appendChild(attachBtn);
+    }
     grid.appendChild(item);
   }
 
