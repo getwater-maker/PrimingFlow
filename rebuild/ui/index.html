@@ -1233,14 +1233,6 @@
           </select>
         </div>
 
-        <div class="setting">
-          <label>자막</label>
-          <select id="subtitleSelect">
-            <option value="no">이미지만</option>
-            <option value="yes">자막 합성</option>
-          </select>
-        </div>
-
       </div>
 
       <!-- 동영상 설정 -->
@@ -2456,7 +2448,7 @@ async function startGeneration() {
     ratio: isVideo ? selectedVideoRatio : selectedRatio,
     model: isVideo ? document.getElementById('videoModelSelect').value : document.getElementById('modelSelect').value,
     count: isVideo ? selectedVideoCount : selectedCount,
-    withSubtitle: isVideo ? false : document.getElementById('subtitleSelect').value === 'yes',
+    withSubtitle: false,  // .vrew 자막 트랙만 사용 (이미지에 합성 안 함)
     outputDir: finalDir,
     profileId: getSelectedProfile(),
     characterImages: characterImagePaths,
@@ -7416,7 +7408,7 @@ async function _runGroupImageGeneration(groupIds, label) {
     ratio: selectedRatio,
     model: document.getElementById('modelSelect').value,
     count: selectedCount,
-    withSubtitle: document.getElementById('subtitleSelect').value === 'yes',
+    withSubtitle: false,  // .vrew 자막 트랙만 사용 (이미지에 합성 안 함)
     outputDir: finalDir,
     profileId: (channel && channel.profileId) || getSelectedProfile(),
     characterImages: characterImagePaths,
