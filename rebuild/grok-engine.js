@@ -378,21 +378,21 @@ class GrokEngine {
       this.log(`[Grok] 이미지 업로드: ${path.basename(imagePath)}`);
       if (abortSignal && abortSignal()) return { success: false, error: '사용자 중단' };
 
-      // 7. 모션 프롬프트 입력 — 자연스러운 타이핑 속도 (delay 13ms, 약 분당 460자)
-      //    이전 delay 10ms 가 너무 빨라 30% 감속 (10 → 13).
+      // 7. 모션 프롬프트 입력 — 자연스러운 타이핑 속도 (delay 16ms, 약 분당 380자)
+      //    감속 이력: 10 → 13 → 16 (사용자 요청에 따라 단계적 감속).
       const promptEl = await this.page.$(GROK_SELECTORS.promptInput);
       if (promptEl) {
         await promptEl.click();
         const tagName = await promptEl.evaluate(el => el.tagName.toLowerCase());
         if (tagName === 'textarea' || tagName === 'input') {
           // textarea 도 keyboard.type 으로 변경 — 자연스러운 타이핑 속도 적용
-          await this.page.keyboard.type(motion, { delay: 13 });
+          await this.page.keyboard.type(motion, { delay: 16 });
         } else {
           // contenteditable
-          await this.page.keyboard.type(motion, { delay: 13 });
+          await this.page.keyboard.type(motion, { delay: 16 });
         }
         await this.page.waitForTimeout(500);
-        this.log(`[Grok] 모션 프롬프트 입력: "${motion.substring(0, 40)}..." (delay 13ms)`);
+        this.log(`[Grok] 모션 프롬프트 입력: "${motion.substring(0, 40)}..." (delay 16ms)`);
       } else {
         this.log('[Grok] ⚠️ 프롬프트 입력 영역 못 찾음 — 빈 프롬프트로 진행');
       }

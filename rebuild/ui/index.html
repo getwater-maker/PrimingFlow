@@ -2849,9 +2849,11 @@ function _renderStyleManagerList() {
     const safeName = escapeHtml(s.name || '');
     const safePrompt = escapeHtml(s.prompt || '');
     const safePreview = escapeHtml(promptPreview);
+    const copyBtn = `<button class="btn-sm" type="button" data-style-id="${s.id}" onclick="copyStyleEntry(this.dataset.styleId)" title="이 스타일을 복사해서 새 스타일로 추가">📋 복사</button>`;
     const actions = s.isBuiltIn
-      ? `<span style="font-size:11px; color:var(--text-muted); padding:0 6px;">읽기 전용</span>`
-      : `<button class="btn-sm" type="button" data-style-id="${s.id}" onclick="openStyleEditForm(this.dataset.styleId)">🔧 수정</button>` +
+      ? copyBtn
+      : copyBtn +
+        `<button class="btn-sm" type="button" data-style-id="${s.id}" onclick="openStyleEditForm(this.dataset.styleId)">🔧 수정</button>` +
         `<button class="btn-sm" type="button" data-style-id="${s.id}" onclick="deleteStyleEntry(this.dataset.styleId)" style="color:var(--danger);">🗑</button>`;
     row.innerHTML =
       `<div style="flex:1; min-width:0;">` +
@@ -2887,6 +2889,22 @@ function openStyleEditForm(id) {
   document.getElementById('styleManagerFormPrompt').value = s.prompt;
   document.getElementById('styleManagerForm').style.display = '';
   document.getElementById('styleManagerFormName').focus();
+}
+
+/** 기존 스타일 (기본·사용자) 을 복사해서 새 사용자 스타일로 추가하는 폼 열기.
+ *  이름은 "(복사본)" 추가 + 자동 select 되어 사용자가 즉시 수정 가능. */
+function copyStyleEntry(id) {
+  const StyleStore = require('../core/style-store');
+  const s = StyleStore.getById(id);
+  if (!s) return;
+  _styleManagerEditingId = null;   // 새 추가 모드 (update 가 아닌 add)
+  document.getElementById('styleManagerFormTitle').textContent = `📋 복사: ${s.name}`;
+  document.getElementById('styleManagerFormName').value = `${s.name} (복사본)`;
+  document.getElementById('styleManagerFormPrompt').value = s.prompt;
+  document.getElementById('styleManagerForm').style.display = '';
+  const nameEl = document.getElementById('styleManagerFormName');
+  nameEl.focus();
+  nameEl.select();   // 사용자가 바로 이름 손볼 수 있게 미리 선택
 }
 
 function cancelStyleManagerForm() {
@@ -3645,7 +3663,7 @@ function renderTaskList(project) {
       : '';
 
     actions.innerHTML =
-      `<button class="btn-sm group-attach-btn" data-group-id="${g.id}" title="기존 이미지 파일 선택해서 첨부">📎 이미지 첨부</button>` +
+      `<button class="btn-sm group-attach-btn" data-group-id="${g.id}" title="이미지(jpg/png/webp) 또는 동영상(mp4/webm/mkv/mov) 파일을 직접 첨부">📎 미디어 첨부</button>` +
       `<button class="btn-sm group-regen-btn" data-group-id="${g.id}" title="이 그룹만 이미지 재생성 (기존 첨부 자동 제거 후 새로 생성)">🔄 이미지 재생성</button>` +
       removeImgBtn +
       removeVideoBtn +
@@ -3660,7 +3678,7 @@ function renderTaskList(project) {
     const ttsBtn2 = actions.querySelector('.group-tts-btn');
     const videoBtn = actions.querySelector('.group-video-btn');
     const groupId = g.id;
-    attachBtn.onclick = (e) => { e.stopPropagation(); attachGroupImage(groupId); };
+    attachBtn.onclick = (e) => { e.stopPropagation(); attachGroupMedia(groupId); };
     regenBtn.onclick = (e) => { e.stopPropagation(); regenerateGroups([groupId]); };
     if (removeImgBtnEl) removeImgBtnEl.onclick = (e) => { e.stopPropagation(); removeGroupImage(groupId); };
     if (removeVideoBtnEl) removeVideoBtnEl.onclick = (e) => { e.stopPropagation(); removeGroupVideo(groupId); };
@@ -5995,14 +6013,20 @@ function openImageBatchAttach() {
 }
 
 // 그룹 카드 [📎 이미지 첨부] — 기존 jpg/png 파일을 그룹 imagePath 로 설정
-async function attachGroupImage(groupId) {
+/**
+ * 그룹에 이미지 또는 동영상 파일 첨부.
+ * - 이미지(jpg/png/webp)면 g.imagePath 에 등록
+ * - 동영상(mp4/webm/mkv/mov)면 g.videoPath 에 등록 + videoStatus='done'
+ * - 비디오 첨부 시 기존 이미지는 유지 (반대도 동일)
+ */
+async function attachGroupMedia(groupId) {
   const proj = window._currentProject;
   if (!proj) return;
   const g = proj.groups.find(x => x.id === groupId);
   if (!g) return;
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = 'image/jpeg,image/png,image/jpg';
+  input.accept = 'image/jpeg,image/png,image/jpg,image/webp,video/mp4,video/webm,video/x-matroska,video/quicktime';
   input.onchange = (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -6015,22 +6039,38 @@ async function attachGroupImage(groupId) {
       filePath = file.path; // fallback (구 Electron)
     }
     if (!filePath || typeof filePath !== 'string') {
-      addLog(`[Image] 파일 경로 가져오기 실패 (${file.name})`, 'err');
+      addLog(`[Media] 파일 경로 가져오기 실패 (${file.name})`, 'err');
       return;
     }
     try {
       const fs = require('fs');
       if (!fs.existsSync(filePath)) {
-        addLog(`[Image] 파일 없음: ${filePath}`, 'err');
+        addLog(`[Media] 파일 없음: ${filePath}`, 'err');
         return;
       }
     } catch {}
-    _setGroupImageThumbnail(groupId, filePath);
-    _setGroupImageStatus(groupId, 'done');
-    addLog(`[Image] 그룹 ${g.num} ← ${file.name} 첨부 완료`, 'ok');
+
+    const isVideo = /\.(mp4|webm|mkv|mov)$/i.test(file.name)
+                  || (file.type || '').startsWith('video/');
+    if (isVideo) {
+      // 비디오 첨부 — 기존 이미지는 유지
+      g.videoPath = filePath;
+      g.videoStatus = 'done';
+      g.videoSourceImage = g.imagePath || null;
+      addLog(`[Media] 그룹 ${g.num} ← ${file.name} 비디오 첨부 완료`, 'ok');
+      renderTaskList(proj);
+    } else {
+      // 이미지 첨부 — _setGroupImageStatus('done') 가 renderTaskList 호출
+      _setGroupImageThumbnail(groupId, filePath);
+      _setGroupImageStatus(groupId, 'done');
+      addLog(`[Media] 그룹 ${g.num} ← ${file.name} 이미지 첨부 완료`, 'ok');
+    }
   };
   input.click();
 }
+
+// 호환성 alias — 옛 호출처가 있을 수 있음
+const attachGroupImage = attachGroupMedia;
 
 // 그룹 카드 [▶ 그룹 미리듣기] — sentence TTS mp3 들을 순차 재생, 다시 누르면 중지
 async function previewGroupAudio(groupId, btnEl) {
@@ -7116,6 +7156,11 @@ function _setGroupImageStatus(groupId, status, extraText) {
   } else {
     el.textContent = extraText || '🖼 미생성';
     el.style.color = 'var(--text-muted)';
+  }
+  // 'done' 으로 전환되면 카드 액션 영역도 다시 그림 — 🗑 이미지 제거 버튼 등 즉시 등장.
+  // 다른 status (generating/idle/fail) 에서는 깜박임 방지 위해 부분 갱신만.
+  if (status === 'done' && window._currentProject) {
+    try { renderTaskList(window._currentProject); } catch {}
   }
 }
 
