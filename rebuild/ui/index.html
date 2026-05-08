@@ -1091,8 +1091,8 @@
       <div style="border-top:1px solid var(--border-soft); padding-top:10px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
           <span style="font-size:12px; font-weight:700; color:var(--text-strong);">⚙ 분할 옵션 (변경 시 자동 재분할)</span>
-          <label style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-soft); cursor:pointer; white-space:nowrap;" title="🤖 AI 분할 (Gemini) — 의미 분할이 더 자연스러움. API 키 필요. 알고리즘 폴백 자동.">
-            <input type="checkbox" id="useAiSplitter" checked onchange="autoSplitDebounced()" style="cursor:pointer;">
+          <label style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-soft); cursor:pointer; white-space:nowrap;" title="🤖 AI 분할 (Gemini) — 의미 분할이 더 자연스러움. API 키 필요. API 실패·텍스트 변형 시 algo 폴백 자동.">
+            <input type="checkbox" id="useAiSplitter" onchange="autoSplitDebounced()" style="cursor:pointer;">
             <span>🤖 AI 분할</span>
           </label>
         </div>

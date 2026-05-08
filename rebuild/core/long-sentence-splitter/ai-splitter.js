@@ -103,16 +103,34 @@ async function splitLongSentenceAI(text, opts = {}) {
       .map(s => s.replace(/^\s*[\-•\d]+[\.\)]\s*/, '').trim())
       .filter(Boolean);
 
-    if (lines.length < 2) {
+    // (1) 줄 끝의 메타 표시 제거 — Gemini 가 종종 "텍스트 (15)" 또는 "텍스트 - 15자" 식으로 출력
+    //     이걸 안 떼면 sub-clip 자막에 "(15)" 같은 글자수 표시가 그대로 박힘.
+    const META_TAIL = /\s*[\(\[]\s*\d+\s*[자글자\s]*\s*[\)\]]\s*$|\s*[-–—]\s*\d+\s*[자글자]?\s*$/;
+    const cleaned = lines
+      .map(s => s.replace(META_TAIL, '').trim())
+      .filter(Boolean);
+
+    if (cleaned.length < 2) {
       // AI 가 한 줄로만 답변 → 알고리즘 폴백
       log('[ai-splitter] 분할 결과 1개 — 알고리즘 폴백');
       return splitLongSentenceAlgo(text, maxChars);
     }
 
-    // 가중치 = 한국어 발음 시간 가중치 비율 (받침/구두점 반영)
-    const weights = lines.map(t => Math.max(0.1, koSpeechWeight(t)));
+    // (2) 검증 — 분할된 텍스트들의 합이 원본과 (공백·구두점 무시) 같은지 확인
+    //     "시아버지" 가 "시아버" 로 잘리거나, AI 가 글자를 추가/누락하면 검증 실패 → algo 폴백.
+    //     이 검증이 sub-clip 자막이 원본 대본과 한 글자라도 달라지는 것을 차단하는 안전장치.
+    const _normalize = (s) => String(s).replace(/[\s,.!?;:()\[\]"'。、・·…\-–—]/g, '');
+    const reconstituted = _normalize(cleaned.join(''));
+    const original = _normalize(text);
+    if (reconstituted !== original) {
+      log(`[ai-splitter] 검증 실패 (원본과 다름) — algo 폴백. orig=${original.length}자 vs ai=${reconstituted.length}자`);
+      return splitLongSentenceAlgo(text, maxChars);
+    }
+
+    // (3) 가중치 = 한국어 발음 시간 가중치 비율 (받침/구두점 반영)
+    const weights = cleaned.map(t => Math.max(0.1, koSpeechWeight(t)));
     const total = weights.reduce((s, w) => s + w, 0) || 1;
-    return lines.map((t, i) => ({
+    return cleaned.map((t, i) => ({
       text: t,
       weight: weights[i] / total,
     }));
