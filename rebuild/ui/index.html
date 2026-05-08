@@ -3700,17 +3700,13 @@ function renderTaskList(project) {
       img.onclick = (e) => { e.stopPropagation(); attachGroupMedia(g.id); };
     }
 
-    // 그룹 TTS 음성 길이 배지
+    // 그룹 TTS 음성 길이 배지 — 미디어 첨부 시에만 표시 (미생성 박스엔 '미생성' 글자만)
     const groupDur = _groupTtsDuration(g, project.sentences);
-    if (groupDur) {
+    const hasMedia = g.imagePath || (g.videoPath && g.videoStatus === 'done');
+    if (groupDur && hasMedia) {
       const durEl = document.createElement('div');
-      const hasMedia = g.imagePath || (g.videoPath && g.videoStatus === 'done');
-      if (hasMedia) {
-        durEl.style.cssText = 'position:absolute; bottom:4px; left:4px; background:rgba(0,0,0,0.55); color:#fff; font-size:11px; padding:2px 7px; border-radius:4px; pointer-events:none; z-index:2;';
-        img.style.position = 'relative';
-      } else {
-        durEl.style.cssText = 'display:block; font-size:11px; color:var(--text-soft); margin-top:5px; text-align:center;';
-      }
+      durEl.style.cssText = 'position:absolute; bottom:4px; left:4px; background:rgba(0,0,0,0.55); color:#fff; font-size:11px; padding:2px 7px; border-radius:4px; pointer-events:none; z-index:2;';
+      img.style.position = 'relative';
       durEl.textContent = '⏱ ' + groupDur;
       img.appendChild(durEl);
     }

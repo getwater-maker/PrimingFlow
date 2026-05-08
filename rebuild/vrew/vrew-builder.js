@@ -21,7 +21,37 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { spawnSync } = require('child_process');
 const { splitLongSentenceAlgo } = require('../core/long-sentence-splitter/algo-splitter');
+
+// ffmpeg 바이너리 경로 (ffmpeg-static 패키지). asar 패키징 시
+// app.asar.unpacked 로 풀려 있어야 spawn 가능 — package.json asarUnpack 참고.
+let _ffmpegPath = null;
+try {
+  _ffmpegPath = require('ffmpeg-static');
+  // Electron asar 환경에서 unpacked 경로로 보정
+  if (_ffmpegPath && _ffmpegPath.includes('app.asar') && !_ffmpegPath.includes('app.asar.unpacked')) {
+    _ffmpegPath = _ffmpegPath.replace('app.asar', 'app.asar.unpacked');
+  }
+} catch (_) {}
+
+// wav → mp3 (libmp3lame, 192kbps, 24kHz mono — OmniVoice 출력 그대로 인코딩)
+// .vrew 호환성 향상 (Vrew 가 mp3 권장 형식). 실패 시 false.
+function wavToMp3(wavPath, mp3Path) {
+  if (!_ffmpegPath || !fs.existsSync(_ffmpegPath)) return false;
+  try {
+    const r = spawnSync(_ffmpegPath, [
+      '-y', '-i', wavPath,
+      '-codec:a', 'libmp3lame',
+      '-b:a', '192k',
+      '-ar', '24000', '-ac', '1',
+      mp3Path,
+    ], { stdio: 'pipe' });
+    return r.status === 0 && fs.existsSync(mp3Path);
+  } catch (_) {
+    return false;
+  }
+}
 
 // Vrew 본가가 STT 로 만드는 word 단위 자막을 흉내 — 공백 기준 어절 분리.
 // 빈 입력은 [원문] 그대로 1개 토큰으로 처리해 트랙이 깨지지 않게 함.
@@ -572,13 +602,25 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
     }
 
     const ttsDur = s.ttsDurationSec || estimateAudioDuration(s.ttsAudioPath);
-    const ext = (path.extname(s.ttsAudioPath).toLowerCase().replace('.', '')) || 'mp3';
-    const codec = (ext === 'wav') ? 'wav' : 'mp3';
+    const srcExt = (path.extname(s.ttsAudioPath).toLowerCase().replace('.', '')) || 'mp3';
 
-    // (a) TTS 파일 — 실제 음성 mp3 1개 (test.vrew 형식)
+    // (a) TTS 파일 — wav 면 mp3 변환 (Vrew 호환성). 실패 시 wav 그대로 fallback.
     const ttsMid = sid();
-    const ttsFn = `${ttsMid}.${ext}`;
-    const ttsBytes = fs.statSync(s.ttsAudioPath).size;
+    let ttsSrc  = s.ttsAudioPath;
+    let outExt  = srcExt;
+    let codec   = (srcExt === 'wav') ? 'wav' : 'mp3';
+    if (srcExt === 'wav') {
+      const mp3Path = path.join(os.tmpdir(), `pf_tts_${ttsMid}.mp3`);
+      if (wavToMp3(s.ttsAudioPath, mp3Path)) {
+        ttsSrc = mp3Path;
+        outExt = 'mp3';
+        codec  = 'mp3';
+      } else {
+        log(`[Vrew] wav→mp3 변환 실패 — wav 그대로 사용: ${path.basename(s.ttsAudioPath)}`);
+      }
+    }
+    const ttsFn = `${ttsMid}.${outExt}`;
+    const ttsBytes = fs.statSync(ttsSrc).size;
     pj.files.push({
       version: 1, mediaId: ttsMid, sourceOrigin: 'VREW_RESOURCE',
       fileSize: ttsBytes, name: ttsFn, type: 'AVMedia',
@@ -588,7 +630,7 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
       },
       sourceFileType: 'TTS', fileLocation: 'IN_MEMORY',
     });
-    mediaZip.push({ src: s.ttsAudioPath, name: ttsFn });
+    mediaZip.push({ src: ttsSrc, name: ttsFn });
 
     // (b) ttsClipInfosMap entry — key = ttsMid (실제 음성 mediaId)
     const cleanText = ttsCleanText(s.text);
