@@ -1102,7 +1102,7 @@
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
           <span style="font-size:12px; font-weight:700; color:var(--text-strong);">⚙ 분할 옵션 (변경 시 자동 재분할)</span>
           <label style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-soft); cursor:pointer; white-space:nowrap;" title="🤖 AI 분할 (Gemini) — 의미 분할이 더 자연스러움. API 키 필요. API 실패·텍스트 변형 시 algo 폴백 자동.">
-            <input type="checkbox" id="useAiSplitter" onchange="autoSplitDebounced()" style="cursor:pointer;">
+            <input type="checkbox" id="useAiSplitter" checked onchange="autoSplitDebounced()" style="cursor:pointer;">
             <span>🤖 AI 분할</span>
           </label>
         </div>
@@ -1110,12 +1110,12 @@
         <!-- 그룹 크기 — 도입부 / 본론 분리 -->
         <div class="setting" style="display:flex; align-items:center; gap:6px; margin-bottom:8px; flex-wrap:wrap;">
           <label style="font-size:13px; color:var(--info); font-weight:600; white-space:nowrap;">📘 도입부</label>
-          <input type="number" id="introSentenceSize" min="1" max="20" value="2" oninput="autoSplitDebounced()"
+          <input type="number" id="introSentenceSize" min="1" max="20" value="3" oninput="autoSplitDebounced()"
                  style="width:50px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
           <span style="font-size:12px; color:var(--text-muted); white-space:nowrap;">문장씩</span>
           <span style="color:var(--border); margin:0 4px;">|</span>
           <label style="font-size:13px; color:var(--text-soft); white-space:nowrap;">📕 본론</label>
-          <input type="number" id="mainSentenceSize" min="1" max="20" value="3" oninput="autoSplitDebounced()"
+          <input type="number" id="mainSentenceSize" min="1" max="20" value="5" oninput="autoSplitDebounced()"
                  style="width:50px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
           <span style="font-size:12px; color:var(--text-muted); white-space:nowrap;">문장씩</span>
         </div>
@@ -1763,20 +1763,26 @@
       </div>
       <div>
         <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">이름</label>
-        <input type="text" id="presetForm_name" autocomplete="off" placeholder="예: 차분한 여성" style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 10px; border-radius:6px; font-size:14px;">
+        <div style="display:flex; gap:6px; align-items:center;">
+          <input type="text" id="presetForm_name" autocomplete="off" placeholder="예: 차분한 여성" style="flex:1; min-width:0; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 10px; border-radius:6px; font-size:14px;">
+          <label title="기본 프리셋 — 맨 위에 표시" style="display:flex; align-items:center; gap:4px; cursor:pointer; font-size:13px; color:var(--text-strong); padding:6px 8px; background:var(--bg-soft); border:1px solid var(--border-soft); border-radius:6px; flex:none;">
+            <input type="checkbox" id="presetForm_isDefault" style="cursor:pointer; width:14px; height:14px;">
+            <span>⭐</span>
+          </label>
+        </div>
       </div>
     </div>
 
-    <!-- 2행: 성우 + 기본 프리셋 토글 -->
+    <!-- 2행: 성우 + 스타일 -->
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px; align-items:end;">
       <div>
         <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">성우 / Voice</label>
         <select id="presetForm_voice" style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 10px; border-radius:6px; font-size:14px;"></select>
       </div>
-      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; color:var(--text-strong); padding:7px 10px; background:var(--bg-soft); border:1px solid var(--border-soft); border-radius:6px;">
-        <input type="checkbox" id="presetForm_isDefault" style="cursor:pointer; width:16px; height:16px;">
-        <span>⭐ 기본 프리셋 <span style="color:var(--text-muted); font-weight:normal; font-size:11px;">(맨 위 표시)</span></span>
-      </label>
+      <div>
+        <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">스타일 (이미지 생성)</label>
+        <select id="presetForm_styleId" style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 10px; border-radius:6px; font-size:14px;"></select>
+      </div>
     </div>
 
     <!-- 3행: 속도 + 문장 무음 (한 줄) -->
@@ -1859,7 +1865,7 @@
     <div id="presetForm_previewSection" style="display:none; padding-top:10px; border-top:1px dashed var(--border-soft); margin-top:10px;">
       <div style="display:flex; gap:6px; align-items:center;">
         <span style="font-size:12px; color:var(--text-soft); flex:none;">🔊 미리듣기 (테스트)</span>
-        <input type="text" id="presetForm_previewText" value="안녕하세요. 프라이밍 플로우 음성 테스트입니다." style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px;">
+        <input type="text" id="presetForm_previewText" value="갉아 먹히는 마음을 정약용의 가르침으로 회복해요." style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px;">
         <button class="btn-sm" onclick="previewPreset()" id="presetForm_previewBtn">🔊 듣기</button>
       </div>
       <audio id="presetForm_audio" controls style="width:100%; display:none; height:30px; margin-top:6px;"></audio>
@@ -1878,6 +1884,22 @@
             <button class="btn-sm" onclick="clearPresetOutputFolder()" style="color:var(--danger); padding:6px 8px;">초기화</button>
           </div>
           <div id="presetForm_outputFolder" data-path="" style="font-size:11px; color:var(--text-muted); margin-top:4px; word-break:break-all;">선택 안 됨</div>
+
+          <!-- Flow계정 — 출력 폴더 컬럼 안 한 줄 -->
+          <div style="display:flex; gap:6px; align-items:center; margin-top:10px;">
+            <span style="font-size:12px; color:var(--text-soft); flex:none;">Flow계정</span>
+            <select id="presetForm_profileId" style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 8px; border-radius:5px; font-size:12px;">
+              <option value="default">기본 계정</option>
+            </select>
+            <button class="btn-sm" onclick="toggleAddProfileForm()" title="새 계정 추가" style="padding:4px 7px; font-size:12px;">⊕</button>
+            <button class="btn-sm" onclick="removeProfileFromPreset()" title="선택한 계정 삭제" style="padding:4px 7px; font-size:12px; color:var(--danger);">🗑</button>
+          </div>
+          <div id="presetForm_addProfileRow" style="display:none; gap:4px; margin-top:4px;">
+            <input type="text" id="presetForm_newProfileId" autocomplete="off" placeholder="새 계정 이름"
+              style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:4px 6px; border-radius:4px; font-size:12px;">
+            <button class="btn-sm" onclick="confirmAddProfile()" style="padding:3px 6px; font-size:12px;">확인</button>
+            <button class="btn-sm" onclick="toggleAddProfileForm(false)" style="padding:3px 6px; font-size:12px;">취소</button>
+          </div>
         </div>
         <div>
           <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">채널 로고 (워터마크 + 오버레이)</label>
@@ -1907,22 +1929,6 @@
         </div>
       </div>
 
-      <!-- Flow계정 (이미지 자동 생성용) — 한 줄 -->
-      <div style="display:flex; gap:6px; align-items:center; margin-bottom:10px;">
-        <span style="font-size:12px; color:var(--text-soft); flex:none;">Flow계정</span>
-        <select id="presetForm_profileId" style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 8px; border-radius:5px; font-size:12px;">
-          <option value="default">기본 계정</option>
-        </select>
-        <button class="btn-sm" onclick="toggleAddProfileForm()" title="새 계정 추가" style="padding:4px 7px; font-size:12px;">⊕</button>
-        <button class="btn-sm" onclick="removeProfileFromPreset()" title="선택한 계정 삭제" style="padding:4px 7px; font-size:12px; color:var(--danger);">🗑</button>
-      </div>
-      <div id="presetForm_addProfileRow" style="display:none; gap:4px; margin-bottom:10px;">
-        <input type="text" id="presetForm_newProfileId" autocomplete="off" placeholder="새 계정 이름"
-          style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:4px 6px; border-radius:4px; font-size:12px;">
-        <button class="btn-sm" onclick="confirmAddProfile()" style="padding:3px 6px; font-size:12px;">확인</button>
-        <button class="btn-sm" onclick="toggleAddProfileForm(false)" style="padding:3px 6px; font-size:12px;">취소</button>
-      </div>
-
       <!-- 영상 후처리 (vrew 빌드 시 적용 — 이미지/동영상 모드 무관 항상 적용) -->
       <div style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:8px;">
         <!-- AI 고지 문구 자막 -->
@@ -1931,7 +1937,7 @@
             <input type="checkbox" id="aiNoticeEnabled" checked style="cursor:pointer; flex:none;">
             <span style="font-weight:600;">AI 고지 문구 자막</span>
           </label>
-          <textarea id="aiNoticeText" rows="2" style="width:100%; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); border-radius:6px; padding:6px 8px; font-size:12px; margin-top:6px; resize:vertical; font-family:inherit; line-height:1.4; box-sizing:border-box;">본 영상의 음성과 이미지는 AI 도구를 활용하여 제작되었습니다.</textarea>
+          <input type="text" id="aiNoticeText" value="본 영상의 음성과 이미지는 AI 도구를 활용하여 제작되었습니다." style="width:100%; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); border-radius:6px; padding:6px 8px; font-size:12px; margin-top:6px; font-family:inherit; line-height:1.4; box-sizing:border-box;">
           <!-- 시작/노출 + 색상 3개 한 줄 (AI 고지 옵션 컴팩트 통합) -->
           <div style="display:flex; align-items:center; gap:5px; margin-top:8px; font-size:12px; flex-wrap:wrap;">
             <span style="color:var(--text-soft); flex:none;">시작</span>
@@ -1947,14 +1953,23 @@
             <input type="number" id="aiNoticeDurationSeconds" value="10" min="0" step="0.5" title="0 = 끝까지" style="width:44px; flex:none; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
             <span style="color:var(--text-muted);" title="0 = 끝까지">초</span>
             <span style="color:var(--border); margin:0 2px;">|</span>
-            <!-- 색상 3개 — 컴팩트 -->
-            <span style="color:var(--text-soft); flex:none;" title="텍스트색">글자</span>
-            <input type="color" id="aiNoticeFontColor" value="#FFFFFF" title="텍스트 색상" style="width:24px; height:24px; cursor:pointer; padding:0; border:1px solid var(--border); border-radius:4px; background:none;">
-            <span style="color:var(--text-soft); flex:none;" title="배경색">배경</span>
-            <input type="color" id="aiNoticeBgColor" value="#FFFFFF" title="배경 색상" style="width:24px; height:24px; cursor:pointer; padding:0; border:1px solid var(--border); border-radius:4px; background:none;">
+            <!-- 색상 3개 — A 미리보기 스타일 (글자/배경/외곽 시각적 구분) -->
+            <span title="글자색" style="position:relative; display:inline-block; width:30px; height:28px; flex:none;">
+              <input type="color" id="aiNoticeFontColor" value="#FFFFFF" style="position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; padding:0; border:0;"
+                oninput="document.getElementById('aiNoticeFontPreview').style.color=this.value">
+              <span id="aiNoticeFontPreview" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:bold; color:#FFFFFF; background:#888; border:1px solid var(--border); border-radius:4px; pointer-events:none; line-height:1;">A</span>
+            </span>
+            <span title="배경색" style="position:relative; display:inline-block; width:30px; height:28px; flex:none;">
+              <input type="color" id="aiNoticeBgColor" value="#FFFFFF" style="position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; padding:0; border:0;"
+                oninput="document.getElementById('aiNoticeBgPreview').style.background=this.value">
+              <span id="aiNoticeBgPreview" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:bold; color:#222; background:#FFFFFF; border:1px solid var(--border); border-radius:4px; pointer-events:none; line-height:1;">A</span>
+            </span>
             <label style="cursor:pointer; user-select:none; font-size:11px; color:var(--text-muted);"><input type="checkbox" id="aiNoticeBgNone" style="vertical-align:middle; margin:0 2px 0 0; cursor:pointer;">없음</label>
-            <span style="color:var(--text-soft); flex:none;" title="외곽선">외곽</span>
-            <input type="color" id="aiNoticeOutlineColor" value="#000000" title="외곽선 색상" style="width:24px; height:24px; cursor:pointer; padding:0; border:1px solid var(--border); border-radius:4px; background:none;">
+            <span title="외곽선색" style="position:relative; display:inline-block; width:30px; height:28px; flex:none;">
+              <input type="color" id="aiNoticeOutlineColor" value="#000000" style="position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; padding:0; border:0;"
+                oninput="document.getElementById('aiNoticeOutlinePreview').style.webkitTextStroke='1.5px '+this.value">
+              <span id="aiNoticeOutlinePreview" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:bold; color:#FFFFFF; background:#fff; border:1px solid var(--border); border-radius:4px; pointer-events:none; line-height:1; -webkit-text-stroke:1.5px #000000;">A</span>
+            </span>
             <label style="cursor:pointer; user-select:none; font-size:11px; color:var(--text-muted);"><input type="checkbox" id="aiNoticeOutlineNone" style="vertical-align:middle; margin:0 2px 0 0; cursor:pointer;">없음</label>
           </div>
         </div>
@@ -3098,7 +3113,7 @@ function _refreshStyleSelectOptions() {
   let StyleStore;
   try { StyleStore = require('../core/style-store'); } catch (e) { return; }
   const list = StyleStore.loadAll();
-  for (const selId of ['styleSelect', 'videoStyleSelect']) {
+  for (const selId of ['styleSelect', 'videoStyleSelect', 'presetForm_styleId']) {
     const sel = document.getElementById(selId);
     if (!sel) continue;
     const prevValue = sel.value;
@@ -3496,6 +3511,20 @@ function _splitScriptImpl() {
     } else {
       previewEl.innerHTML =
         `→ ${sentTxt} → <span style="color:var(--accent);">총 ${groups.length}그룹</span>`;
+    }
+  }
+
+  // 그룹 범위 입력 자동 채움 — 도입부 그룹이 있으면 그 범위, 없으면 전체
+  const fromEl = document.getElementById('videoRangeFrom');
+  const toEl   = document.getElementById('videoRangeTo');
+  if (fromEl && toEl && groups.length > 0) {
+    const introGroups = groups.filter(g => g.isIntro);
+    if (introGroups.length > 0) {
+      fromEl.value = introGroups[0].num;
+      toEl.value   = introGroups[introGroups.length - 1].num;
+    } else {
+      fromEl.value = groups[0].num;
+      toEl.value   = groups[groups.length - 1].num;
     }
   }
 
@@ -4425,6 +4454,14 @@ function applyAiNoticeToForm(opt) {
   if (Object.prototype.hasOwnProperty.call(o, 'bgNone'))      setChk('aiNoticeBgNone',      o.bgNone);
   if (Object.prototype.hasOwnProperty.call(o, 'outlineNone')) setChk('aiNoticeOutlineNone', o.outlineNone);
 
+  // A 미리보기 박스에 색상 동기화 (DOM 에 있을 때만)
+  const fp = document.getElementById('aiNoticeFontPreview');
+  const bp = document.getElementById('aiNoticeBgPreview');
+  const op = document.getElementById('aiNoticeOutlinePreview');
+  if (fp && o.fontColor)    fp.style.color = o.fontColor;
+  if (bp && o.bgColor)       bp.style.background = o.bgColor;
+  if (op && o.outlineColor) op.style.webkitTextStroke = '1.5px ' + o.outlineColor;
+
   // 시작 모드 따라 초/클립 입력 표시 토글
   if (typeof _onAiNoticeStartModeChange === 'function') {
     try { _onAiNoticeStartModeChange(); } catch (_) {}
@@ -5169,6 +5206,17 @@ function openPresetModal(presetId) {
   // AI 고지 자막 폼 채우기 — 프리셋에 저장된 색상/시작/노출 복원
   applyAiNoticeToForm(p.aiNotice);
 
+  // 이미지 스타일 셀렉트 채우기 + 저장된 styleId 복원
+  if (typeof _refreshStyleSelectOptions === 'function') {
+    try { _refreshStyleSelectOptions(); } catch (_) {}
+  }
+  const styleSelEl = document.getElementById('presetForm_styleId');
+  if (styleSelEl && p.styleId) {
+    if (Array.from(styleSelEl.options).some(o => o.value === p.styleId)) {
+      styleSelEl.value = p.styleId;
+    }
+  }
+
 
   // voice select 의 onchange 재바인딩 후 강제 트리거 (Clone 영역 표시 갱신)
   document.getElementById('presetForm_voice').dispatchEvent(new Event('change'));
@@ -5459,6 +5507,10 @@ function _readPresetForm() {
   if (typeof collectAiNoticeOpts === 'function') {
     preset.aiNotice = collectAiNoticeOpts();
   }
+
+  // 이미지 생성 스타일 (프리셋별 다르게 운영 가능)
+  const _styleEl = document.getElementById('presetForm_styleId');
+  preset.styleId = (_styleEl && _styleEl.value) || '';
   return preset;
 }
 
