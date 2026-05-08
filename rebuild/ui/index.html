@@ -3348,7 +3348,7 @@ function renderTaskList(project) {
     img.dataset.groupNum = g.num;
     // 비디오가 완성됐으면 비디오 미리보기 (자동재생 안 함, 첫 프레임만), 아니면 이미지
     if (g.videoPath && g.videoStatus === 'done') {
-      const vUrl = 'file:///' + g.videoPath.replace(/\\/g, '/');
+      const vUrl = 'file:///' + encodeURI(g.videoPath.replace(/\\/g, '/'));
       img.innerHTML =
         `<video class="group-video" src="${vUrl}" muted playsinline preload="metadata" style="width:100%; height:100%; object-fit:cover; border-radius:6px;"></video>` +
         `<div class="group-video-overlay" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.25); border-radius:6px; pointer-events:none; transition:opacity 0.2s;">` +
@@ -3381,13 +3381,13 @@ function renderTaskList(project) {
         }
       }, 50);
     } else if (g.videoStatus === 'generating') {
-      const url = g.imagePath ? 'file:///' + g.imagePath.replace(/\\/g, '/') : '';
+      const url = g.imagePath ? 'file:///' + encodeURI(g.imagePath.replace(/\\/g, '/')) : '';
       img.innerHTML = (url ? `<img src="${url}" alt="그룹 ${g.num}" style="width:100%; height:100%; object-fit:cover; border-radius:6px; opacity:0.5;">` : '') +
         `<div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(240,180,60,0.4); border-radius:6px; color:#fff; font-size:12px; font-weight:600; text-align:center; padding:6px;">⏳<br>비디오 생성중</div>`;
       img.style.position = 'relative';
       img.classList.add('has-image');
     } else if (g.imagePath) {
-      const url = 'file:///' + g.imagePath.replace(/\\/g, '/');
+      const url = 'file:///' + encodeURI(g.imagePath.replace(/\\/g, '/'));
       img.innerHTML = `<img src="${url}" alt="그룹 ${g.num}" style="width:100%; height:100%; object-fit:cover; border-radius:6px;">`;
       img.classList.add('has-image');
     } else {
@@ -4693,7 +4693,7 @@ function playRefAudioPreview() {
     return;
   }
   if (typeof _stopAllPreviews === 'function') _stopAllPreviews();
-  const url = 'file:///' + wavPath.replace(/\\/g, '/');
+  const url = 'file:///' + encodeURI(wavPath.replace(/\\/g, '/'));
   const audio = new Audio(url);
   window._sentencePlayer = audio;
   audio.play().catch(e => addLog(`참조 음성 재생 실패: ${e.message}`, 'err'));
@@ -5763,7 +5763,7 @@ function playSentence(sid) {
     }
   } catch {}
   _stopAllPreviews();
-  const url = 'file:///' + sentence.ttsAudioPath.replace(/\\/g, '/');
+  const url = 'file:///' + encodeURI(sentence.ttsAudioPath.replace(/\\/g, '/'));
   const audio = new Audio(url);
   audio.playbackRate = _getPreviewSpeed();
   window._sentencePlayer = audio;
@@ -5924,7 +5924,7 @@ async function previewGroupAudio(groupId, btnEl) {
   for (const s of sents) {
     if (!window._groupPreviewActive) break;
     await new Promise((resolve) => {
-      const url = 'file:///' + s.ttsAudioPath.replace(/\\/g, '/');
+      const url = 'file:///' + encodeURI(s.ttsAudioPath.replace(/\\/g, '/'));
       const audio = new Audio(url);
       window._sentencePlayer = audio;
       audio.onended = resolve;
@@ -5969,7 +5969,7 @@ async function previewAllSentences() {
 
   for (const s of ready) {
     if (!window._taskPreviewActive) break;
-    const url = 'file:///' + s.ttsAudioPath.replace(/\\/g, '/');
+    const url = 'file:///' + encodeURI(s.ttsAudioPath.replace(/\\/g, '/'));
     await new Promise(resolve => {
       const audio = new Audio(url);
       audio.playbackRate = _getPreviewSpeed();
@@ -6121,6 +6121,13 @@ async function _convertGroupListToVideo(groupIds, label) {
     addLog(`[Grok] 비디오 변환 중지 — 성공 ${success} / 실패 ${fail}`, 'err');
   } else {
     addLog(`[Grok] 비디오 변환 완료 — 성공 ${success} / 실패 ${fail}`, fail ? 'err' : 'ok');
+  }
+  // 마지막 영상 첨부 안정화 — UI 한 번 더 갱신 후 짧은 대기 (디스크 I/O + DOM 반영 보장)
+  try {
+    renderTaskList(window._currentProject);
+    await new Promise(r => setTimeout(r, 2000));   // 2초 대기 — 마지막 비디오 첨부가 화면에 반영될 시간 확보
+  } catch (e) {
+    console.error('[grok wrap-up]', e);
   }
   // 작업 끝 — Grok Chrome 자동 닫기
   try {
@@ -6908,7 +6915,7 @@ function _setGroupImageThumbnail(groupId, imgPath) {
   if (g) g.imagePath = imgPath;
   const box = document.querySelector(`.group-image[data-group-id="${groupId}"]`);
   if (!box) return;
-  const url = 'file:///' + imgPath.replace(/\\/g, '/');
+  const url = 'file:///' + encodeURI(imgPath.replace(/\\/g, '/'));
   box.innerHTML = `<img src="${url}" alt="" style="width:100%; height:100%; object-fit:cover; border-radius:6px;">`;
   box.classList.add('has-image');
   // 동일 파일명을 재생성 시 브라우저 캐시 회피용 쿼리스트링 추가는 file:// 환경에서 효과 적음
