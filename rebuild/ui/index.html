@@ -3508,20 +3508,36 @@ function renderTaskList(project) {
                        : g.videoStatus === 'generating' ? '⏳ 비디오 생성중'
                        : g.videoStatus === 'fail' ? '🎬 비디오 다시'
                        : '🎬 비디오 변환';
+    // 미디어 제거 버튼은 첨부된 게 있을 때만 표시
+    const hasImage = !!g.imagePath;
+    const hasVideo = !!g.videoPath && g.videoStatus === 'done';
+    const removeImgBtn = hasImage
+      ? `<button class="btn-sm group-remove-img-btn" data-group-id="${g.id}" title="이 그룹의 첨부 이미지 제거 (디스크 파일은 유지)" style="color:var(--danger);">🗑 이미지 제거</button>`
+      : '';
+    const removeVideoBtn = hasVideo
+      ? `<button class="btn-sm group-remove-video-btn" data-group-id="${g.id}" title="이 그룹의 첨부 비디오 제거 (디스크 파일은 유지)" style="color:var(--danger);">🗑 비디오 제거</button>`
+      : '';
+
     actions.innerHTML =
       `<button class="btn-sm group-attach-btn" data-group-id="${g.id}" title="기존 이미지 파일 선택해서 첨부">📎 이미지 첨부</button>` +
-      `<button class="btn-sm group-regen-btn" data-group-id="${g.id}" title="이 그룹만 이미지 재생성 (같은 이름으로 덮어쓰기)">🔄 이미지 재생성</button>` +
+      `<button class="btn-sm group-regen-btn" data-group-id="${g.id}" title="이 그룹만 이미지 재생성 (기존 첨부 자동 제거 후 새로 생성)">🔄 이미지 재생성</button>` +
+      removeImgBtn +
+      removeVideoBtn +
       `<button class="btn-sm group-preview-btn" data-group-id="${g.id}" title="이 그룹의 TTS 음성 순차 재생 (다시 클릭 시 중지)">▶ 그룹 미리듣기</button>` +
       `<button class="btn-sm group-tts-btn" data-group-id="${g.id}" title="이 그룹의 모든 문장 TTS 재변환">🎙 그룹 TTS 변환</button>` +
       `<button class="btn-sm group-video-btn" data-group-id="${g.id}" title="이 그룹의 이미지를 Grok 으로 비디오 변환 (이미지 자리에 비디오가 들어감)">${videoBtnLabel}</button>`;
     const attachBtn = actions.querySelector('.group-attach-btn');
     const regenBtn = actions.querySelector('.group-regen-btn');
+    const removeImgBtnEl = actions.querySelector('.group-remove-img-btn');
+    const removeVideoBtnEl = actions.querySelector('.group-remove-video-btn');
     const previewBtn = actions.querySelector('.group-preview-btn');
     const ttsBtn2 = actions.querySelector('.group-tts-btn');
     const videoBtn = actions.querySelector('.group-video-btn');
     const groupId = g.id;
     attachBtn.onclick = (e) => { e.stopPropagation(); attachGroupImage(groupId); };
     regenBtn.onclick = (e) => { e.stopPropagation(); regenerateGroups([groupId]); };
+    if (removeImgBtnEl) removeImgBtnEl.onclick = (e) => { e.stopPropagation(); removeGroupImage(groupId); };
+    if (removeVideoBtnEl) removeVideoBtnEl.onclick = (e) => { e.stopPropagation(); removeGroupVideo(groupId); };
     previewBtn.onclick = (e) => { e.stopPropagation(); previewGroupAudio(groupId, previewBtn); };
     ttsBtn2.onclick = (e) => { e.stopPropagation(); convertGroupSentences(groupId); };
     videoBtn.onclick = (e) => { e.stopPropagation(); convertGroupVideo(groupId); };
@@ -6471,6 +6487,58 @@ async function generateEmptyGroupImages() {
   await _runGroupImageGeneration(empties.map(g => g.id), '빈그룹');
 }
 
+/**
+ * 그룹의 첨부 이미지를 제거 (그룹 데이터에서만 — 디스크 파일은 그대로 유지).
+ * 이미지가 마음에 안 들 때 작업 목록에서 빼고 다시 생성/첨부 가능하게.
+ * 비디오가 같은 그룹에 있으면 비디오도 같이 제거 (이미지 없으면 비디오 의미 없음).
+ */
+function removeGroupImage(groupId) {
+  const proj = window._currentProject;
+  if (!proj) return;
+  const g = proj.groups.find(x => x.id === groupId);
+  if (!g) return;
+  if (!g.imagePath) {
+    addLog(`[Image] 그룹 ${g.num} — 제거할 이미지 없음`, 'info');
+    return;
+  }
+  if (!confirm(`그룹 ${g.num} 의 첨부 이미지를 제거할까요?\n(디스크의 파일 자체는 삭제되지 않습니다)`)) return;
+  const oldPath = g.imagePath;
+  g.imagePath = null;
+  g.imageStatus = 'idle';
+  // 이미지가 빠지면 비디오도 의미 없음 — 같이 제거
+  if (g.videoPath) {
+    g.videoPath = null;
+    g.videoStatus = 'idle';
+    g.videoSourceImage = null;
+    addLog(`[Image] 그룹 ${g.num} 이미지 제거 — 연결된 비디오도 함께 제거`, 'ok');
+  } else {
+    addLog(`[Image] 그룹 ${g.num} 이미지 제거 (파일은 유지: ${oldPath})`, 'ok');
+  }
+  renderTaskList(proj);
+}
+
+/**
+ * 그룹의 첨부 비디오를 제거 (그룹 데이터에서만 — 디스크 파일은 그대로 유지).
+ * 이미지는 유지됨 — 다시 비디오 변환 가능.
+ */
+function removeGroupVideo(groupId) {
+  const proj = window._currentProject;
+  if (!proj) return;
+  const g = proj.groups.find(x => x.id === groupId);
+  if (!g) return;
+  if (!g.videoPath) {
+    addLog(`[Grok] 그룹 ${g.num} — 제거할 비디오 없음`, 'info');
+    return;
+  }
+  if (!confirm(`그룹 ${g.num} 의 첨부 비디오를 제거할까요?\n(디스크의 mp4 파일 자체는 삭제되지 않습니다)`)) return;
+  const oldPath = g.videoPath;
+  g.videoPath = null;
+  g.videoStatus = 'idle';
+  g.videoSourceImage = null;
+  addLog(`[Grok] 그룹 ${g.num} 비디오 제거 (파일은 유지: ${oldPath})`, 'ok');
+  renderTaskList(proj);
+}
+
 /** 좌상단 체크박스로 선택된 그룹들만 이미지 생성/재생성 (영상의 convertSelectedGroupsVideo 와 짝) */
 async function generateSelectedGroupImages() {
   const proj = window._currentProject;
@@ -6673,27 +6741,44 @@ async function _runGroupImageGeneration(groupIds, label) {
     addLog(`이미지 ${label} — ${targetGroups.length}개 그룹 → 새 폴더: ${finalDir}`, 'info');
   }
 
-  // ─── 재생성 cleanup — 같은 그룹 prefix 의 기존 파일 삭제 (그룹당 1장 보장) ───
+  // ─── 재생성 cleanup — 그룹의 기존 imagePath 직접 검사해서 삭제 ───
+  // 견고함: prefix 기준 매칭 대신 g.imagePath 자체를 본다 — 외부 첨부 파일명도 인식.
+  // 안전: 출력 폴더 내부 파일만 디스크 삭제 (사용자가 외부에서 첨부한 원본 파일은 보호).
+  // 비디오: 이미지 재생성 시 기존 비디오도 의미 없어지므로 함께 제거 (디스크 mp4 도 출력 폴더면 삭제).
   try {
     const fs = require('fs');
     const path = require('path');
-    const imgDir = path.join(finalDir, 'images');
-    if (fs.existsSync(imgDir)) {
-      const files = fs.readdirSync(imgDir);
-      let removed = 0;
-      for (const g of targetGroups) {
-        const prefix = `그룹 ${String(g.num).padStart(2, '0')}_`;
-        for (const f of files) {
-          if (f.startsWith(prefix) && /\.(png|jpg|jpeg|webp)$/i.test(f)) {
-            try { fs.unlinkSync(path.join(imgDir, f)); removed++; } catch {}
-          }
+    const projectDir = proj.outputDir || _getProjectOutputDir() || '';
+    const projectDirNorm = projectDir ? path.normalize(projectDir) : '';
+    let removedImg = 0, removedVideo = 0;
+    for (const g of targetGroups) {
+      // 기존 이미지 처리
+      if (g.imagePath && typeof g.imagePath === 'string') {
+        const normalized = path.normalize(g.imagePath);
+        const inside = projectDirNorm && normalized.startsWith(projectDirNorm);
+        if (inside) {
+          try {
+            if (fs.existsSync(g.imagePath)) { fs.unlinkSync(g.imagePath); removedImg++; }
+          } catch {}
         }
-        // imagePath 가 imgDir 외부 (사용자 첨부 파일) 인 경우는 건드리지 않음
-        const imgInside = g.imagePath && typeof g.imagePath === 'string'
-          && path.normalize(g.imagePath).startsWith(path.normalize(imgDir));
-        if (imgInside) g.imagePath = null;
+        g.imagePath = null;   // 외부 첨부든 내부든 항상 그룹에서 분리
       }
-      if (removed > 0) addLog(`[cleanup] 같은 그룹 prefix 기존 이미지 ${removed}개 삭제`, 'info');
+      // 연결된 비디오도 같이 제거 (이미지 바뀌면 비디오 의미 없음)
+      if (g.videoPath && typeof g.videoPath === 'string') {
+        const normalized = path.normalize(g.videoPath);
+        const inside = projectDirNorm && normalized.startsWith(projectDirNorm);
+        if (inside) {
+          try {
+            if (fs.existsSync(g.videoPath)) { fs.unlinkSync(g.videoPath); removedVideo++; }
+          } catch {}
+        }
+        g.videoPath = null;
+        g.videoStatus = 'idle';
+        g.videoSourceImage = null;
+      }
+    }
+    if (removedImg > 0 || removedVideo > 0) {
+      addLog(`[cleanup] 기존 이미지 ${removedImg}개 + 비디오 ${removedVideo}개 디스크에서 삭제`, 'info');
     }
   } catch (e) {
     addLog(`[cleanup] 예외: ${e.message} — 계속 진행`, 'info');
