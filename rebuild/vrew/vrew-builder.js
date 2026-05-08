@@ -486,9 +486,16 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
     log(`[Vrew] 자막 정렬 랜덤 → '${resolvedAlign === 'start' ? '좌' : '가운데'}' (이 영상 전체 동일)`);
   }
 
+  // 크기 'random' 도 동일 — 빌드 1회당 한 번만 100/125 중 결정 → 영상 안에서 일관 유지
+  let resolvedSize = _userCap.size;
+  if (resolvedSize === 'random') {
+    resolvedSize = (Math.random() < 0.5) ? '100' : '125';
+    log(`[Vrew] 자막 크기 랜덤 → '${resolvedSize}px' (이 영상 전체 동일)`);
+  }
+
   const captionAttrs = {
     ...CAPTION_ATTRS,
-    ...(_userCap.size         ? { size: String(_userCap.size) }                : {}),
+    ...(resolvedSize          ? { size: String(resolvedSize) }                 : {}),
     ...(_userCap.fontColor    ? { color: _userCap.fontColor }                  : {}),
     ...(_userCap.outlineColor ? { 'outline-color': _userCap.outlineColor }     : {}),
   };

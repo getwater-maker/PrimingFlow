@@ -1937,7 +1937,11 @@
           <div style="font-weight:600; margin-bottom:6px;">📝 본문 자막</div>
           <div style="display:flex; align-items:center; gap:5px; font-size:12px; flex-wrap:wrap;">
             <span style="color:var(--text-soft); flex:none;">크기</span>
-            <input type="number" id="captionSize" value="100" min="50" max="200" step="5" style="width:50px; flex:none; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
+            <select id="captionSize" title="랜덤: 빌드 시점에 100/125 중 한 번 정해 모든 자막에 동일 적용 (영상 안에서 변하지 않음)" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
+              <option value="100" selected>100</option>
+              <option value="125">125</option>
+              <option value="random">랜덤</option>
+            </select>
             <span style="color:var(--border); margin:0 2px;">|</span>
             <span style="color:var(--text-soft); flex:none;">정렬</span>
             <select id="captionAlign" title="랜덤: 빌드 시점에 좌/가운데 중 한 번 정해 모든 자막에 동일 적용 (영상 안에서 왔다갔다 하지 않음)" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
@@ -4472,17 +4476,19 @@ function _onAiNoticeStartModeChange() {
 
 // 본문 자막 옵션 수집 (vrew 빌드 시 buildVrew 에 전달 + 프리셋 저장)
 function collectCaptionStyleOpts() {
-  const size       = parseInt(document.getElementById('captionSize')?.value || '100', 10);
+  const sizeRaw    = document.getElementById('captionSize')?.value || '100';
+  // size: 'random' (빌드 시점에 100/125 중 결정) 또는 숫자 문자열
+  const size       = (sizeRaw === 'random') ? 'random' : String(parseInt(sizeRaw, 10) || 100);
   const align      = document.getElementById('captionAlign')?.value || 'start';
   const yOffsetPct = parseFloat(document.getElementById('captionYOffset')?.value || '-12.5');
   const widthPct   = parseFloat(document.getElementById('captionWidth')?.value || '96');
   const fontColor    = document.getElementById('captionFontColor')?.value    || '#FFFFFF';
   const outlineColor = document.getElementById('captionOutlineColor')?.value || '#000000';
   return {
-    size: String(size),
+    size,
     fontColor,
     outlineColor,
-    align,                       // 'start' | 'center' | 'end'
+    align,                       // 'start' | 'center' | 'random'
     yOffset: yOffsetPct / 100,   // -12.5% → -0.125
     width:   widthPct / 100,     // 96% → 0.96
   };
@@ -4492,7 +4498,16 @@ function collectCaptionStyleOpts() {
 function applyCaptionStyleToForm(opt) {
   const o = opt || {};
   const set = (id, val) => { const el = document.getElementById(id); if (el != null && val !== undefined) el.value = val; };
-  if (o.size != null)         set('captionSize', String(parseInt(o.size, 10) || 100));
+  if (o.size != null) {
+    const sval = String(o.size);
+    // 셀렉트의 옵션(100/125/random) 중 하나면 그대로, 아니면 가까운 값으로
+    if (sval === 'random' || sval === '100' || sval === '125') {
+      set('captionSize', sval);
+    } else {
+      const n = parseInt(sval, 10);
+      set('captionSize', (Number.isFinite(n) && n >= 113) ? '125' : '100');
+    }
+  }
   if (o.align)                set('captionAlign', o.align);
   if (o.yOffset != null)      set('captionYOffset', (o.yOffset * 100).toFixed(1));
   if (o.width != null)        set('captionWidth', Math.round(o.width * 100));
