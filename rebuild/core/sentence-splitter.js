@@ -28,11 +28,19 @@ const MARKDOWN_HEADER_LINE = /^\s{0,3}#{1,6}\s.*$/gm;
 // 대괄호 섹션 마커: 줄 전체가 [텍스트] 인 경우만 인식 (인라인 제외)
 const BRACKET_SECTION_RE = /^\s*\[([^\]]+?)\]\s*$/;
 
+// TTS 가 발음 어색한 특수문자 제거 — 일반 문장기호는 보존, 이모지/기호 제거.
+//   - 이모지 (다양한 유니코드 블록)
+//   - 화살표·도형·기호 (★ ※ § © ® ™ ♬ ♪ ◆ ▶ → 등)
+const SPECIAL_NONTEXT = /[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{25A0}-\u{25FF}\u{2700}-\u{27BF}\u{2B00}-\u{2BFF}★☆※§©®™♬♪♫♩♭♯◆◇■□●○▲▼▶◀※❶❷❸❹❺❻❼❽❾❿]/gu;
+
 /**
  * 단락 텍스트 → 문장 배열 (내부 헬퍼)
  */
 function _paragraphsToSentences(text) {
-  let cleaned = text.replace(MARKDOWN_HEADER_LINE, '').replace(QUOTE_CHARS, '');
+  let cleaned = text
+    .replace(MARKDOWN_HEADER_LINE, '')
+    .replace(QUOTE_CHARS, '')
+    .replace(SPECIAL_NONTEXT, '');   // 이모지·기호 제거 (TTS 발음 자연스럽게)
   const paragraphs = cleaned
     .split(/\r?\n\s*\r?\n+/)
     .map(p => p.trim())
