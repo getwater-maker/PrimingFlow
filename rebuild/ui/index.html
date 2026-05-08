@@ -1794,6 +1794,30 @@
       </div>
     </div>
 
+    <!-- 4행: Clone 강도 + 언어 (OmniVoice 일 때만 표시) -->
+    <div id="presetForm_omniParamsRow" style="display:none; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px;">
+      <div style="display:flex; gap:8px; align-items:center;">
+        <label style="font-size:12px; color:var(--text-soft); flex:0 0 64px;">Clone 강도</label>
+        <input type="range" id="presetForm_cfgValue" min="1" max="5" step="0.5" value="2.0" style="flex:1; accent-color:var(--accent);"
+          oninput="document.getElementById('presetForm_cfgValueLabel').textContent = parseFloat(this.value).toFixed(1)">
+        <span id="presetForm_cfgValueLabel" style="font-size:13px; color:var(--text-strong); width:30px; text-align:right;">2.0</span>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <label style="font-size:12px; color:var(--text-soft); flex:0 0 36px;">언어</label>
+        <select id="presetForm_voxcpmLang" style="flex:1; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 8px; border-radius:6px; font-size:13px;">
+          <option value="ko">한국어</option>
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+          <option value="zh">中文</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 시드 / lockVoice / timesteps — UI 비표시 (매번 같은 목소리 항상 ON) -->
+    <input type="hidden" id="presetForm_timesteps" value="32">
+    <input type="hidden" id="presetForm_seed" value="">
+    <input type="checkbox" id="presetForm_lockVoice" checked style="display:none;">
+
     <!-- Gemini 전용 영역 -->
     <div id="presetForm_geminiSection" style="display:none; padding-top:12px; border-top:1px solid var(--border-soft); margin-top:12px;">
       <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">
@@ -1804,18 +1828,18 @@
 
     <!-- Voice Clone 전용 영역 (OmniVoice clone 일 때 표시) -->
     <div id="presetForm_cloneSection" style="display:none; padding-top:12px; border-top:1px solid var(--border-soft); margin-top:12px;">
-      <div style="font-size:13px; font-weight:600; color:var(--text-strong); margin-bottom:8px;">참조음성</div>
-      <div style="display:flex; gap:6px; margin-bottom:8px; align-items:center;">
+      <div style="display:flex; gap:6px; align-items:center;">
+        <span style="font-size:13px; font-weight:600; color:var(--text-strong); flex:none;">참조음성</span>
         <select id="presetForm_refAudioSelect" onchange="onPresetRefAudioSelect(this)"
-          style="flex:1; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px;">
+          style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px;">
           <option value="">— 보관소가 비어있습니다 —</option>
         </select>
         <button class="btn-sm" onclick="playRefAudioPreview()" title="선택한 참조 음성 들어보기" style="padding:6px 8px;">▶ 듣기</button>
         <button class="btn-sm" onclick="refreshRefAudioVault()" title="목록 새로고침" style="padding:6px 8px;">🔄</button>
         <button class="btn-sm" onclick="openRefAudioVault()" title="보관소 폴더를 윈도우 탐색기로 열기" style="padding:6px 8px;">📂 폴더 열기</button>
       </div>
-      <div id="presetForm_refAudioName" data-full-path="" style="font-size:12px; color:var(--text-muted); margin-bottom:6px; word-break:break-all;">선택된 파일 없음</div>
-      <!-- 참조 텍스트 표시 박스는 사용자 수정 영역이 아니므로 숨김. TTS 페이로드에는 hidden input 으로 전달. -->
+      <!-- 파일명/dataset 보존용 hidden (_readPresetForm 이 dataset.fullPath 를 읽음) -->
+      <div id="presetForm_refAudioName" data-full-path="" style="display:none;"></div>
       <div id="presetForm_refTextBox" style="display:none;"></div>
       <input type="hidden" id="presetForm_refText" value="">
     </div>
@@ -1833,61 +1857,20 @@
 
     <!-- 미리듣기 (Voice Design / Clone 양쪽에서 공통 사용) -->
     <div id="presetForm_previewSection" style="display:none; padding-top:10px; border-top:1px dashed var(--border-soft); margin-top:10px;">
-      <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">🔊 미리듣기 (테스트)</label>
-      <div style="display:flex; gap:6px; margin-bottom:6px;">
-        <input type="text" id="presetForm_previewText" value="안녕하세요. 프라이밍 플로우 음성 테스트입니다." style="flex:1; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px;">
+      <div style="display:flex; gap:6px; align-items:center;">
+        <span style="font-size:12px; color:var(--text-soft); flex:none;">🔊 미리듣기 (테스트)</span>
+        <input type="text" id="presetForm_previewText" value="안녕하세요. 프라이밍 플로우 음성 테스트입니다." style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px;">
         <button class="btn-sm" onclick="previewPreset()" id="presetForm_previewBtn">🔊 듣기</button>
       </div>
-      <audio id="presetForm_audio" controls style="width:100%; display:none; height:30px;"></audio>
-    </div>
-
-    <!-- OmniVoice 파라미터 (언어 / Clone 강도 / 음성 고정 시드) -->
-    <div id="presetForm_voxcpmSection" style="display:none; padding-top:12px; border-top:1px solid var(--border-soft); margin-top:12px;">
-      <div id="presetForm_gpuSectionLabel" style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">OmniVoice 파라미터</div>
-      <!-- Clone 강도 + 언어 한 줄 -->
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:8px;">
-        <div style="display:flex; gap:8px; align-items:center;">
-          <label style="font-size:12px; color:var(--text-soft); flex:0 0 64px;">Clone 강도</label>
-          <input type="range" id="presetForm_cfgValue" min="1" max="5" step="0.5" value="2.0" style="flex:1; accent-color:var(--accent);"
-            oninput="document.getElementById('presetForm_cfgValueLabel').textContent = parseFloat(this.value).toFixed(1)">
-          <span id="presetForm_cfgValueLabel" style="font-size:13px; color:var(--text-strong); width:30px; text-align:right;">2.0</span>
-        </div>
-        <div style="display:flex; gap:8px; align-items:center;">
-          <label style="font-size:12px; color:var(--text-soft); flex:0 0 36px;">언어</label>
-          <select id="presetForm_voxcpmLang" style="flex:1; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 8px; border-radius:6px; font-size:13px;">
-            <option value="ko">한국어</option>
-            <option value="en">English</option>
-            <option value="ja">日本語</option>
-            <option value="zh">中文</option>
-          </select>
-        </div>
-      </div>
-      <!-- 디퓨전 스텝은 32 로 고정 -->
-      <input type="hidden" id="presetForm_timesteps" value="32">
-      <!-- 음성 고정 — 토글 ON 시 시드를 채워 항상 같은 음색으로 합성 -->
-      <div style="margin-top:4px; padding:8px 10px; background:var(--bg-soft); border:1px solid var(--border-soft); border-radius:6px;">
-        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; color:var(--text-strong);">
-          <input type="checkbox" id="presetForm_lockVoice" onchange="onLockVoiceToggle()" style="cursor:pointer; width:16px; height:16px;">
-          <span>🔒 매번 같은 목소리로 생성 <span style="color:var(--text-muted); font-weight:normal;">(채널 일관성 권장)</span></span>
-        </label>
-        <div id="presetForm_seedRow" style="display:none; gap:8px; align-items:center; margin-top:8px; padding-left:24px;">
-          <span style="font-size:11px; color:var(--text-muted);">시드</span>
-          <input type="number" id="presetForm_seed" min="0" max="2147483647" placeholder="자동 생성됨"
-            style="flex:1; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:4px 8px; border-radius:5px; font-size:12px;">
-          <button class="btn-sm" onclick="document.getElementById('presetForm_seed').value = Math.floor(Math.random()*100000)" title="다른 음색으로 변경" style="padding:3px 7px; font-size:12px;">🎲 다시</button>
-        </div>
-        <div style="font-size:11px; color:var(--text-muted); margin-top:6px; padding-left:24px; line-height:1.4;">
-          ※ 더 강한 일관성을 원하면 위에서 <b>참조음성(Voice Clone)</b> 도 함께 등록하세요.
-        </div>
-      </div>
+      <audio id="presetForm_audio" controls style="width:100%; display:none; height:30px; margin-top:6px;"></audio>
     </div>
 
     <!-- 채널 운영 설정 (이미지 생성 / .vrew 저장 시 사용) -->
     <div id="presetForm_channelSection" style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border-soft);">
       <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">📺 채널 운영 (이미지 생성 · 저장)</div>
 
-      <!-- 출력 폴더 + 로고 (2단) -->
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px;">
+      <!-- 출력 폴더 + 로고 (균등 2등분) -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px; align-items:start;">
         <div>
           <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">출력 폴더</label>
           <div style="display:flex; gap:4px;">
@@ -1895,22 +1878,6 @@
             <button class="btn-sm" onclick="clearPresetOutputFolder()" style="color:var(--danger); padding:6px 8px;">초기화</button>
           </div>
           <div id="presetForm_outputFolder" data-path="" style="font-size:11px; color:var(--text-muted); margin-top:4px; word-break:break-all;">선택 안 됨</div>
-
-          <!-- Google 계정 (출력 폴더 컬럼 안에 작게 통합) -->
-          <label style="display:block; font-size:12px; color:var(--text-soft); margin:10px 0 4px 0;">Google 계정 (이미지 자동 생성용)</label>
-          <div style="display:flex; gap:4px;">
-            <select id="presetForm_profileId" style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 8px; border-radius:5px; font-size:12px;">
-              <option value="default">기본 계정</option>
-            </select>
-            <button class="btn-sm" onclick="toggleAddProfileForm()" title="새 계정 추가" style="padding:4px 7px; font-size:12px;">⊕</button>
-            <button class="btn-sm" onclick="removeProfileFromPreset()" title="선택한 계정 삭제" style="padding:4px 7px; font-size:12px; color:var(--danger);">🗑</button>
-          </div>
-          <div id="presetForm_addProfileRow" style="display:none; gap:4px; margin-top:4px;">
-            <input type="text" id="presetForm_newProfileId" autocomplete="off" placeholder="새 계정 이름"
-              style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:4px 6px; border-radius:4px; font-size:12px;">
-            <button class="btn-sm" onclick="confirmAddProfile()" style="padding:3px 6px; font-size:12px;">확인</button>
-            <button class="btn-sm" onclick="toggleAddProfileForm(false)" style="padding:3px 6px; font-size:12px;">취소</button>
-          </div>
         </div>
         <div>
           <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">채널 로고 (워터마크 + 오버레이)</label>
@@ -1940,12 +1907,26 @@
         </div>
       </div>
 
+      <!-- Flow계정 (이미지 자동 생성용) — 한 줄 -->
+      <div style="display:flex; gap:6px; align-items:center; margin-bottom:10px;">
+        <span style="font-size:12px; color:var(--text-soft); flex:none;">Flow계정</span>
+        <select id="presetForm_profileId" style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 8px; border-radius:5px; font-size:12px;">
+          <option value="default">기본 계정</option>
+        </select>
+        <button class="btn-sm" onclick="toggleAddProfileForm()" title="새 계정 추가" style="padding:4px 7px; font-size:12px;">⊕</button>
+        <button class="btn-sm" onclick="removeProfileFromPreset()" title="선택한 계정 삭제" style="padding:4px 7px; font-size:12px; color:var(--danger);">🗑</button>
+      </div>
+      <div id="presetForm_addProfileRow" style="display:none; gap:4px; margin-bottom:10px;">
+        <input type="text" id="presetForm_newProfileId" autocomplete="off" placeholder="새 계정 이름"
+          style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:4px 6px; border-radius:4px; font-size:12px;">
+        <button class="btn-sm" onclick="confirmAddProfile()" style="padding:3px 6px; font-size:12px;">확인</button>
+        <button class="btn-sm" onclick="toggleAddProfileForm(false)" style="padding:3px 6px; font-size:12px;">취소</button>
+      </div>
+
       <!-- 영상 후처리 (vrew 빌드 시 적용 — 이미지/동영상 모드 무관 항상 적용) -->
       <div style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:8px;">
-        <div style="font-size:12px; font-weight:700; color:var(--text-strong); margin-bottom:8px;">🎞 영상 후처리 (vrew 빌드 시 적용)</div>
-
         <!-- AI 고지 문구 자막 -->
-        <div style="border-top:1px solid var(--border-soft); padding-top:8px; margin-top:6px;">
+        <div style="padding-top:0; margin-top:0;">
           <label style="display:flex; align-items:center; gap:6px; width:auto;">
             <input type="checkbox" id="aiNoticeEnabled" checked style="cursor:pointer; flex:none;">
             <span style="font-weight:600;">AI 고지 문구 자막</span>
@@ -4814,7 +4795,7 @@ function _setPresetEngine(engine) {
 
   document.getElementById('presetForm_geminiSection').style.display = (engine === 'gemini') ? '' : 'none';
   const isGpuEngine = engine === 'omnivoice';
-  document.getElementById('presetForm_voxcpmSection').style.display  = isGpuEngine ? '' : 'none';
+  document.getElementById('presetForm_omniParamsRow').style.display  = isGpuEngine ? 'grid' : 'none';
   document.getElementById('presetForm_previewSection').style.display = isGpuEngine ? '' : 'none';
 
   const _updateOmniVoiceMode = () => {
@@ -4852,7 +4833,7 @@ function refreshRefAudioVault(selectPath) {
   for (const it of items) {
     const opt = document.createElement('option');
     opt.value = it.wavPath;
-    opt.textContent = it.fileName + (it.refText ? ' ✓' : ' (TXT 없음)');
+    opt.textContent = it.fileName + (it.refText ? '' : ' (TXT 없음)');
     sel.appendChild(opt);
   }
 
@@ -4909,7 +4890,7 @@ function onPresetRefAudioSelect(sel, forcedWavPath) {
 
   // 파일명 + 경로 즉시 표시 (메모리 캐시 의존 X)
   const fname = wavPath.split(/[\\/]/).pop() || wavPath;
-  nameEl.textContent = `✅ ${fname}`;
+  nameEl.textContent = fname;
   nameEl.dataset.fullPath = wavPath;
 
   // TXT 직접 읽기 (가장 신뢰할 수 있는 방식)
@@ -5143,6 +5124,24 @@ function openPresetModal(presetId) {
   const silSec = p.silenceSec != null ? p.silenceSec : 0.8;
   const silEl = document.getElementById('presetForm_silenceSec');
   if (silEl) { silEl.value = silSec; document.getElementById('presetForm_silenceSecLabel').textContent = silSec.toFixed(1) + 's'; }
+
+  // OmniVoice 파라미터 — Clone 강도, 언어, 시드(매번 같은 목소리 항상 ON)
+  const cfgInputEl = document.getElementById('presetForm_cfgValue');
+  if (cfgInputEl) {
+    const cfg = (p.cfgValue != null) ? p.cfgValue : 2.0;
+    cfgInputEl.value = cfg;
+    const cfgLabel = document.getElementById('presetForm_cfgValueLabel');
+    if (cfgLabel) cfgLabel.textContent = parseFloat(cfg).toFixed(1);
+  }
+  const langInputEl = document.getElementById('presetForm_voxcpmLang');
+  if (langInputEl) langInputEl.value = p.language || 'ko';
+  const seedInputEl = document.getElementById('presetForm_seed');
+  if (seedInputEl) {
+    const hasSeed = (p.seed != null && p.seed !== '' && Number.isFinite(parseInt(p.seed, 10)));
+    seedInputEl.value = hasSeed ? String(p.seed) : String(Math.floor(Math.random() * 100000));
+  }
+  const lockEl = document.getElementById('presetForm_lockVoice');
+  if (lockEl) lockEl.checked = true;
 
 
   // voice select 의 onchange 재바인딩 후 강제 트리거 (Clone 영역 표시 갱신)
@@ -5399,6 +5398,23 @@ function _readPresetForm() {
     }
     preset.voiceCloneRefAudio = refAudio;
     preset.voiceCloneRefText = (document.getElementById('presetForm_refText')?.value || '').trim();
+
+    // OmniVoice 파라미터
+    const cfgEl = document.getElementById('presetForm_cfgValue');
+    preset.cfgValue = cfgEl ? parseFloat(cfgEl.value) : 2.0;
+    const langEl = document.getElementById('presetForm_voxcpmLang');
+    preset.language = langEl ? langEl.value : 'ko';
+    const tsEl = document.getElementById('presetForm_timesteps');
+    preset.inferenceTimesteps = tsEl ? parseInt(tsEl.value, 10) : 32;
+
+    // 매번 같은 목소리 — 항상 ON. 시드는 자동 생성/유지
+    const seedEl = document.getElementById('presetForm_seed');
+    let seed = seedEl ? parseInt(seedEl.value, 10) : NaN;
+    if (!Number.isFinite(seed) || seed < 0) {
+      seed = Math.floor(Math.random() * 100000);
+      if (seedEl) seedEl.value = String(seed);
+    }
+    preset.seed = seed;
   }
   // 채널 운영 필드 (모든 엔진 공통)
   const _outFolder = document.getElementById('presetForm_outputFolder');
@@ -5838,6 +5854,10 @@ function _buildSynthesizeOpts(preset, channel) {
       addLog(`[!] 참조 음성 파일 없음: ${preset.voiceCloneRefAudio}`, 'err');
     }
     if (preset.instruct) opts.instruct = preset.instruct;
+    if (preset.cfgValue != null) opts.cfgValue = preset.cfgValue;
+    if (preset.language) opts.language = preset.language;
+    if (preset.inferenceTimesteps != null) opts.inferenceTimesteps = preset.inferenceTimesteps;
+    if (preset.seed != null && preset.seed !== '') opts.seed = preset.seed;
   }
   opts.silenceSec = preset.silenceSec != null ? preset.silenceSec : 0;
   return opts;
