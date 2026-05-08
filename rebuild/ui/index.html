@@ -1818,21 +1818,32 @@
       <!-- 참조 텍스트 표시 박스는 사용자 수정 영역이 아니므로 숨김. TTS 페이로드에는 hidden input 으로 전달. -->
       <div id="presetForm_refTextBox" style="display:none;"></div>
       <input type="hidden" id="presetForm_refText" value="">
+    </div>
 
-      <!-- 미리듣기 — 참조 텍스트 바로 아래 (TXT 받자마자 바로 테스트 가능) -->
-      <div style="margin-top:10px;">
-        <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">🔊 미리듣기 (테스트)</label>
-        <div style="display:flex; gap:6px; margin-bottom:6px;">
-          <input type="text" id="presetForm_previewText" value="안녕하세요. 프라이밍 플로우 음성 테스트입니다." style="flex:1; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px;">
-          <button class="btn-sm" onclick="previewPreset()" id="presetForm_previewBtn">🔊 듣기</button>
-        </div>
-        <audio id="presetForm_audio" controls style="width:100%; display:none; height:30px;"></audio>
+    <!-- Voice Design 전용 영역 (OmniVoice default 일 때 표시) -->
+    <div id="presetForm_designSection" style="display:none; padding-top:12px; border-top:1px solid var(--border-soft); margin-top:12px;">
+      <div style="font-size:13px; font-weight:600; color:var(--text-strong); margin-bottom:8px;">🎨 Voice Design — 음색 설명</div>
+      <textarea id="presetForm_instruct" rows="2"
+        placeholder="예: 자연스러운 한국어 여성 목소리, 차분하고 따뜻한 톤"
+        style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.4;"></textarea>
+      <div style="font-size:11px; color:var(--text-muted); margin-top:6px; line-height:1.4;">
+        ※ 참조 음성 없이 텍스트 설명만으로 음색을 만듭니다. 매번 다른 목소리가 나올 수 있어 일관성이 필요하면 아래 🔒 <b>음성 고정</b> 을 켜세요.
       </div>
     </div>
 
-    <!-- GPU 엔진 고급 파라미터 (VoxCPM2 / OmniVoice 공통) -->
+    <!-- 미리듣기 (Voice Design / Clone 양쪽에서 공통 사용) -->
+    <div id="presetForm_previewSection" style="display:none; padding-top:10px; border-top:1px dashed var(--border-soft); margin-top:10px;">
+      <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">🔊 미리듣기 (테스트)</label>
+      <div style="display:flex; gap:6px; margin-bottom:6px;">
+        <input type="text" id="presetForm_previewText" value="안녕하세요. 프라이밍 플로우 음성 테스트입니다." style="flex:1; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px;">
+        <button class="btn-sm" onclick="previewPreset()" id="presetForm_previewBtn">🔊 듣기</button>
+      </div>
+      <audio id="presetForm_audio" controls style="width:100%; display:none; height:30px;"></audio>
+    </div>
+
+    <!-- OmniVoice 파라미터 (언어 / Clone 강도 / 음성 고정 시드) -->
     <div id="presetForm_voxcpmSection" style="display:none; padding-top:12px; border-top:1px solid var(--border-soft); margin-top:12px;">
-      <div id="presetForm_gpuSectionLabel" style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">GPU 엔진 파라미터</div>
+      <div id="presetForm_gpuSectionLabel" style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">OmniVoice 파라미터</div>
       <!-- Clone 강도 + 언어 한 줄 -->
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:8px;">
         <div style="display:flex; gap:8px; align-items:center;">
@@ -4803,14 +4814,16 @@ function _setPresetEngine(engine) {
 
   document.getElementById('presetForm_geminiSection').style.display = (engine === 'gemini') ? '' : 'none';
   const isGpuEngine = engine === 'omnivoice';
-  document.getElementById('presetForm_voxcpmSection').style.display = 'none';
+  document.getElementById('presetForm_voxcpmSection').style.display  = isGpuEngine ? '' : 'none';
+  document.getElementById('presetForm_previewSection').style.display = isGpuEngine ? '' : 'none';
 
-  const _updateClone = () => {
-    const isClone = isGpuEngine && select.value === 'clone';
-    document.getElementById('presetForm_cloneSection').style.display = isClone ? '' : 'none';
+  const _updateOmniVoiceMode = () => {
+    const v = select.value;
+    document.getElementById('presetForm_cloneSection').style.display  = (isGpuEngine && v === 'clone')   ? '' : 'none';
+    document.getElementById('presetForm_designSection').style.display = (isGpuEngine && v === 'default') ? '' : 'none';
   };
-  _updateClone();
-  select.onchange = _updateClone;
+  _updateOmniVoiceMode();
+  select.onchange = _updateOmniVoiceMode;
 }
 
 // ─── 참조음성 보관소 (~/.flow-app/ref-audio/) 헬퍼 ──────
@@ -5395,7 +5408,10 @@ function _readPresetForm() {
   const _profile = document.getElementById('presetForm_profileId');
   preset.profileId = (_profile && _profile.value) || 'default';
   const _instruct = document.getElementById('presetForm_instruct');
-  preset.instruct = ((_instruct && _instruct.value) || '').trim();
+  // Voice Design 모드(voice='default')일 때만 instruct 저장 — clone 모드에 잔존값 남지 않도록
+  preset.instruct = (engine === 'omnivoice' && preset.voice === 'default')
+    ? ((_instruct && _instruct.value) || '').trim()
+    : '';
   return preset;
 }
 

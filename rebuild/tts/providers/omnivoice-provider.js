@@ -181,7 +181,7 @@ class OmniVoiceProvider {
 
   static getVoices() {
     return [
-      { id: 'default', name: 'OmniVoice 기본', gender: null },
+      { id: 'default', name: 'Voice Design (음색 설명으로 합성)', gender: null },
       { id: 'clone',   name: 'Voice Clone (참조음성 사용)', gender: null },
     ];
   }
