@@ -6986,12 +6986,7 @@ async function generateAll() {
     : (skipImgCount > 0
         ? `1. 이미지 ${needImgCount}개 생성 (Flow) — ${skipImgCount}개는 첨부 이미지 재사용\n`
         : `1. 이미지 ${needImgCount}개 생성 (Flow)\n`);
-  const msg = `자동 제작 시작 (이미지 + TTS)\n\n` +
-    imgLine +
-    `2. TTS ${sentenceCount}개 변환\n\n` +
-    `시간이 오래 걸릴 수 있습니다. 시작할까요?\n` +
-    `(.vrew 파일은 검토 후 [브루생성] 버튼으로 별도 빌드)`;
-  if (!confirm(msg)) return;
+  // 사용자 요청: 자동 제작 시작 confirm 팝업 제거 — 바로 진행
 
   // ────────── 폴더 일괄 결정 ──────────
   // 폴더명 = "프리셋이름_YYYYMMDD" / vrew 파일명 = 첨부한 대본 파일명 (대본_삼국지_제000회.vrew)
