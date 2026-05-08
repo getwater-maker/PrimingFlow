@@ -1968,11 +1968,11 @@
               <input type="color" id="aiNoticeFontColor" value="#FFFFFF" style="width:100%; height:24px; cursor:pointer; padding:0; border:1px solid var(--border); border-radius:4px; background:none;">
             </div>
             <div style="display:flex; flex-direction:column; align-items:center; gap:3px;">
-              <span style="color:var(--text-soft);">배경색</span>
-              <input type="color" id="aiNoticeBgColor" value="#000000" style="width:100%; height:24px; cursor:pointer; padding:0; border:1px solid var(--border); border-radius:4px; background:none;">
+              <span style="color:var(--text-soft);">배경색 / <label style="cursor:pointer; user-select:none;"><input type="checkbox" id="aiNoticeBgNone" style="vertical-align:middle; margin:0 2px 0 0; cursor:pointer;">없음</label></span>
+              <input type="color" id="aiNoticeBgColor" value="#FFFFFF" style="width:100%; height:24px; cursor:pointer; padding:0; border:1px solid var(--border); border-radius:4px; background:none;">
             </div>
             <div style="display:flex; flex-direction:column; align-items:center; gap:3px;">
-              <span style="color:var(--text-soft);">외곽선</span>
+              <span style="color:var(--text-soft);">외곽선 / <label style="cursor:pointer; user-select:none;"><input type="checkbox" id="aiNoticeOutlineNone" style="vertical-align:middle; margin:0 2px 0 0; cursor:pointer;">없음</label></span>
               <input type="color" id="aiNoticeOutlineColor" value="#000000" style="width:100%; height:24px; cursor:pointer; padding:0; border:1px solid var(--border); border-radius:4px; background:none;">
             </div>
           </div>
@@ -2768,30 +2768,60 @@ function loadGallery(targetPath) {
     grid.appendChild(item);
   }
 
-  // 비디오 항목 (첫 프레임 미리보기 + 그룹 첨부 버튼)
+  // 비디오 항목 — IntersectionObserver 로 lazy 로드 (보이는 순간 src 설정).
+  // 일부 비디오 파일이 손상되거나 0byte 면 ffmpeg 에러 (Unsupported pixel format) 가 콘솔에 나오는데,
+  // onerror 로 fallback placeholder 표시해서 사용자에게 시각적으로 알려줌.
+  const _videoLazyObserver = ('IntersectionObserver' in window) ? new IntersectionObserver((entries, obs) => {
+    for (const ent of entries) {
+      if (ent.isIntersecting) {
+        const v = ent.target;
+        if (v.dataset.src && !v.src) v.src = v.dataset.src;
+        obs.unobserve(v);
+      }
+    }
+  }, { rootMargin: '200px' }) : null;
+
   for (const file of videos) {
     const fullPath = pathm.join(galleryCurrentPath, file);
+    let fileSize = 0;
+    try { fileSize = fss.statSync(fullPath).size; } catch {}
     const vidUrl = 'file:///' + encodeURI(fullPath.replace(/\\/g, '/'));
     const item = document.createElement('div');
     item.className = 'gallery-item';
     item.style.cssText = 'cursor:pointer; position:relative;';
-    // <video preload="metadata"> 가 첫 프레임 보여줌. 자동재생 안 함.
-    const video = document.createElement('video');
-    video.src = vidUrl;
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = 'metadata';
-    video.style.cssText = 'width:100%; display:block; aspect-ratio:16/9; background:#000; object-fit:cover;';
-    // 첫 프레임 보장: 재생 한 번 시도해서 화면 표시 후 일시정지
-    video.addEventListener('loadedmetadata', () => {
-      try { video.currentTime = 0.05; } catch {}
-    });
+
+    // 0byte 또는 매우 작은 파일은 손상 가능성 — placeholder 표시
+    const isCorrupt = fileSize < 1024;
+    if (isCorrupt) {
+      const ph = document.createElement('div');
+      ph.style.cssText = 'width:100%; aspect-ratio:16/9; display:flex; align-items:center; justify-content:center; background:#222; color:#888; font-size:13px; flex-direction:column; gap:4px;';
+      ph.innerHTML = '⚠️<br><span style="font-size:11px;">파일 손상 또는 0byte</span>';
+      item.appendChild(ph);
+    } else {
+      const video = document.createElement('video');
+      video.dataset.src = vidUrl;        // lazy — IntersectionObserver 가 src 설정
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = 'metadata';
+      video.style.cssText = 'width:100%; display:block; aspect-ratio:16/9; background:#000; object-fit:cover;';
+      video.addEventListener('loadedmetadata', () => {
+        try { video.currentTime = 0.05; } catch {}
+      });
+      // 디코딩/로딩 실패 시 placeholder 로 교체 — 콘솔 ffmpeg 에러를 무시하고 UX 깔끔
+      video.addEventListener('error', () => {
+        const ph = document.createElement('div');
+        ph.style.cssText = 'width:100%; aspect-ratio:16/9; display:flex; align-items:center; justify-content:center; background:#222; color:#888; font-size:13px; flex-direction:column; gap:4px;';
+        ph.innerHTML = '🎬<br><span style="font-size:11px;">미리보기 불가</span>';
+        if (video.parentNode) video.parentNode.replaceChild(ph, video);
+      });
+      item.appendChild(video);
+      if (_videoLazyObserver) _videoLazyObserver.observe(video);
+      else video.src = vidUrl;            // observer 없으면 즉시 로드 (폴백)
+    }
     const cap = document.createElement('div');
     cap.className = 'caption';
-    cap.textContent = '🎬 ' + file;
-    item.appendChild(video);
+    cap.textContent = '🎬 ' + file + (isCorrupt ? `  (${fileSize}B)` : '');
     item.appendChild(cap);
-    // 비디오 영역 좌상단 ▶ 오버레이 (시각적 비디오 표시)
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:absolute; top:8px; left:8px; background:rgba(80,180,120,0.85); color:#fff; font-size:11px; padding:2px 6px; border-radius:4px; font-weight:600; pointer-events:none;';
     overlay.textContent = '🎬 비디오';
@@ -4412,8 +4442,10 @@ function collectAiNoticeOpts() {
     startSeconds: parseFloat(document.getElementById('aiNoticeStartSeconds').value || '0'),
     durationSeconds: parseFloat(document.getElementById('aiNoticeDurationSeconds').value || '0'),
     fontColor:    document.getElementById('aiNoticeFontColor')?.value    || '#FFFFFF',
-    bgColor:      document.getElementById('aiNoticeBgColor')?.value      || '#000000',
+    bgColor:      document.getElementById('aiNoticeBgColor')?.value      || '#FFFFFF',
     outlineColor: document.getElementById('aiNoticeOutlineColor')?.value || '#000000',
+    bgNone:       !!document.getElementById('aiNoticeBgNone')?.checked,
+    outlineNone:  !!document.getElementById('aiNoticeOutlineNone')?.checked,
   };
 }
 

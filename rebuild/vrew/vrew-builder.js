@@ -121,19 +121,23 @@ function addAiNoticeTrack(pj, opt, clipDurations, log) {
 
   // 색상 처리 — 사용자가 .vrew 파일을 분석해 확인한 표준 형식:
   //   fontColor    — 텍스트 색 (default #FFFFFF)
-  //   outlineColor — 외곽선 색 (outline-on:true 필수, 없으면 외곽선 안 보임)
-  //   bgColor      — 배경. #000000 또는 빈 값이면 투명 (#00000000), 그 외는 6자리 hex 그대로 (불투명)
+  //   outlineColor — 외곽선 색
+  //   outlineNone  — true 면 outline-on:'false' 로 외곽선 비활성
+  //   bgColor      — 배경 색 (6자리 hex 그대로 = 100% 불투명)
+  //   bgNone       — true 면 배경 투명 (#00000000)
   const fontColor    = String(opt.fontColor    || opt.color || '#FFFFFF');
   const outlineColor = String(opt.outlineColor || '#000000');
-  const bgRaw = String(opt.bgColor || '').toLowerCase();
-  const bgValue = (!bgRaw || bgRaw === '#000000') ? '#00000000' : bgRaw;
+  const bgRaw        = String(opt.bgColor      || '#FFFFFF').toLowerCase();
+  const bgNone       = !!opt.bgNone;
+  const outlineNone  = !!opt.outlineNone;
+  const bgValue      = bgNone ? '#00000000' : bgRaw;
 
   const textAttrs = {
     size: String(opt.fontSize || '75'),
     color: fontColor,
     font: 'Pretendard-Vrew_700',
     'outline-color': outlineColor,
-    'outline-on': 'true',           // 외곽선 활성화 — 빠지면 outline-color 가 시각적으로 안 들어감
+    'outline-on': outlineNone ? 'false' : 'true',
     'outline-width': '6',
   };
 
@@ -386,22 +390,24 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
         sourceFileType: 'ASSET_VIDEO', fileLocation: 'IN_MEMORY',
       });
 
-      // 비디오 트랙 — 이미지처럼 화면 가득 채우기 (cover/cut). 흰 letterbox 바 발생 방지.
-      // xPos/yPos/width/height 는 이미지 트랙과 동일하게 맞추고 stats.fillType='cut' 적용.
+      // 비디오 트랙 — 영상.vrew (사용자 의도) 형식과 일치:
+      //   - fillType: 'cut' 이 stats 안이 아닌 트랙 직속 (이미지와 다름)
+      //   - xPos/yPos/width/height = 0/0/1/1 (Vrew 가 비율에 맞춰 자동 cover)
+      //   - 흰 letterbox 바 발생 방지
       pj.props.tracks[videoTid] = {
         trackId: videoTid, mediaId: mid,
-        xPos: -0.004, yPos: 0, height: 1, width: 1.008,
+        xPos: 0, yPos: 0, height: 1, width: 1,
         rotation: 0, zIndex: groupIdx, type: 'video',
         sourceIn: 0, sourceOut: dur,
         originalWidthHeightRatio: videoWidth / videoHeight,
         isTrimmable: true, hasAlphaChannel: false,
         editInfo: {},
-        stats: { fillType: 'cut', fillMenu: 'floating', rearrangeCount: 0 },
+        fillType: 'cut',                 // 트랙 직속 (영상.vrew 형식)
       };
-      // 비디오 오디오 트랙 — volume:0 으로 음소거 (TTS 와 겹침 방지) ★ 핵심
+      // 비디오 오디오 트랙 — 영상.vrew 와 일치 (volume:0.5)
       pj.props.tracks[audioTid] = {
         trackId: audioTid, mediaId: mid,
-        volume: 0, sourceIn: 0, sourceOut: dur,
+        volume: 0.5, sourceIn: 0, sourceOut: dur,
         loop: true, playbackRate: 1, type: 'videoAudio',
       };
       pj.props.assets[aid] = { trackIds: [videoTid, audioTid], role: 'sub' };
