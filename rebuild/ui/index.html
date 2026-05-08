@@ -1246,72 +1246,6 @@
           </select>
         </div>
 
-        <!-- AI 고지 문구 자막 (vrew web 텍스트박스 트랙) -->
-        <div class="setting" style="display:block; border-top:1px solid var(--border-soft); padding-top:10px; margin-top:6px;">
-          <label style="display:flex; align-items:center; gap:6px; width:auto;">
-            <input type="checkbox" id="aiNoticeEnabled" checked style="cursor:pointer; flex:none;">
-            <span style="font-weight:600;">AI 고지 문구 자막</span>
-          </label>
-          <textarea id="aiNoticeText" rows="2" style="width:100%; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); border-radius:6px; padding:6px 8px; font-size:12px; margin-top:6px; resize:vertical; font-family:inherit; line-height:1.4; box-sizing:border-box;">본 영상의 음성과 이미지는 AI 도구를 활용하여 제작되었습니다.</textarea>
-
-          <!-- 시작 + 노출 한 줄 -->
-          <div style="display:flex; align-items:center; gap:5px; margin-top:8px; font-size:12px; flex-wrap:nowrap;">
-            <span style="color:var(--text-soft); flex:none;">시작</span>
-            <select id="aiNoticeStartMode" onchange="_onAiNoticeStartModeChange()" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
-              <option value="seconds" selected>시작후</option>
-              <option value="clip">클립</option>
-            </select>
-            <input type="number" id="aiNoticeStartSeconds" value="5" min="0" step="0.5" style="width:44px; flex:none; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
-            <input type="number" id="aiNoticeStartClip" value="1" min="1" style="width:44px; flex:none; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px; display:none;">
-            <span style="color:var(--text-muted);" id="aiNoticeStartUnit">초</span>
-            <span style="color:var(--border); margin:0 2px;">|</span>
-            <span style="color:var(--text-soft); flex:none;">노출</span>
-            <input type="number" id="aiNoticeDurationSeconds" value="10" min="0" step="0.5" title="0 = 끝까지" style="width:44px; flex:none; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
-            <span style="color:var(--text-muted);" title="0 = 끝까지">초</span>
-          </div>
-
-          <!-- 색상 (텍스트 / 배경 / 외곽선) -->
-          <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px; font-size:12px;">
-            <div style="display:flex; flex-direction:column; align-items:center; gap:3px;">
-              <span style="color:var(--text-soft);">텍스트색</span>
-              <input type="color" id="aiNoticeFontColor" value="#FFFFFF" style="width:100%; height:24px; cursor:pointer; padding:0; border:1px solid var(--border); border-radius:4px; background:none;">
-            </div>
-            <div style="display:flex; flex-direction:column; align-items:center; gap:3px;">
-              <span style="color:var(--text-soft);">배경색</span>
-              <input type="color" id="aiNoticeBgColor" value="#000000" style="width:100%; height:24px; cursor:pointer; padding:0; border:1px solid var(--border); border-radius:4px; background:none;">
-            </div>
-            <div style="display:flex; flex-direction:column; align-items:center; gap:3px;">
-              <span style="color:var(--text-soft);">외곽선</span>
-              <input type="color" id="aiNoticeOutlineColor" value="#000000" style="width:100%; height:24px; cursor:pointer; padding:0; border:1px solid var(--border); border-radius:4px; background:none;">
-            </div>
-          </div>
-        </div>
-
-        <!-- 채널 로고 오버레이 (image 트랙, 모서리 배치) -->
-        <div class="setting" style="display:block; border-top:1px solid var(--border-soft); padding-top:10px; margin-top:6px;">
-          <label style="display:flex; align-items:center; gap:6px; width:auto;">
-            <input type="checkbox" id="logoOverlayEnabled" style="cursor:pointer; flex:none;">
-            <span style="font-weight:600;">채널 로고 오버레이</span>
-          </label>
-          <div id="logoSourceLabel" style="font-size:12px; color:var(--text-muted); margin-top:6px; word-break:break-all;">선택된 채널 없음 — 직접 선택 또는 채널 logoPath 등록 필요</div>
-          <div style="display:flex; gap:6px; margin-top:6px;">
-            <button class="btn-sm" onclick="selectLogoOverride()" style="flex:1;">직접 선택</button>
-            <button class="btn-sm" onclick="clearLogoOverride()" style="color:var(--danger);">초기화</button>
-          </div>
-          <div style="display:flex; gap:6px; margin-top:6px;">
-            <select id="logoPosition" style="flex:1; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:4px 6px; font-size:12px; border-radius:4px;">
-              <option value="top-right" selected>우상단</option>
-              <option value="top-left">좌상단</option>
-              <option value="bottom-right">우하단</option>
-              <option value="bottom-left">좌하단</option>
-            </select>
-            <select id="logoSize" style="flex:1; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:4px 6px; font-size:12px; border-radius:4px;">
-              <option value="small">작음 (10%)</option>
-              <option value="medium" selected>중간 (15%)</option>
-              <option value="large">큼 (20%)</option>
-            </select>
-          </div>
-        </div>
       </div>
 
       <!-- 동영상 설정 -->
@@ -1975,12 +1909,74 @@
         </div>
       </div>
 
-      <!-- AI 지시문 -->
-      <div>
-        <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">채널 지시문 (선택 — 이미지 생성 분위기 가이드)</label>
-        <textarea id="presetForm_instruct" placeholder="예: 사극풍 한국 회화 스타일, 따뜻한 황혼 조명" rows="2"
-          style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 10px; border-radius:6px; font-size:13px; resize:vertical; font-family:inherit;"></textarea>
+      <!-- 영상 후처리 (vrew 빌드 시 적용 — 이미지/동영상 모드 무관 항상 적용) -->
+      <div style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:8px;">
+        <div style="font-size:12px; font-weight:700; color:var(--text-strong); margin-bottom:8px;">🎞 영상 후처리 (vrew 빌드 시 적용)</div>
+
+        <!-- AI 고지 문구 자막 -->
+        <div style="border-top:1px solid var(--border-soft); padding-top:8px; margin-top:6px;">
+          <label style="display:flex; align-items:center; gap:6px; width:auto;">
+            <input type="checkbox" id="aiNoticeEnabled" checked style="cursor:pointer; flex:none;">
+            <span style="font-weight:600;">AI 고지 문구 자막</span>
+          </label>
+          <textarea id="aiNoticeText" rows="2" style="width:100%; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); border-radius:6px; padding:6px 8px; font-size:12px; margin-top:6px; resize:vertical; font-family:inherit; line-height:1.4; box-sizing:border-box;">본 영상의 음성과 이미지는 AI 도구를 활용하여 제작되었습니다.</textarea>
+          <div style="display:flex; align-items:center; gap:5px; margin-top:8px; font-size:12px; flex-wrap:nowrap;">
+            <span style="color:var(--text-soft); flex:none;">시작</span>
+            <select id="aiNoticeStartMode" onchange="_onAiNoticeStartModeChange()" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
+              <option value="seconds" selected>시작후</option>
+              <option value="clip">클립</option>
+            </select>
+            <input type="number" id="aiNoticeStartSeconds" value="5" min="0" step="0.5" style="width:44px; flex:none; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
+            <input type="number" id="aiNoticeStartClip" value="1" min="1" style="width:44px; flex:none; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px; display:none;">
+            <span style="color:var(--text-muted);" id="aiNoticeStartUnit">초</span>
+            <span style="color:var(--border); margin:0 2px;">|</span>
+            <span style="color:var(--text-soft); flex:none;">노출</span>
+            <input type="number" id="aiNoticeDurationSeconds" value="10" min="0" step="0.5" title="0 = 끝까지" style="width:44px; flex:none; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
+            <span style="color:var(--text-muted);" title="0 = 끝까지">초</span>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px; font-size:12px;">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:3px;">
+              <span style="color:var(--text-soft);">텍스트색</span>
+              <input type="color" id="aiNoticeFontColor" value="#FFFFFF" style="width:100%; height:24px; cursor:pointer; padding:0; border:1px solid var(--border); border-radius:4px; background:none;">
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:3px;">
+              <span style="color:var(--text-soft);">배경색</span>
+              <input type="color" id="aiNoticeBgColor" value="#000000" style="width:100%; height:24px; cursor:pointer; padding:0; border:1px solid var(--border); border-radius:4px; background:none;">
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:3px;">
+              <span style="color:var(--text-soft);">외곽선</span>
+              <input type="color" id="aiNoticeOutlineColor" value="#000000" style="width:100%; height:24px; cursor:pointer; padding:0; border:1px solid var(--border); border-radius:4px; background:none;">
+            </div>
+          </div>
+        </div>
+
+        <!-- 채널 로고 오버레이 -->
+        <div style="border-top:1px solid var(--border-soft); padding-top:8px; margin-top:8px;">
+          <label style="display:flex; align-items:center; gap:6px; width:auto;">
+            <input type="checkbox" id="logoOverlayEnabled" style="cursor:pointer; flex:none;">
+            <span style="font-weight:600;">채널 로고 오버레이</span>
+          </label>
+          <div id="logoSourceLabel" style="font-size:12px; color:var(--text-muted); margin-top:6px; word-break:break-all;">선택된 채널 없음 — 직접 선택 또는 채널 logoPath 등록 필요</div>
+          <div style="display:flex; gap:6px; margin-top:6px;">
+            <button class="btn-sm" onclick="selectLogoOverride()" style="flex:1;">직접 선택</button>
+            <button class="btn-sm" onclick="clearLogoOverride()" style="color:var(--danger);">초기화</button>
+          </div>
+          <div style="display:flex; gap:6px; margin-top:6px;">
+            <select id="logoPosition" style="flex:1; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:4px 6px; font-size:12px; border-radius:4px;">
+              <option value="top-right" selected>우상단</option>
+              <option value="top-left">좌상단</option>
+              <option value="bottom-right">우하단</option>
+              <option value="bottom-left">좌하단</option>
+            </select>
+            <select id="logoSize" style="flex:1; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:4px 6px; font-size:12px; border-radius:4px;">
+              <option value="small">작음 (10%)</option>
+              <option value="medium" selected>중간 (15%)</option>
+              <option value="large">큼 (20%)</option>
+            </select>
+          </div>
+        </div>
       </div>
+
     </div>
 
     <!-- 미리듣기 -->
@@ -2849,11 +2845,15 @@ function _renderStyleManagerList() {
     const safeName = escapeHtml(s.name || '');
     const safePrompt = escapeHtml(s.prompt || '');
     const safePreview = escapeHtml(promptPreview);
-    const copyBtn = `<button class="btn-sm" type="button" data-style-id="${s.id}" onclick="copyStyleEntry(this.dataset.styleId)" title="이 스타일을 복사해서 새 스타일로 추가">📋 복사</button>`;
+    // 모든 스타일 옆 🔧 수정 버튼.
+    // 기본 스타일: copyStyleEntry — 사용자 사본을 만들면서 prompt 수정 (원본은 보존)
+    // 사용자 스타일: openStyleEditForm — 그 스타일 자체를 수정
+    const editBtn = s.isBuiltIn
+      ? `<button class="btn-sm" type="button" data-style-id="${s.id}" onclick="copyStyleEntry(this.dataset.styleId)" title="이 기본 스타일의 사본을 만들고 수정 (원본 보존)">🔧 수정</button>`
+      : `<button class="btn-sm" type="button" data-style-id="${s.id}" onclick="openStyleEditForm(this.dataset.styleId)" title="이 스타일을 수정">🔧 수정</button>`;
     const actions = s.isBuiltIn
-      ? copyBtn
-      : copyBtn +
-        `<button class="btn-sm" type="button" data-style-id="${s.id}" onclick="openStyleEditForm(this.dataset.styleId)">🔧 수정</button>` +
+      ? editBtn
+      : editBtn +
         `<button class="btn-sm" type="button" data-style-id="${s.id}" onclick="deleteStyleEntry(this.dataset.styleId)" style="color:var(--danger);">🗑</button>`;
     row.innerHTML =
       `<div style="flex:1; min-width:0;">` +
@@ -2891,15 +2891,15 @@ function openStyleEditForm(id) {
   document.getElementById('styleManagerFormName').focus();
 }
 
-/** 기존 스타일 (기본·사용자) 을 복사해서 새 사용자 스타일로 추가하는 폼 열기.
- *  이름은 "(복사본)" 추가 + 자동 select 되어 사용자가 즉시 수정 가능. */
+/** 기본 스타일을 베이스로 새 사용자 사본을 만들면서 수정 폼 열기 (원본은 보존).
+ *  이름은 "(수정본)" 추가 + 자동 select 되어 사용자가 즉시 수정 가능. */
 function copyStyleEntry(id) {
   const StyleStore = require('../core/style-store');
   const s = StyleStore.getById(id);
   if (!s) return;
   _styleManagerEditingId = null;   // 새 추가 모드 (update 가 아닌 add)
-  document.getElementById('styleManagerFormTitle').textContent = `📋 복사: ${s.name}`;
-  document.getElementById('styleManagerFormName').value = `${s.name} (복사본)`;
+  document.getElementById('styleManagerFormTitle').textContent = `🔧 수정 (사본 만들기): ${s.name}`;
+  document.getElementById('styleManagerFormName').value = `${s.name} (수정본)`;
   document.getElementById('styleManagerFormPrompt').value = s.prompt;
   document.getElementById('styleManagerForm').style.display = '';
   const nameEl = document.getElementById('styleManagerFormName');
@@ -3664,9 +3664,9 @@ function renderTaskList(project) {
 
     actions.innerHTML =
       `<button class="btn-sm group-attach-btn" data-group-id="${g.id}" title="이미지(jpg/png/webp) 또는 동영상(mp4/webm/mkv/mov) 파일을 직접 첨부">📎 미디어 첨부</button>` +
-      `<button class="btn-sm group-regen-btn" data-group-id="${g.id}" title="이 그룹만 이미지 재생성 (기존 첨부 자동 제거 후 새로 생성)">🔄 이미지 재생성</button>` +
       removeImgBtn +
       removeVideoBtn +
+      `<button class="btn-sm group-regen-btn" data-group-id="${g.id}" title="이 그룹만 이미지 재생성 (기존 첨부 자동 제거 후 새로 생성)">🔄 이미지 재생성</button>` +
       `<button class="btn-sm group-preview-btn" data-group-id="${g.id}" title="이 그룹의 TTS 음성 순차 재생 (다시 클릭 시 중지)">▶ 그룹 미리듣기</button>` +
       `<button class="btn-sm group-tts-btn" data-group-id="${g.id}" title="이 그룹의 모든 문장 TTS 재변환">🎙 그룹 TTS 변환</button>` +
       `<button class="btn-sm group-video-btn" data-group-id="${g.id}" title="이 그룹의 이미지를 Grok 으로 비디오 변환 (이미지 자리에 비디오가 들어감)">${videoBtnLabel}</button>`;
@@ -5386,6 +5386,8 @@ async function openGlobalDictModal() {
 }
 function closeGlobalDictModal() {
   document.getElementById('globalDictModal').style.display = 'none';
+  // 글로벌 사전 변경 가능성 — 발음 사전 배지 갱신
+  if (typeof _updateScriptDictBadge === 'function') _updateScriptDictBadge();
 }
 function globalDictAddRow() {
   _globalDictAppendRow('', '', true);
@@ -5491,6 +5493,8 @@ function openScriptDictModal() {
 }
 function closeScriptDictModal() {
   document.getElementById('scriptDictModal').style.display = 'none';
+  // 모달에서 글로벌 사전이 갱신됐을 수 있음 — 배지 다시 계산
+  if (typeof _updateScriptDictBadge === 'function') _updateScriptDictBadge();
 }
 
 // 대본 발음 모달의 클립번호 클릭 → 모달 닫고 작업 목록 해당 sentence 로 스크롤 + 강조
@@ -6667,7 +6671,7 @@ function removeGroupImage(groupId) {
     addLog(`[Image] 그룹 ${g.num} — 제거할 이미지 없음`, 'info');
     return;
   }
-  if (!confirm(`그룹 ${g.num} 의 첨부 이미지를 제거할까요?\n(디스크의 파일 자체는 삭제되지 않습니다)`)) return;
+  // 확인 팝업 없이 즉시 제거 — 디스크 파일은 유지되므로 실수해도 다시 첨부 가능
   const oldPath = g.imagePath;
   g.imagePath = null;
   g.imageStatus = 'idle';
@@ -6696,7 +6700,7 @@ function removeGroupVideo(groupId) {
     addLog(`[Grok] 그룹 ${g.num} — 제거할 비디오 없음`, 'info');
     return;
   }
-  if (!confirm(`그룹 ${g.num} 의 첨부 비디오를 제거할까요?\n(디스크의 mp4 파일 자체는 삭제되지 않습니다)`)) return;
+  // 확인 팝업 없이 즉시 제거 — 디스크 mp4 는 유지되므로 실수해도 다시 첨부 가능
   const oldPath = g.videoPath;
   g.videoPath = null;
   g.videoStatus = 'idle';
