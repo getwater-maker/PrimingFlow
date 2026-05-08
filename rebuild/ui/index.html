@@ -1087,15 +1087,15 @@
 
       <!-- 채널 영역은 좌측 프리셋으로 통합됨 (2026-05) — 드롭다운/버튼 폐기 -->
 
-      <!-- Google 계정 프로필 -->
-      <div style="display:flex; gap:6px; margin-bottom:8px;">
-        <select id="profileSelect" style="flex:1; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 8px; border-radius:6px; font-size:13px;">
+      <!-- Google 계정 프로필 — [셀렉트] [로그인] | [+추가] [삭제] 한 줄 -->
+      <div style="display:flex; gap:6px; margin-bottom:14px; align-items:center;">
+        <select id="profileSelect" style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 8px; border-radius:6px; font-size:13px;">
           <option value="default">기본 계정</option>
         </select>
-        <button class="btn-sm" onclick="addProfile()">+추가</button>
-        <button class="btn-sm" onclick="removeProfile()" style="color:var(--danger);">삭제</button>
+        <button class="btn-sm btn-login" onclick="flowLogin()" style="flex:none; padding:6px 10px;">로그인</button>
+        <button class="btn-sm" onclick="addProfile()" style="flex:none;">+추가</button>
+        <button class="btn-sm" onclick="removeProfile()" style="flex:none; color:var(--danger);">삭제</button>
       </div>
-      <button class="btn-sm btn-login" onclick="flowLogin()" style="width:100%; margin-bottom:14px;">선택한 계정으로 로그인</button>
 
       <!-- 분할 옵션 — 변경 시 자동 재분할 -->
       <div style="border-top:1px solid var(--border-soft); padding-top:10px;">
