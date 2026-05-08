@@ -168,9 +168,30 @@ const uid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
 });
 const sid = () => uid().replace(/-/g, '').substring(0, 10);
 
+// 자막 글자 속성 (사용자가 영상.vrew 에서 검증한 값 — 100pt 가 1080p 에서 적정)
 const CAPTION_ATTRS = {
-  font: 'Pretendard-Vrew_700', size: '150', color: '#ffffff',
+  font: 'Pretendard-Vrew_700', size: '100', color: '#ffffff',
   'outline-on': 'true', 'outline-color': '#000000', 'outline-width': '6',
+};
+
+// 자막 박스 위치/정렬 (사용자가 영상.vrew 에서 설정한 값)
+//   yOffset: -0.125 → 화면 하단에서 ~12.5% 위로 올림 (피사체 가리지 않도록)
+//   width: 0.96 → 화면 폭의 96%
+//   textbox-align: 'start' → 왼쪽 정렬
+//   textbox-color: rgba(0,0,0,0) → 박스 배경 투명
+// 영상.vrew 형식대로 transcript.clips[i].captions[j].style 에 직접 박아 영구 보존.
+const CAPTION_STYLE = {
+  mediaId: 'uc-0010-simple-textbox',
+  yAlign: 'bottom',
+  yOffset: -0.125,
+  xOffset: 0,
+  rotation: 0,
+  width: 0.96,
+  customAttributes: [
+    { attributeName: '--textbox-color', type: 'color-hex', value: 'rgba(0, 0, 0, 0)' },
+    { attributeName: '--textbox-align', type: 'textbox-align', value: 'start' },
+  ],
+  scaleFactor: 1.7777777777777777,
 };
 
 const DEFAULT_SPEAKER = {
@@ -724,9 +745,16 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
         id: sid(),
         captionMode: 'MANUAL',
         words: wordsArr,
+        // captions 마다 style 직접 박아 자막 위치(yOffset 등) 영구 보존
         captions: [
-          { text: [{ attributes: CAPTION_ATTRS, insert: vc.text }, { insert: '\n' }] },
-          { text: [{ insert: '\n' }] },
+          {
+            text: [{ insert: vc.text + '\n', attributes: { ...CAPTION_ATTRS } }],
+            style: { ...CAPTION_STYLE, customAttributes: CAPTION_STYLE.customAttributes.map(a => ({ ...a })) },
+          },
+          {
+            text: [{ insert: '\n', attributes: { ...CAPTION_ATTRS } }],
+            style: { ...CAPTION_STYLE, customAttributes: CAPTION_STYLE.customAttributes.map(a => ({ ...a })) },
+          },
         ],
         assetIds: [...clipAssetIds],
         dirty: { blankDeleted: false, caption: false, video: false },
