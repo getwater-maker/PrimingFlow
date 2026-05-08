@@ -232,6 +232,24 @@ class GrokEngine {
   }
 
   /**
+   * 그록 로그인 페이지로 이동 — 사용자가 X 계정 로그인 미리 해두는 용도.
+   * 자동화 크롬 시작 후 grok.com/login 페이지로 직행.
+   * 이미 로그인돼 있으면 grok 이 자동으로 메인 페이지로 redirect.
+   */
+  async openLoginPage() {
+    await this.start();   // 브라우저 시작 (start 가 grok.com/imagine 까지 이동)
+    try {
+      this.log('[Grok] 로그인 페이지로 이동');
+      await this.page.goto('https://grok.com/login', {
+        waitUntil: 'domcontentloaded',
+        timeout: 30000,
+      });
+    } catch (e) {
+      this.log(`[Grok] /login 이동 실패: ${e.message} — 메인 페이지에 머무름`);
+    }
+  }
+
+  /**
    * 이미지 1장 → 비디오 1개 생성.
    * @param {object} args
    *   imagePath   : 입력 이미지 절대경로
