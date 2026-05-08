@@ -478,6 +478,14 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
 
   // 사용자가 프리셋에서 지정한 자막 옵션을 기본값에 병합 (없으면 기본값 사용)
   const _userCap = opts.captionStyle || {};
+
+  // 정렬 'random' 은 빌드 1회당 한 번만 좌/가운데 중 결정 → 영상 안에서 일관 유지
+  let resolvedAlign = _userCap.align;
+  if (resolvedAlign === 'random') {
+    resolvedAlign = (Math.random() < 0.5) ? 'start' : 'center';
+    log(`[Vrew] 자막 정렬 랜덤 → '${resolvedAlign === 'start' ? '좌' : '가운데'}' (이 영상 전체 동일)`);
+  }
+
   const captionAttrs = {
     ...CAPTION_ATTRS,
     ...(_userCap.size         ? { size: String(_userCap.size) }                : {}),
@@ -489,8 +497,8 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
     ...(_userCap.yOffset != null ? { yOffset: _userCap.yOffset } : {}),
     ...(_userCap.width   != null ? { width:   _userCap.width   } : {}),
     customAttributes: CAPTION_STYLE.customAttributes.map(a => {
-      if (a.attributeName === '--textbox-align' && _userCap.align) {
-        return { ...a, value: _userCap.align };
+      if (a.attributeName === '--textbox-align' && resolvedAlign) {
+        return { ...a, value: resolvedAlign };
       }
       return { ...a };
     }),
