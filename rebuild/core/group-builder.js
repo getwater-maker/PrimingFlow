@@ -158,4 +158,73 @@ function buildGroupsWithSections(items, thresholds) {
   return { sentences, groups };
 }
 
-module.exports = { buildGroups, buildGroupsWithSections };
+/**
+ * 도입부/본론 분리 그룹화.
+ * - 도입부 sentence 들끼리, 본론 sentence 들끼리 각각 다른 그룹 크기로 묶음.
+ * - 도입↔본론 경계는 항상 새 그룹 시작 (같은 그룹에 섞이지 않음).
+ *
+ * @param {Array<{text:string, isIntro:boolean}>} items - splitIntoSentencesWithIntro() 결과
+ * @param {{
+ *   shortLen: number,
+ *   longLen: number,
+ *   introSentenceSize: number,   // 도입부 그룹 크기 (문장 수)
+ *   mainSentenceSize: number,    // 본론 그룹 크기 (문장 수)
+ *   vrewMaxChars?: number
+ * }} thresholds
+ * @returns {{ sentences: Sentence[], groups: Group[] }}
+ */
+function buildGroupsWithIntro(items, thresholds) {
+  const { shortLen, longLen, introSentenceSize, mainSentenceSize } = thresholds;
+  const vrewMaxChars = thresholds.vrewMaxChars || longLen;
+
+  const sentences = items.map((item, i) => {
+    const s = new Sentence({ num: i + 1, text: item.text });
+    s.isShort = s.charCount < shortLen;
+    s.isLong = s.charCount > longLen;
+    s.isIntro = !!item.isIntro;
+    s.vrewClips = s.isLong
+      ? splitLongSentenceAlgo(item.text, vrewMaxChars)
+      : [{ text: item.text, weight: 1.0 }];
+    return s;
+  });
+
+  const groups = [];
+  let gNum = 0;
+  let currentGroup = null;
+  let currentCount = 0;
+  let currentMode = null;       // 'intro' | 'main'
+
+  const startNewGroup = (isIntro) => {
+    gNum++;
+    currentGroup = new Group({ num: gNum, sentenceIds: [] });
+    currentGroup.isIntro = isIntro;
+    groups.push(currentGroup);
+    currentCount = 0;
+    currentMode = isIntro ? 'intro' : 'main';
+  };
+
+  for (const s of sentences) {
+    const targetMode = s.isIntro ? 'intro' : 'main';
+    // 모드 변경 시 강제로 새 그룹 시작 (도입↔본론 경계는 절대 같은 그룹 X)
+    if (!currentGroup || currentMode !== targetMode) {
+      startNewGroup(s.isIntro);
+    }
+    const groupSize = s.isIntro
+      ? (introSentenceSize || 2)
+      : (mainSentenceSize || 3);
+
+    if (s.isShort && currentGroup.sentenceIds.length > 0) {
+      // 짧은 문장은 흡수
+      currentGroup.sentenceIds.push(s.id);
+      s.groupId = currentGroup.id;
+    } else {
+      if (currentCount >= groupSize) startNewGroup(s.isIntro);
+      currentGroup.sentenceIds.push(s.id);
+      s.groupId = currentGroup.id;
+      currentCount++;
+    }
+  }
+  return { sentences, groups };
+}
+
+module.exports = { buildGroups, buildGroupsWithSections, buildGroupsWithIntro };

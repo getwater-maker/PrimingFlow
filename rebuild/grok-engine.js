@@ -66,10 +66,73 @@ const GROK_SELECTORS = {
   loginIndicator:    'a[href*="login" i], button:has-text("Sign in"), button:has-text("Log in"), button:has-text("로그인")',
 };
 
+/**
+ * 사용자의 기본 크롬 프로필을 grok-profiles/userchrome/ 으로 한 번 복사.
+ * 이미 복사된 흔적(Cookies 파일)이 있으면 건너뜀 — 매번 작동하지 않고 첫 실행 시만.
+ * 복사가 부분 실패하거나 사용자 크롬 폴더가 없으면 null 반환 → 호출부가 격리 프로필로 폴백.
+ *
+ * 의도: 사용자가 평소 크롬에서 X 계정 (또는 grok.com) 에 이미 로그인돼 있으면
+ *       그 쿠키·세션이 따라옴 → PrimingFlow 안에서 별도 X 로그인 불필요.
+ *       사용자의 진짜 크롬 폴더는 건드리지 않음 (읽기만).
+ */
+async function _ensureUserChromeProfileCopy(log) {
+  const targetDir = path.join(PROFILE_BASE, 'userchrome');
+  const targetCookies = path.join(targetDir, 'Default', 'Cookies');
+  if (fs.existsSync(targetCookies)) return targetDir;   // 이미 복사 완료 — 건너뜀
+
+  // Windows 사용자 기본 크롬 프로필 위치
+  const sourceUserData = path.join(os.homedir(),
+    'AppData', 'Local', 'Google', 'Chrome', 'User Data');
+  if (!fs.existsSync(sourceUserData)) {
+    log('[Grok] 사용자 크롬 프로필 폴더 없음 — 격리 프로필 사용');
+    return null;
+  }
+
+  log('[Grok] 첫 실행: 사용자 크롬 프로필을 복사합니다 (10~30초). 크롬을 닫아두면 더 안전합니다...');
+  const targetDefault = path.join(targetDir, 'Default');
+  fs.mkdirSync(targetDefault, { recursive: true });
+
+  // 핵심 파일/폴더만 복사 (캐시·인덱스 등 큰 폴더 제외 — 빠르고 가벼움)
+  const ESSENTIAL = [
+    'Cookies', 'Cookies-journal',
+    'Login Data', 'Login Data-journal',
+    'Preferences', 'Bookmarks',
+    'Local Storage', 'Session Storage',
+    'History', 'Network',
+  ];
+  for (const item of ESSENTIAL) {
+    const src = path.join(sourceUserData, 'Default', item);
+    const dst = path.join(targetDefault, item);
+    try {
+      if (!fs.existsSync(src)) continue;
+      const stat = fs.statSync(src);
+      if (stat.isDirectory()) fs.cpSync(src, dst, { recursive: true, force: true });
+      else fs.copyFileSync(src, dst);
+    } catch (e) {
+      // Cookies 잠금 등 — 부분 실패는 로그 후 계속 (다른 파일이라도 가져오면 도움)
+      log(`[Grok]   ${item} 복사 스킵: ${e.message}`);
+    }
+  }
+  // Local State (필수 — Chrome 부팅에 필요)
+  try {
+    const ls = path.join(sourceUserData, 'Local State');
+    if (fs.existsSync(ls)) fs.copyFileSync(ls, path.join(targetDir, 'Local State'));
+  } catch {}
+
+  if (fs.existsSync(targetCookies)) {
+    log('[Grok] 프로필 복사 완료 — 평소 크롬 로그인 세션이 따라옵니다.');
+    return targetDir;
+  }
+  log('[Grok] Cookies 복사 실패 (크롬 실행 중일 수 있음) — 격리 프로필 사용. 첫 실행 시 X 계정 로그인 필요.');
+  return null;
+}
+
 class GrokEngine {
   constructor(opts = {}) {
     this.profileId = opts.profileId || 'default';
-    this.profileDir = path.join(PROFILE_BASE, this.profileId);
+    // profileDir 는 start() 에서 결정 — profileId='default' 면 사용자 크롬 프로필 복사 시도,
+    // 명시적 profileId 면 그 격리 프로필 사용.
+    this.profileDir = null;
     this.logger = typeof opts.logger === 'function' ? opts.logger : () => {};
     this.context = null;
     this.page = null;
@@ -100,6 +163,19 @@ class GrokEngine {
       this.page = null;
     }
     if (this.context) return;
+
+    // 첫 호출 시 profileDir 결정.
+    // - profileId='default' (기본): 사용자 크롬 프로필 복사 시도 → 평소 크롬 로그인 세션 활용.
+    // - 명시적 profileId: 격리 프로필 (기존 동작 유지).
+    if (!this.profileDir) {
+      if (this.profileId === 'default') {
+        const userCopy = await _ensureUserChromeProfileCopy(this.log.bind(this)).catch(() => null);
+        this.profileDir = userCopy || path.join(PROFILE_BASE, 'default');
+      } else {
+        this.profileDir = path.join(PROFILE_BASE, this.profileId);
+      }
+    }
+
     fs.mkdirSync(this.profileDir, { recursive: true });
     // 잠금 파일 제거 (이전 비정상 종료 흔적)
     try {

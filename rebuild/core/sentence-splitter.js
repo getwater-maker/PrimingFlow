@@ -106,4 +106,64 @@ function splitWithSections(text) {
   return { items, hasSections };
 }
 
-module.exports = { splitIntoSentences, splitWithSections };
+// 마크다운 헤더 + 헤더 텍스트 캡처 (도입부 자동 인식용)
+const HEADER_LINE_CAPTURE = /^\s{0,3}#{1,6}\s+(.+?)\s*$/;
+
+/**
+ * 마크다운 헤더의 텍스트에 "도입" 이 들어있으면 그 헤더 이후 ~ 다음 헤더 전까지를
+ * "도입부" 로 마킹. 헤더 자체는 sentence 에 포함되지 않음 (기존 동작과 동일).
+ *
+ * 예시:
+ *   # 도입부
+ *   첫 도입 문장입니다.
+ *   두 번째 도입 문장입니다.
+ *
+ *   ## 1장 시작
+ *   본론 첫 문장입니다.
+ *
+ *   → items: [
+ *       { text: "첫 도입 문장입니다.",   isIntro: true },
+ *       { text: "두 번째 도입 문장입니다.", isIntro: true },
+ *       { text: "본론 첫 문장입니다.",   isIntro: false },
+ *     ], hasIntro: true
+ *
+ * @param {string} text
+ * @returns {{ items: Array<{text:string, isIntro:boolean}>, hasIntro: boolean }}
+ */
+function splitIntoSentencesWithIntro(text) {
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    return { items: [], hasIntro: false };
+  }
+  const lines = text.split(/\r?\n/);
+
+  // 줄들을 헤더 기준으로 블록 분할 → 각 블록에 isIntro 플래그
+  const blocks = [];
+  let curIntro = false;
+  let curLines = [];
+  const flush = () => {
+    if (curLines.length > 0) blocks.push({ isIntro: curIntro, lines: curLines });
+  };
+  for (const line of lines) {
+    const m = line.match(HEADER_LINE_CAPTURE);
+    if (m) {
+      flush();
+      curIntro = /도입/.test(m[1]);   // 헤더 텍스트에 "도입" 이 있으면 도입부 시작
+      curLines = [];
+    } else {
+      curLines.push(line);
+    }
+  }
+  flush();
+
+  const items = [];
+  let hasIntro = false;
+  for (const blk of blocks) {
+    const blockText = blk.lines.join('\n');
+    const sents = _paragraphsToSentences(blockText);
+    for (const t of sents) items.push({ text: t, isIntro: blk.isIntro });
+    if (blk.isIntro && sents.length > 0) hasIntro = true;
+  }
+  return { items, hasIntro };
+}
+
+module.exports = { splitIntoSentences, splitWithSections, splitIntoSentencesWithIntro };

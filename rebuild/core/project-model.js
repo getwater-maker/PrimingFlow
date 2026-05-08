@@ -39,6 +39,9 @@ class Sentence {
     this.isShort = false;
     this.isLong = false;
 
+    // 도입부 여부 (group-builder 가 마크다운 헤더 "도입" 키워드로 채움)
+    this.isIntro = false;
+
     // 그룹 소속
     this.groupId = null;
 
@@ -58,6 +61,7 @@ class Group {
     this.id = id || nextId('g');
     this.num = num;                     // 1부터 시작하는 표시 번호
     this.title = null;                  // 대괄호 섹션 제목 (없으면 null)
+    this.isIntro = false;               // 도입부 그룹 여부 (UI 색상 구분용)
     this.sentenceIds = sentenceIds || [];
 
     // 이미지 (그룹 = 이미지 1장)
