@@ -3163,7 +3163,11 @@ function splitScript() {
   // 전역 저장 (TTS/이미지/저장 단계에서 사용)
   window._currentProject = {
     scriptText: text,
-    thresholds: { stages, shortLen, longLen },
+    thresholds: {
+      shortLen, longLen,
+      introSentenceSize: introSize,
+      mainSentenceSize: mainSize,
+    },
     sentences,
     groups,
   };
