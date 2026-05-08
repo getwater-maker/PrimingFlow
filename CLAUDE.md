@@ -64,8 +64,7 @@ GPU 컴퓨터(192.168.219.157)는 **Windows 만 켜져있으면 됨**. PrimingFl
 | Gemini | 무료 quota | API 키 | 좋음 (30 voices) | 보조 / 백업 |
 
 ## 인증 상태
-- adwise.co.kr 권한 검증 완전 제거 (auth-manager.js 가 더미)
-- 단독 사용 모드
+- 단독 사용 모드 (auth-manager.js 는 더미 — 항상 활성 사용자 반환)
 
 ## 작업 규칙
 - 모든 변경은 D:\PrimingFlow 안에서만
@@ -80,7 +79,7 @@ GPU 컴퓨터(192.168.219.157)는 **Windows 만 켜져있으면 됨**. PrimingFl
 
 ## 빌드 / 실행
 - 개발: `cd D:\PrimingFlow && npm start`
-- 인스톨러: `cd D:\PrimingFlow && npm run dist` → dist/Flow_Studio_Setup.exe
+- 인스톨러: `cd D:\PrimingFlow && npm run dist` → dist/PrimingFlow Setup.exe
 - OmniVoice 의존: conda env `D:/miniconda3/envs/OmniVoice/python.exe` (api.py 자동 spawn)
 
 ## 알려진 한계

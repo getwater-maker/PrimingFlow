@@ -43,7 +43,6 @@ logs/
 npm-debug.log*
 
 # ── 외부 빌드 .exe (커밋 X — 너무 큼) ────────────────
-DadoendayunFlow-Setup-*.exe
 *.exe
 
 # ── OS / IDE ──────────────────────────────────────────
