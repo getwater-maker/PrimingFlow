@@ -43,6 +43,83 @@ const LOGO_SIZE_PRESETS = {
   large:  { width: 0.20, height: 0.20 },
 };
 
+// mp4 헤더(moov/trak/tkhd/mvhd) 직접 파싱 — width/height/duration 추출.
+// grok-store 추정값(1280x720) 이 실제 영상(예: 1280x704) 과 어긋나면 Vrew 가
+// 메타와 실제 frame 차이만큼 흰 letterbox 띠를 그리므로 정확한 값이 필요.
+function readMp4VideoMeta(filePath) {
+  let fd;
+  try {
+    fd = fs.openSync(filePath, 'r');
+    const stat = fs.fstatSync(fd);
+    const bufSize = Math.min(stat.size, 4 * 1024 * 1024); // 첫 4MB 면 moov 포함 충분
+    const buf = Buffer.alloc(bufSize);
+    fs.readSync(fd, buf, 0, bufSize, 0);
+    const out = { width: 0, height: 0, duration: 0 };
+    walkMp4Boxes(buf, 0, buf.length, out);
+    return (out.width > 0 && out.height > 0) ? out : null;
+  } catch (_) {
+    return null;
+  } finally {
+    if (fd != null) { try { fs.closeSync(fd); } catch (_) {} }
+  }
+}
+
+function walkMp4Boxes(buf, off, end, out) {
+  while (off + 8 <= end) {
+    let size = buf.readUInt32BE(off);
+    const type = buf.toString('ascii', off + 4, off + 8);
+    let headerSize = 8;
+    if (size === 1) {
+      if (off + 16 > end) break;
+      size = Number(buf.readBigUInt64BE(off + 8));
+      headerSize = 16;
+    } else if (size === 0) {
+      size = end - off;
+    }
+    if (size < headerSize || off + size > end) break;
+    const body = off + headerSize;
+    const bodyEnd = off + size;
+
+    if (type === 'moov' || type === 'trak' || type === 'mdia' ||
+        type === 'minf' || type === 'stbl') {
+      walkMp4Boxes(buf, body, bodyEnd, out);
+    } else if (type === 'mvhd') {
+      const v = buf.readUInt8(body);
+      let p = body + 4; // version(1) + flags(3)
+      if (v === 0) {
+        p += 4 + 4; // creation, modification
+        const timescale = buf.readUInt32BE(p); p += 4;
+        const duration  = buf.readUInt32BE(p);
+        if (timescale > 0) out.duration = duration / timescale;
+      } else if (v === 1) {
+        p += 8 + 8; // creation, modification (64-bit)
+        const timescale = buf.readUInt32BE(p); p += 4;
+        const duration  = Number(buf.readBigUInt64BE(p));
+        if (timescale > 0) out.duration = duration / timescale;
+      }
+    } else if (type === 'tkhd') {
+      const v = buf.readUInt8(body);
+      // version 0: creation(4)+modification(4)+track_id(4)+reserved(4)+duration(4)+reserved2(8) = 28
+      // version 1: creation(8)+modification(8)+track_id(4)+reserved(4)+duration(8)+reserved2(8) = 40
+      // 그 후 layer(2)+alt_group(2)+volume(2)+reserved(2)+matrix(36) = 44
+      // 마지막에 width(4)+height(4) (16.16 fixed point)
+      let p = body + 4;
+      if (v === 0)      p += 28 + 44;
+      else if (v === 1) p += 40 + 44;
+      else              { off += size; continue; }
+      if (p + 8 > bodyEnd) { off += size; continue; }
+      const w = buf.readUInt32BE(p) / 65536;
+      const h = buf.readUInt32BE(p + 4) / 65536;
+      // 비디오 트랙만 width/height > 0 (오디오 트랙은 0)
+      if (w > 0 && h > 0) {
+        out.width  = Math.round(w);
+        out.height = Math.round(h);
+      }
+    }
+    off += size;
+  }
+}
+
 const uid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
   const r = Math.random() * 16 | 0;
   return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
@@ -364,15 +441,26 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
       const fn = `${mid}.mp4`;
       const fileSize = fs.statSync(g.videoPath).size;
 
-      // Grok 비디오 메타데이터 — grok-store 설정값에서 추정 (720p 6s 16:9 등)
+      // 비디오 메타데이터 — 실제 mp4 헤더(moov/tkhd/mvhd) 직접 파싱이 1순위.
+      // grok-store 추정(예: 1280x720)이 실제(예: 1280x704)와 어긋나면 Vrew 가
+      // 차이만큼 흰 letterbox 띠를 그리므로 실제값 사용이 필수.
       let videoWidth = 1280, videoHeight = 720, dur = 6;
-      try {
-        const GrokCfg = require('../tts/grok-store').load();
-        const isHd = (GrokCfg.videoResolution === '720p');
-        videoWidth = isHd ? 1280 : 854;
-        videoHeight = isHd ? 720 : 480;
-        dur = parseFloat(String(GrokCfg.videoDuration).replace('s', '')) || 6;
-      } catch {}
+      const realMeta = readMp4VideoMeta(g.videoPath);
+      if (realMeta) {
+        videoWidth  = realMeta.width;
+        videoHeight = realMeta.height;
+        if (realMeta.duration > 0) dur = realMeta.duration;
+        log(`[Vrew] mp4 메타: ${path.basename(g.videoPath)} ${videoWidth}x${videoHeight}, ${dur.toFixed(2)}초`);
+      } else {
+        try {
+          const GrokCfg = require('../tts/grok-store').load();
+          const isHd = (GrokCfg.videoResolution === '720p');
+          videoWidth = isHd ? 1280 : 854;
+          videoHeight = isHd ? 720 : 480;
+          dur = parseFloat(String(GrokCfg.videoDuration).replace('s', '')) || 6;
+        } catch {}
+        log(`[Vrew] mp4 헤더 파싱 실패 — grok-store 추정값 사용: ${videoWidth}x${videoHeight}`);
+      }
 
       // 비디오 자산 (사용자 샘플 vrew 형식 그대로)
       pj.files.push({
