@@ -119,20 +119,22 @@ function addAiNoticeTrack(pj, opt, clipDurations, log) {
 
   const tid = sid();
 
-  // 색상 처리:
+  // 색상 처리 — 사용자가 .vrew 파일을 분석해 확인한 표준 형식:
   //   fontColor    — 텍스트 색 (default #FFFFFF)
-  //   outlineColor — 외곽선 (default #000000)
-  //   bgColor      — 배경. #000000 (default) 이면 투명, 다른 색은 80% 불투명 (RRGGBB+CC)
+  //   outlineColor — 외곽선 색 (outline-on:true 필수, 없으면 외곽선 안 보임)
+  //   bgColor      — 배경. #000000 또는 빈 값이면 투명 (#00000000), 그 외는 6자리 hex 그대로 (불투명)
   const fontColor    = String(opt.fontColor    || opt.color || '#FFFFFF');
   const outlineColor = String(opt.outlineColor || '#000000');
   const bgRaw = String(opt.bgColor || '').toLowerCase();
-  const bgValue = (!bgRaw || bgRaw === '#000000') ? '#00000000' : (bgRaw + 'cc');
+  const bgValue = (!bgRaw || bgRaw === '#000000') ? '#00000000' : bgRaw;
 
   const textAttrs = {
     size: String(opt.fontSize || '75'),
     color: fontColor,
     font: 'Pretendard-Vrew_700',
     'outline-color': outlineColor,
+    'outline-on': 'true',           // 외곽선 활성화 — 빠지면 outline-color 가 시각적으로 안 들어감
+    'outline-width': '6',
   };
 
   pj.props.tracks[tid] = {
@@ -384,15 +386,17 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
         sourceFileType: 'ASSET_VIDEO', fileLocation: 'IN_MEMORY',
       });
 
-      // 비디오 트랙 — 이미지 대신 화면 차지
+      // 비디오 트랙 — 이미지처럼 화면 가득 채우기 (cover/cut). 흰 letterbox 바 발생 방지.
+      // xPos/yPos/width/height 는 이미지 트랙과 동일하게 맞추고 stats.fillType='cut' 적용.
       pj.props.tracks[videoTid] = {
         trackId: videoTid, mediaId: mid,
-        xPos: 0, yPos: 0.011, height: 0.977, width: 1,
+        xPos: -0.004, yPos: 0, height: 1, width: 1.008,
         rotation: 0, zIndex: groupIdx, type: 'video',
         sourceIn: 0, sourceOut: dur,
         originalWidthHeightRatio: videoWidth / videoHeight,
         isTrimmable: true, hasAlphaChannel: false,
         editInfo: {},
+        stats: { fillType: 'cut', fillMenu: 'floating', rearrangeCount: 0 },
       };
       // 비디오 오디오 트랙 — volume:0 으로 음소거 (TTS 와 겹침 방지) ★ 핵심
       pj.props.tracks[audioTid] = {

@@ -25,7 +25,7 @@ const DEFAULTS = {
   profileId: 'default',
   defaultMotionPrompt: 'natural slow motion, cinematic feel',
   videoResolution: '720p',     // '480p' | '720p' (사용자 정책: 720p 기본)
-  videoDuration:   '6s',       // '6s' | '10s'
+  videoDuration:   '10s',      // '6s' | '10s' (사용자 정책: 10s 기본)
   videoAspect:     '16:9 Widescreen',  // '16:9 Widescreen' | '9:16 Vertical' | '1:1 Square' | '2:3 Tall' | '3:2 Wide'
   maxDailyVideos: 30,
   todayCount: 0,

@@ -1139,7 +1139,6 @@
 
         <div style="font-size:11px; color:var(--text-muted); margin-top:6px; line-height:1.5;">
           · 짧은 문장은 윗 그룹에 흡수
-          · 마크다운 헤더에 <span style="color:var(--info); font-weight:600;">"도입"</span> 포함 시 자동으로 도입부 그룹 (파란 카드)
           <div id="splitGroupCountPreview" style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--border-soft); font-size:12px; font-weight:600; color:var(--text-strong);"></div>
         </div>
       </div>
@@ -1823,8 +1822,18 @@
       </div>
       <div id="presetForm_refAudioName" data-full-path="" style="font-size:12px; color:var(--text-muted); margin-bottom:8px; word-break:break-all;">선택된 파일 없음</div>
       <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">참조 텍스트 (TXT 자동 로드)</label>
-      <div id="presetForm_refTextBox" style="font-size:13px; color:var(--text-strong); padding:8px 10px; background:var(--bg-soft); border:1px solid var(--border-soft); border-radius:6px; min-height:36px; max-height:96px; overflow-y:auto; line-height:1.5; word-break:break-word;">참조 텍스트가 여기에 표시됩니다</div>
+      <div id="presetForm_refTextBox" style="font-size:13px; color:var(--text-strong); padding:8px 10px; background:var(--bg-soft); border:1px solid var(--border-soft); border-radius:6px; min-height:36px; max-height:80px; overflow-y:auto; line-height:1.5; word-break:break-word;">참조 텍스트가 여기에 표시됩니다</div>
       <input type="hidden" id="presetForm_refText" value="">
+
+      <!-- 미리듣기 — 참조 텍스트 바로 아래 (TXT 받자마자 바로 테스트 가능) -->
+      <div style="margin-top:10px;">
+        <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">🔊 미리듣기 (테스트)</label>
+        <div style="display:flex; gap:6px; margin-bottom:6px;">
+          <input type="text" id="presetForm_previewText" value="안녕하세요. 프라이밍 플로우 음성 테스트입니다." style="flex:1; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px;">
+          <button class="btn-sm" onclick="previewPreset()" id="presetForm_previewBtn">🔊 듣기</button>
+        </div>
+        <audio id="presetForm_audio" controls style="width:100%; display:none; height:30px;"></audio>
+      </div>
     </div>
 
     <!-- GPU 엔진 고급 파라미터 (VoxCPM2 / OmniVoice 공통) -->
@@ -1883,12 +1892,30 @@
           <div id="presetForm_outputFolder" data-path="" style="font-size:11px; color:var(--text-muted); margin-top:4px; word-break:break-all;">선택 안 됨</div>
         </div>
         <div>
-          <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">채널 로고 (워터마크)</label>
+          <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">채널 로고 (워터마크 + 오버레이)</label>
           <div style="display:flex; gap:4px;">
             <button class="btn-sm" onclick="selectPresetLogo()" style="flex:1;">🖼 로고 선택</button>
             <button class="btn-sm" onclick="clearPresetLogo()" style="color:var(--danger); padding:6px 8px;">초기화</button>
           </div>
           <div id="presetForm_logo" data-path="" style="font-size:11px; color:var(--text-muted); margin-top:4px; word-break:break-all;">선택 안 됨</div>
+          <!-- 오버레이 옵션 — 위 로고를 화면 모서리에 표시 -->
+          <label style="display:flex; align-items:center; gap:6px; margin-top:8px; font-size:12px; color:var(--text-soft); cursor:pointer;">
+            <input type="checkbox" id="logoOverlayEnabled" style="cursor:pointer; flex:none;">
+            <span>위 로고를 화면 오버레이로 표시</span>
+          </label>
+          <div style="display:flex; gap:6px; margin-top:4px;">
+            <select id="logoPosition" style="flex:1; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:4px 6px; font-size:12px; border-radius:4px;">
+              <option value="top-right" selected>우상단</option>
+              <option value="top-left">좌상단</option>
+              <option value="bottom-right">우하단</option>
+              <option value="bottom-left">좌하단</option>
+            </select>
+            <select id="logoSize" style="flex:1; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:4px 6px; font-size:12px; border-radius:4px;">
+              <option value="small">작음 (10%)</option>
+              <option value="medium" selected>중간 (15%)</option>
+              <option value="large">큼 (20%)</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -1951,47 +1978,13 @@
           </div>
         </div>
 
-        <!-- 채널 로고 오버레이 -->
-        <div style="border-top:1px solid var(--border-soft); padding-top:8px; margin-top:8px;">
-          <label style="display:flex; align-items:center; gap:6px; width:auto;">
-            <input type="checkbox" id="logoOverlayEnabled" style="cursor:pointer; flex:none;">
-            <span style="font-weight:600;">채널 로고 오버레이</span>
-          </label>
-          <div id="logoSourceLabel" style="font-size:12px; color:var(--text-muted); margin-top:6px; word-break:break-all;">선택된 채널 없음 — 직접 선택 또는 채널 logoPath 등록 필요</div>
-          <div style="display:flex; gap:6px; margin-top:6px;">
-            <button class="btn-sm" onclick="selectLogoOverride()" style="flex:1;">직접 선택</button>
-            <button class="btn-sm" onclick="clearLogoOverride()" style="color:var(--danger);">초기화</button>
-          </div>
-          <div style="display:flex; gap:6px; margin-top:6px;">
-            <select id="logoPosition" style="flex:1; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:4px 6px; font-size:12px; border-radius:4px;">
-              <option value="top-right" selected>우상단</option>
-              <option value="top-left">좌상단</option>
-              <option value="bottom-right">우하단</option>
-              <option value="bottom-left">좌하단</option>
-            </select>
-            <select id="logoSize" style="flex:1; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:4px 6px; font-size:12px; border-radius:4px;">
-              <option value="small">작음 (10%)</option>
-              <option value="medium" selected>중간 (15%)</option>
-              <option value="large">큼 (20%)</option>
-            </select>
-          </div>
-        </div>
+        <!-- 채널 로고 오버레이는 위 "채널 로고 (워터마크 + 오버레이)" 영역으로 통합됨 -->
       </div>
 
-    </div>
-
-    <!-- 미리듣기 -->
-    <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border-soft);">
-      <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">🔊 미리듣기 (테스트)</label>
-      <div style="display:flex; gap:6px; margin-bottom:8px;">
-        <input type="text" id="presetForm_previewText" value="안녕하세요. 프라이밍 플로우 음성 테스트입니다." style="flex:1; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px;">
-        <button class="btn-sm" onclick="previewPreset()" id="presetForm_previewBtn">🔊 듣기</button>
-      </div>
-      <audio id="presetForm_audio" controls style="width:100%; display:none; height:32px;"></audio>
     </div>
 
     <!-- 액션 -->
-    <div style="display:flex; gap:6px; margin-top:18px;">
+    <div style="display:flex; gap:6px; margin-top:14px;">
       <button class="btn btn-primary" onclick="savePreset()" style="flex:1;">💾 저장</button>
       <button class="btn-sm" onclick="deletePreset()" id="presetForm_deleteBtn" style="background:var(--bg-soft); color:var(--danger); border:1px solid var(--border); display:none;">🗑 삭제</button>
     </div>
@@ -2716,12 +2709,14 @@ function loadGallery(targetPath) {
     return;
   }
 
-  // 폴더 먼저, 이미지 다음, 기타 파일
+  // 폴더 먼저, 이미지/비디오 다음, 기타 파일
   const folders = entries.filter(e => e.isDirectory()).map(e => e.name);
   const images = entries.filter(e => e.isFile() && /\.(jpg|jpeg|png|webp|gif)$/i.test(e.name)).map(e => e.name);
-  const others = entries.filter(e => e.isFile() && !/\.(jpg|jpeg|png|webp|gif)$/i.test(e.name)).map(e => e.name);
+  const videos = entries.filter(e => e.isFile() && /\.(mp4|webm|mkv|mov)$/i.test(e.name)).map(e => e.name);
+  const others = entries.filter(e => e.isFile()
+    && !/\.(jpg|jpeg|png|webp|gif|mp4|webm|mkv|mov)$/i.test(e.name)).map(e => e.name);
 
-  if (folders.length === 0 && images.length === 0 && others.length === 0) {
+  if (folders.length === 0 && images.length === 0 && videos.length === 0 && others.length === 0) {
     grid.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:40px;">빈 폴더입니다</div>';
     return;
   }
@@ -2764,6 +2759,51 @@ function loadGallery(targetPath) {
       attachBtn.textContent = '📎 그룹 첨부';
       attachBtn.title = '이 이미지를 작업 목록의 특정 그룹에 첨부';
       attachBtn.style.cssText = 'position:absolute; top:6px; right:6px; padding:4px 8px; font-size:11px; background:rgba(0,0,0,0.7); color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:600;';
+      attachBtn.onclick = (e) => {
+        e.stopPropagation();
+        _attachGalleryFileToGroup(fullPath, file);
+      };
+      item.appendChild(attachBtn);
+    }
+    grid.appendChild(item);
+  }
+
+  // 비디오 항목 (첫 프레임 미리보기 + 그룹 첨부 버튼)
+  for (const file of videos) {
+    const fullPath = pathm.join(galleryCurrentPath, file);
+    const vidUrl = 'file:///' + encodeURI(fullPath.replace(/\\/g, '/'));
+    const item = document.createElement('div');
+    item.className = 'gallery-item';
+    item.style.cssText = 'cursor:pointer; position:relative;';
+    // <video preload="metadata"> 가 첫 프레임 보여줌. 자동재생 안 함.
+    const video = document.createElement('video');
+    video.src = vidUrl;
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'metadata';
+    video.style.cssText = 'width:100%; display:block; aspect-ratio:16/9; background:#000; object-fit:cover;';
+    // 첫 프레임 보장: 재생 한 번 시도해서 화면 표시 후 일시정지
+    video.addEventListener('loadedmetadata', () => {
+      try { video.currentTime = 0.05; } catch {}
+    });
+    const cap = document.createElement('div');
+    cap.className = 'caption';
+    cap.textContent = '🎬 ' + file;
+    item.appendChild(video);
+    item.appendChild(cap);
+    // 비디오 영역 좌상단 ▶ 오버레이 (시각적 비디오 표시)
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:absolute; top:8px; left:8px; background:rgba(80,180,120,0.85); color:#fff; font-size:11px; padding:2px 6px; border-radius:4px; font-weight:600; pointer-events:none;';
+    overlay.textContent = '🎬 비디오';
+    item.appendChild(overlay);
+    item.onclick = () => require('electron').shell.showItemInFolder(fullPath);
+    item.ondblclick = () => require('electron').shell.openPath(fullPath);
+    if (hasProject) {
+      const attachBtn = document.createElement('button');
+      attachBtn.className = 'btn-sm';
+      attachBtn.textContent = '📎 그룹 첨부';
+      attachBtn.title = '이 비디오를 작업 목록의 특정 그룹에 첨부';
+      attachBtn.style.cssText = 'position:absolute; top:6px; right:6px; padding:4px 8px; font-size:11px; background:rgba(0,0,0,0.7); color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:600; z-index:5;';
       attachBtn.onclick = (e) => {
         e.stopPropagation();
         _attachGalleryFileToGroup(fullPath, file);
@@ -3643,9 +3683,9 @@ function renderTaskList(project) {
       if (trashBtn) trashBtn.onclick = (e) => { e.stopPropagation(); removeGroupImage(g.id); };
     } else {
       // 미생성 — 클릭 시 attachGroupMedia 호출 (이미지/비디오 파일 첨부)
-      img.innerHTML = '🖼<br>미생성<div style="font-size:10px; color:var(--text-muted); margin-top:6px;">📎 클릭하여 첨부</div>';
+      img.innerHTML = '🖼<br>미생성';
       img.style.cursor = 'pointer';
-      img.title = '이미지(jpg/png/webp) 또는 동영상(mp4/webm/mkv/mov) 파일 첨부';
+      img.title = '클릭하여 이미지(jpg/png/webp) 또는 동영상(mp4/webm/mkv/mov) 파일 첨부';
       img.onclick = (e) => { e.stopPropagation(); attachGroupMedia(g.id); };
     }
 
@@ -3766,8 +3806,14 @@ function renderTaskList(project) {
     // 미디어 첨부 / 이미지 제거 / 비디오 제거 버튼은 그룹 카드의 이미지 영역으로 이전:
     //  - 미생성 박스 클릭 → attachGroupMedia
     //  - 이미지/비디오 좌상단 🗑 → removeGroupImage / removeGroupVideo
+    // "🔄 첨부 재생성" — 첨부 미디어가 동영상이면 동영상 재생성 (Grok), 아니면 이미지 재생성 (Flow)
+    const hasAttachedVideo = !!g.videoPath && g.videoStatus === 'done';
+    const regenLabel = hasAttachedVideo ? '🔄 첨부 재생성 (영상)' : '🔄 첨부 재생성';
+    const regenTitle = hasAttachedVideo
+      ? '이 그룹의 동영상을 Grok 으로 재생성 (기존 영상 제거 후 같은 이미지로 다시 생성)'
+      : '이 그룹의 이미지를 Flow 로 재생성 (기존 첨부 자동 제거 후 새로 생성)';
     actions.innerHTML =
-      `<button class="btn-sm group-regen-btn" data-group-id="${g.id}" title="이 그룹만 이미지 재생성 (기존 첨부 자동 제거 후 새로 생성)">🔄 이미지 재생성</button>` +
+      `<button class="btn-sm group-regen-btn" data-group-id="${g.id}" title="${regenTitle}">${regenLabel}</button>` +
       `<button class="btn-sm group-preview-btn" data-group-id="${g.id}" title="이 그룹의 TTS 음성 순차 재생 (다시 클릭 시 중지)">▶ 그룹 미리듣기</button>` +
       `<button class="btn-sm group-tts-btn" data-group-id="${g.id}" title="이 그룹의 모든 문장 TTS 재변환">🎙 그룹 TTS 변환</button>` +
       `<button class="btn-sm group-video-btn" data-group-id="${g.id}" title="이 그룹의 이미지를 Grok 으로 비디오 변환 (이미지 자리에 비디오가 들어감)">${videoBtnLabel}</button>`;
@@ -3776,7 +3822,25 @@ function renderTaskList(project) {
     const ttsBtn2 = actions.querySelector('.group-tts-btn');
     const videoBtn = actions.querySelector('.group-video-btn');
     const groupId = g.id;
-    regenBtn.onclick = (e) => { e.stopPropagation(); regenerateGroups([groupId]); };
+    regenBtn.onclick = (e) => {
+      e.stopPropagation();
+      // 첨부 미디어가 동영상이면 → 동영상 재생성 (기존 영상 제거 + Grok 재변환)
+      // 그 외 (이미지 첨부 또는 빈 그룹) → 이미지 재생성 (Flow)
+      if (hasAttachedVideo) {
+        // 기존 비디오만 제거하고 (이미지는 살림) Grok 재변환
+        const grp = window._currentProject && window._currentProject.groups.find(x => x.id === groupId);
+        if (grp) {
+          grp.videoPath = null;
+          grp.videoStatus = 'idle';
+          grp.videoSourceImage = null;
+        }
+        renderTaskList(window._currentProject);
+        addLog(`[Grok] 그룹 ${grp ? grp.num : '?'} 비디오 재생성 시작`, 'info');
+        convertGroupVideo(groupId);
+      } else {
+        regenerateGroups([groupId]);
+      }
+    };
     previewBtn.onclick = (e) => { e.stopPropagation(); previewGroupAudio(groupId, previewBtn); };
     ttsBtn2.onclick = (e) => { e.stopPropagation(); convertGroupSentences(groupId); };
     videoBtn.onclick = (e) => { e.stopPropagation(); convertGroupVideo(groupId); };
@@ -4356,7 +4420,16 @@ function collectAiNoticeOpts() {
 function collectLogoOpts() {
   const enabledEl = document.getElementById('logoOverlayEnabled');
   if (!enabledEl || !enabledEl.checked) return { enabled: false };
-  let logoPath = _logoOverride;
+  // 통합 후 우선순위: 활성 프리셋의 logoPath > 채널 logoPath > 옛 _logoOverride
+  let logoPath = '';
+  try {
+    if (typeof _activePresetId !== 'undefined' && _activePresetId) {
+      const PresetStore = require('../tts/preset-store');
+      const p = PresetStore.getById(_activePresetId);
+      if (p && p.logoPath) logoPath = p.logoPath;
+    }
+  } catch {}
+  if (!logoPath && typeof _logoOverride !== 'undefined' && _logoOverride) logoPath = _logoOverride;
   if (!logoPath && _activeChannelId) {
     try {
       const ChannelStore = require('../core/channel-store');
