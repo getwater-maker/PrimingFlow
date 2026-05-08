@@ -9,8 +9,11 @@
  *   - dummy mp3 / TTS_DUBBING 파일 등록 X
  *
  *   - 1 sub-clip = 1 transcript clip (사용자 요구)
- *   - clip.words = [1 type:0 word + 1 type:2 종료 마커]
- *   - clip.captions = sub-clip 텍스트
+ *   - clip.words = [N type:0 word + 1 type:2 종료 마커]  ← Vrew 본가 STT 형식
+ *     · 각 word 가 자기 ttsClip 트랙의 asset 을 가리킴 (단어 단위 자막 표시)
+ *     · 같은 sentence audio 의 sourceIn/sourceOut 시간 슬라이스 (mp3 한 개 공유)
+ *     · 단어 timing 은 글자수 비율로 추정 (PrimingFlow 는 STT 안 씀)
+ *   - clip.captions = sub-clip 텍스트 (한 줄로 통합 표시)
  *   - clip.assetIds = [imageAid] (그룹 이미지)
  *   - 그룹 = 1 image 트랙 + 1 image asset (role:'sub'). 그룹 내 모든 clip 이 같은 asset 공유
  */
@@ -19,6 +22,15 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { splitLongSentenceAlgo } = require('../core/long-sentence-splitter/algo-splitter');
+
+// Vrew 본가가 STT 로 만드는 word 단위 자막을 흉내 — 공백 기준 어절 분리.
+// 빈 입력은 [원문] 그대로 1개 토큰으로 처리해 트랙이 깨지지 않게 함.
+function splitWordsForVrew(text) {
+  const t = String(text || '').trim();
+  if (!t) return [''];
+  const tokens = t.split(/\s+/).filter(s => s.length > 0);
+  return tokens.length > 0 ? tokens : [t];
+}
 
 const TEMPLATE_PATH = path.join(__dirname, '..', 'vrew-template.json');
 const VREW_MAX_CHARS = 20;
@@ -358,17 +370,23 @@ function validateOutput(pj, sentenceCount, imageGroupCount) {
       imgMissingClips++;
     }
     const w = c.words || [];
-    if (w.length !== 2) errs.push(`clip ${c.id} words 길이 ${w.length} != 2 (sub-clip word + 종료 마커)`);
+    // 단어 단위 자막: N type:0 word + 1 type:2 종료 마커 (최소 2개)
+    if (w.length < 2) errs.push(`clip ${c.id} words 길이 ${w.length} < 2 (최소 word 1 + 종료 마커 1)`);
     if (w[0]?.type !== 0) errs.push(`clip ${c.id} words[0].type != 0`);
-    if (w[1]?.type !== 2) errs.push(`clip ${c.id} words[1].type != 2 (종료 마커)`);
+    const last = w[w.length - 1];
+    if (last?.type !== 2) errs.push(`clip ${c.id} words[last].type != 2 (종료 마커)`);
     if (w[0]?.assetIds?.length !== 1) errs.push(`clip ${c.id} words[0].assetIds 길이 ${w[0]?.assetIds?.length} != 1`);
-    if (w[1]?.assetIds?.length !== 0) errs.push(`clip ${c.id} words[1].assetIds 비어야 함`);
+    if (last?.assetIds?.length !== 0) errs.push(`clip ${c.id} words[last].assetIds 비어야 함`);
   }
 
-  const subClipCount = pj.transcript.clips.length;
+  // ttsClip 트랙 수 = sub-clip 안 단어 수 합 (단어 단위 분리 후) + 휴지(type:1)
+  const totalWordTracks = pj.transcript.clips.reduce((sum, c) => {
+    const ws = c.words || [];
+    return sum + ws.filter(w => w.type === 0 || w.type === 1).length;
+  }, 0);
   const ttsTrackCount = Object.values(pj.props.tracks).filter(t => t.type === 'ttsClip').length;
   const dubTrackCount = Object.values(pj.props.tracks).filter(t => t.type === 'ttsDubbing').length;
-  if (ttsTrackCount !== subClipCount) errs.push(`ttsClip 트랙 ${ttsTrackCount} ≠ sub-clip ${subClipCount}`);
+  if (ttsTrackCount !== totalWordTracks) errs.push(`ttsClip 트랙 ${ttsTrackCount} ≠ word 트랙 합 ${totalWordTracks}`);
   if (dubTrackCount !== 0) errs.push(`ttsDubbing 트랙 ${dubTrackCount} != 0 (4.0.1 형식에선 사용 안 함)`);
 
   // role 분포
@@ -604,44 +622,60 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
       const sourceOut = isLast ? ttsDur : Math.min(acc + clipDur, ttsDur);
       const realDur = sourceOut - sourceIn;
 
-      // ttsClip 트랙 — 실제 음성 mediaId 의 시간 슬라이스, volume:1
-      const ttsTid = sid();
-      const ttsAid = uid();
-      pj.props.tracks[ttsTid] = {
-        trackId: ttsTid, mediaId: ttsMid, volume: 1,
-        sourceIn, sourceOut,
-        loop: false, fade: { in: false, out: false },
-        playbackRate: 1, type: 'ttsClip',
-      };
-      pj.props.assets[ttsAid] = { trackIds: [ttsTid], role: 'main' };
+      // 단어 단위 ttsClip 트랙 — 같은 sentence audio 의 시간 슬라이스를 단어 수만큼.
+      // (Vrew 본가의 STT 결과처럼 N word 가 각자 자기 ttsClip asset 을 가리킴)
+      const tokens = splitWordsForVrew(vc.text);
+      const totalChars = tokens.reduce((sum, t) => sum + (t.length || 0), 0) || 1;
 
-      // transcript clip — 1 sub-clip = 1 clip
-      const wordsArr = [
-        {
+      const wordsArr = [];
+      let wAcc = 0;
+      for (let wi = 0; wi < tokens.length; wi++) {
+        const tk = tokens[wi];
+        const isLastWord = (wi === tokens.length - 1);
+        // 글자수 비율로 sub-clip 시간 분배. 마지막 단어는 잔여 시간 모두 흡수.
+        const wDur = isLastWord
+          ? Math.max(0, realDur - wAcc)
+          : realDur * ((tk.length || 1) / totalChars);
+
+        const wTtsTid = sid();
+        const wTtsAid = uid();
+        pj.props.tracks[wTtsTid] = {
+          trackId: wTtsTid, mediaId: ttsMid, volume: 1,
+          sourceIn:  sourceIn + wAcc,
+          sourceOut: sourceIn + wAcc + wDur,
+          loop: false, fade: { in: false, out: false },
+          playbackRate: 1, type: 'ttsClip',
+        };
+        pj.props.assets[wTtsAid] = { trackIds: [wTtsTid], role: 'main' };
+
+        wordsArr.push({
           id: sid(),
-          text: vc.text,
+          text: tk,
           playbackRate: 1,
-          duration: realDur,
+          duration: wDur,
           aligned: false,
           type: 0,
-          originalDuration: realDur,
-          originalStartTime: 0,
+          originalDuration: wDur,
+          originalStartTime: wAcc,
           truncatedWords: [],
-          assetIds: [ttsAid],
-        },
-        {
-          id: sid(),
-          text: '',
-          playbackRate: 1,
-          duration: 0,
-          aligned: false,
-          type: 2,
-          originalDuration: 0,
-          originalStartTime: realDur,
-          truncatedWords: [],
-          assetIds: [],
-        },
-      ];
+          assetIds: [wTtsAid],
+        });
+        wAcc += wDur;
+      }
+
+      // 종료 마커 (type:2)
+      wordsArr.push({
+        id: sid(),
+        text: '',
+        playbackRate: 1,
+        duration: 0,
+        aligned: false,
+        type: 2,
+        originalDuration: 0,
+        originalStartTime: realDur,
+        truncatedWords: [],
+        assetIds: [],
+      });
 
       pj.transcript.clips.push({
         sceneId: unifiedSceneId,
