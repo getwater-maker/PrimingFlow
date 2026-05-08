@@ -6066,16 +6066,32 @@ async function convertGroupVideo(groupId, opts = {}) {
   }
 }
 
-/** 그룹 ID 배열을 순차 비디오 변환하는 공통 헬퍼 */
+/** 그룹 ID 배열을 순차 비디오 변환하는 공통 헬퍼.
+ *  영상 간 20~40초 랜덤 대기 — anti-detect 휴먼타이밍 + Grok rate-limit 부담 분산. */
 async function _convertGroupListToVideo(groupIds, label) {
-  addLog(`[Grok] ${label} — ${groupIds.length}개 그룹 비디오 변환 시작`, 'info');
+  addLog(`[Grok] ${label} — ${groupIds.length}개 그룹 비디오 변환 시작 (영상 간 20~40초 랜덤 대기)`, 'info');
   window._grokConvertActive = true;
   let success = 0, fail = 0, stopped = false;
   try {
-    for (const gid of groupIds) {
+    for (let i = 0; i < groupIds.length; i++) {
       if (!window._grokConvertActive) { stopped = true; break; }
+      const gid = groupIds[i];
       const ok = await convertGroupVideo(gid, { silent: true });
       if (ok) success++; else fail++;
+
+      // 마지막 그룹이면 대기 X
+      if (i < groupIds.length - 1 && window._grokConvertActive) {
+        // 20000~40000ms 랜덤 (균등 분포)
+        const waitMs = 20000 + Math.floor(Math.random() * 20001);
+        addLog(`[Grok] 다음 영상 전 ${(waitMs / 1000).toFixed(1)}초 대기 (휴먼타이밍)`, 'info');
+        // 1초 단위로 쪼개서 대기 — 사용자가 중지 누르면 빠르게 빠져나가도록
+        const startWait = Date.now();
+        while (Date.now() - startWait < waitMs) {
+          if (!window._grokConvertActive) { stopped = true; break; }
+          await new Promise(r => setTimeout(r, 1000));
+        }
+        if (stopped) break;
+      }
     }
   } finally {
     window._grokConvertActive = false;
