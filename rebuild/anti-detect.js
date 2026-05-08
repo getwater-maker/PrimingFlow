@@ -171,12 +171,15 @@ class AntiDetect {
   }
 
   // 단락 처리 진입 시 호출 — 한도 도달 후 추가 진입 시 경고/중단 결정
+  // 경고는 인스턴스 라이프사이클 동안 첫 초과 시 한 번만 (이후 침묵)
   beforeNextGeneration() {
     if (!this.enabled || this.dailyLimit <= 0) return { proceed: true };
     if (this.state.todayCount >= this.dailyLimit) {
       if (this.onLimitReached === 'stop') {
         return { proceed: false, reason: `일일 한도 ${this.dailyLimit}회 도달 — 자동 중지` };
       }
+      if (this._dailyLimitWarned) return { proceed: true };
+      this._dailyLimitWarned = true;
       return { proceed: true, warn: `⚠️ 일일 한도 ${this.dailyLimit}회 초과 (현재 ${this.state.todayCount}회) — 계정 안전 주의` };
     }
     return { proceed: true };
