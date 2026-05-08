@@ -1200,32 +1200,10 @@
       <div id="imageSettings">
         <div class="setting">
           <label>스타일</label>
-          <select id="styleSelect">
-            <option value="k-webtoon">한국 웹툰</option>
-            <option value="webtoon-illust">웹툰 일러스트</option>
-            <option value="cinematic">시네마틱 (영화풍)</option>
-            <option value="photorealistic">포토리얼 (실사)</option>
-            <option value="illustration">일러스트</option>
-            <option value="anime">애니메이션</option>
-            <option value="watercolor">수채화</option>
-            <option value="biblical-watercolor">수채화 (성경시대)</option>
-            <option value="ink">수묵화</option>
-            <option value="oil">유화</option>
-            <option value="fantasy">판타지 아트</option>
-            <option value="noir">필름 누아르</option>
-            <option value="pixel">픽셀 아트</option>
-            <option value="comic">만화/코믹</option>
-            <option value="3d">3D 렌더링</option>
-            <option value="minecraft">마인크래프트</option>
-            <option value="stickman">졸라맨 (스틱맨)</option>
-            <option value="simpsons">심슨 가족</option>
-            <option value="ghibli">지브리 (미야자키)</option>
-            <option value="disney">디즈니/픽사</option>
-            <option value="chibi">치비 (귀여운)</option>
-            <option value="retro">레트로 80s</option>
-            <option value="sketch">연필 스케치</option>
-            <option value="pop">팝아트</option>
-          </select>
+          <div style="display:flex; gap:6px; flex:1;">
+            <select id="styleSelect" style="flex:1;"></select>
+            <button class="btn-sm" type="button" onclick="openStyleManager()" title="스타일 추가/수정/삭제" style="white-space:nowrap;">⚙ 관리</button>
+          </div>
         </div>
 
         <!-- 비율 + 매수 한 줄 -->
@@ -1340,32 +1318,10 @@
       <div id="videoSettings" style="display:none;">
         <div class="setting">
           <label>스타일</label>
-          <select id="videoStyleSelect">
-            <option value="k-webtoon">한국 웹툰</option>
-            <option value="webtoon-illust">웹툰 일러스트</option>
-            <option value="cinematic">시네마틱 (영화풍)</option>
-            <option value="photorealistic">포토리얼 (실사)</option>
-            <option value="illustration">일러스트</option>
-            <option value="anime">애니메이션</option>
-            <option value="watercolor">수채화</option>
-            <option value="biblical-watercolor">수채화 (성경시대)</option>
-            <option value="ink">수묵화</option>
-            <option value="oil">유화</option>
-            <option value="fantasy">판타지 아트</option>
-            <option value="noir">필름 누아르</option>
-            <option value="pixel">픽셀 아트</option>
-            <option value="comic">만화/코믹</option>
-            <option value="3d">3D 렌더링</option>
-            <option value="minecraft">마인크래프트</option>
-            <option value="stickman">졸라맨 (스틱맨)</option>
-            <option value="simpsons">심슨 가족</option>
-            <option value="ghibli">지브리 (미야자키)</option>
-            <option value="disney">디즈니/픽사</option>
-            <option value="chibi">치비 (귀여운)</option>
-            <option value="retro">레트로 80s</option>
-            <option value="sketch">연필 스케치</option>
-            <option value="pop">팝아트</option>
-          </select>
+          <div style="display:flex; gap:6px; flex:1;">
+            <select id="videoStyleSelect" style="flex:1;"></select>
+            <button class="btn-sm" type="button" onclick="openStyleManager()" title="스타일 추가/수정/삭제" style="white-space:nowrap;">⚙ 관리</button>
+          </div>
         </div>
 
         <div class="setting">
@@ -1550,6 +1506,37 @@
 
   </div>
 
+</div>
+
+<!-- 스타일 관리 모달 -->
+<div id="styleManagerOverlay" style="display:none; position:fixed; inset:0; background:rgba(58,52,46,0.5); z-index:999; align-items:center; justify-content:center;" onclick="if(event.target===this)closeStyleManager()">
+  <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:14px; width:640px; max-width:92vw; max-height:85vh; box-shadow:var(--shadow-lg); display:flex; flex-direction:column; overflow:hidden;" onclick="event.stopPropagation()">
+    <div style="flex:none; padding:18px 20px 10px 20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <h2 style="font-size:18px; color:var(--accent); margin:0;">🎨 이미지 스타일 관리</h2>
+        <button class="btn-sm" onclick="closeStyleManager()" type="button" style="font-size:14px;">✕</button>
+      </div>
+      <div style="font-size:12px; color:var(--text-muted);">
+        기본 스타일은 수정/삭제 불가. 사용자가 추가한 스타일만 자유롭게 관리할 수 있습니다.
+      </div>
+    </div>
+    <div id="styleManagerList" style="flex:1 1 auto; overflow-y:auto; padding:6px 14px; border-top:1px solid var(--border-soft); border-bottom:1px solid var(--border-soft); min-height:200px;"></div>
+    <div id="styleManagerForm" style="display:none; padding:10px 16px 4px 16px; background:var(--bg-soft); border-bottom:1px solid var(--border-soft);">
+      <h4 id="styleManagerFormTitle" style="margin:0 0 8px 0; font-size:14px; color:var(--text-strong);"></h4>
+      <input type="text" id="styleManagerFormName" placeholder="스타일 이름 (예: 나의 사이버펑크)"
+             style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px; margin-bottom:6px;">
+      <textarea id="styleManagerFormPrompt" rows="3" placeholder="영문 프롬프트 (예: cyberpunk neon city, futuristic style, glowing lights, ...)"
+                style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px; resize:vertical;"></textarea>
+      <div style="display:flex; gap:6px; margin-top:8px; justify-content:flex-end;">
+        <button class="btn-sm" type="button" onclick="cancelStyleManagerForm()">취소</button>
+        <button class="btn-sm" type="button" onclick="saveStyleManagerForm()" style="background:var(--info); color:#fff; font-weight:600;">저장</button>
+      </div>
+    </div>
+    <div style="flex:none; padding:10px 16px; display:flex; justify-content:space-between; align-items:center;">
+      <span style="font-size:11px; color:var(--text-muted);" id="styleManagerCount"></span>
+      <button class="btn-sm" type="button" onclick="openStyleAddForm()" style="background:var(--info); color:#fff; font-weight:600;">+ 새 스타일 추가</button>
+    </div>
+  </div>
 </div>
 
 <!-- 대본 입력/수정 모달 -->
@@ -2829,6 +2816,145 @@ function openScriptInputModal() {
 }
 function closeScriptInputModal() {
   document.getElementById('scriptInputModal').style.display = 'none';
+}
+
+// ─── 스타일 관리 모달 ──────────────────────────────────
+let _styleManagerEditingId = null;
+
+function openStyleManager() {
+  _styleManagerEditingId = null;
+  document.getElementById('styleManagerForm').style.display = 'none';
+  _renderStyleManagerList();
+  document.getElementById('styleManagerOverlay').style.display = 'flex';
+}
+
+function closeStyleManager() {
+  document.getElementById('styleManagerOverlay').style.display = 'none';
+  _refreshStyleSelectOptions();   // 드롭다운 갱신 (사용자가 추가/수정/삭제했을 수 있음)
+}
+
+function _renderStyleManagerList() {
+  const StyleStore = require('../core/style-store');
+  const list = StyleStore.loadAll();
+  const listEl = document.getElementById('styleManagerList');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+  for (const s of list) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; gap:8px; padding:8px 4px; border-bottom:1px solid var(--border-soft); align-items:center;';
+    const builtBadge = s.isBuiltIn
+      ? `<span style="background:var(--bg-soft); color:var(--text-muted); padding:2px 6px; border-radius:4px; font-size:10px; font-weight:600;">기본</span>`
+      : `<span style="background:var(--info); color:#fff; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:600;">사용자</span>`;
+    const promptPreview = (s.prompt || '').substring(0, 70) + (s.prompt && s.prompt.length > 70 ? '...' : '');
+    const safeName = escapeHtml(s.name || '');
+    const safePrompt = escapeHtml(s.prompt || '');
+    const safePreview = escapeHtml(promptPreview);
+    const actions = s.isBuiltIn
+      ? `<span style="font-size:11px; color:var(--text-muted); padding:0 6px;">읽기 전용</span>`
+      : `<button class="btn-sm" type="button" data-style-id="${s.id}" onclick="openStyleEditForm(this.dataset.styleId)">🔧 수정</button>` +
+        `<button class="btn-sm" type="button" data-style-id="${s.id}" onclick="deleteStyleEntry(this.dataset.styleId)" style="color:var(--danger);">🗑</button>`;
+    row.innerHTML =
+      `<div style="flex:1; min-width:0;">` +
+        `<div style="font-weight:600; font-size:13px; color:var(--text-strong); display:flex; gap:6px; align-items:center; margin-bottom:2px;">${builtBadge}<span>${safeName}</span></div>` +
+        `<div style="font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${safePrompt}">${safePreview}</div>` +
+      `</div>` +
+      actions;
+    listEl.appendChild(row);
+  }
+  const builtCnt = list.filter(s => s.isBuiltIn).length;
+  const userCnt = list.length - builtCnt;
+  document.getElementById('styleManagerCount').textContent =
+    `총 ${list.length}개 — 기본 ${builtCnt}개, 사용자 추가 ${userCnt}개`;
+}
+
+function openStyleAddForm() {
+  _styleManagerEditingId = null;
+  document.getElementById('styleManagerFormTitle').textContent = '+ 새 스타일 추가';
+  document.getElementById('styleManagerFormName').value = '';
+  document.getElementById('styleManagerFormPrompt').value = '';
+  document.getElementById('styleManagerForm').style.display = '';
+  document.getElementById('styleManagerFormName').focus();
+}
+
+function openStyleEditForm(id) {
+  const StyleStore = require('../core/style-store');
+  const s = StyleStore.getById(id);
+  if (!s) return;
+  if (s.isBuiltIn) { alert('기본 스타일은 수정할 수 없습니다.'); return; }
+  _styleManagerEditingId = id;
+  document.getElementById('styleManagerFormTitle').textContent = `🔧 수정: ${s.name}`;
+  document.getElementById('styleManagerFormName').value = s.name;
+  document.getElementById('styleManagerFormPrompt').value = s.prompt;
+  document.getElementById('styleManagerForm').style.display = '';
+  document.getElementById('styleManagerFormName').focus();
+}
+
+function cancelStyleManagerForm() {
+  document.getElementById('styleManagerForm').style.display = 'none';
+  _styleManagerEditingId = null;
+}
+
+function saveStyleManagerForm() {
+  const StyleStore = require('../core/style-store');
+  const name = document.getElementById('styleManagerFormName').value.trim();
+  const prompt = document.getElementById('styleManagerFormPrompt').value.trim();
+  if (!name) { alert('스타일 이름을 입력하세요'); return; }
+  if (!prompt) { alert('영문 프롬프트를 입력하세요'); return; }
+  let result;
+  if (_styleManagerEditingId) {
+    result = StyleStore.update(_styleManagerEditingId, { name, prompt });
+    if (!result) { alert('수정 실패 (기본 스타일은 수정 불가)'); return; }
+    addLog(`[스타일] 수정 완료: ${name}`, 'ok');
+  } else {
+    result = StyleStore.add({ name, prompt });
+    if (!result) { alert('추가 실패 (이름과 프롬프트 모두 필요)'); return; }
+    addLog(`[스타일] 추가 완료: ${name}`, 'ok');
+  }
+  cancelStyleManagerForm();
+  _renderStyleManagerList();
+}
+
+function deleteStyleEntry(id) {
+  const StyleStore = require('../core/style-store');
+  const s = StyleStore.getById(id);
+  if (!s) return;
+  if (s.isBuiltIn) { alert('기본 스타일은 삭제할 수 없습니다.'); return; }
+  if (!confirm(`"${s.name}" 스타일을 삭제할까요?`)) return;
+  if (StyleStore.remove(id)) {
+    addLog(`[스타일] 삭제: ${s.name}`, 'ok');
+    _renderStyleManagerList();
+  } else {
+    alert('삭제 실패');
+  }
+}
+
+/** 두 styleSelect 드롭다운의 옵션을 style-store 데이터로 다시 채움.
+ *  페이지 로드 시 + 다이얼로그 닫을 때 호출. */
+function _refreshStyleSelectOptions() {
+  let StyleStore;
+  try { StyleStore = require('../core/style-store'); } catch (e) { return; }
+  const list = StyleStore.loadAll();
+  for (const selId of ['styleSelect', 'videoStyleSelect']) {
+    const sel = document.getElementById(selId);
+    if (!sel) continue;
+    const prevValue = sel.value;
+    sel.innerHTML = list.map(s => {
+      const label = s.isBuiltIn ? s.name : (s.name + ' ⭐');
+      return `<option value="${s.id}">${escapeHtml(label)}</option>`;
+    }).join('');
+    if (list.some(s => s.id === prevValue)) {
+      sel.value = prevValue;
+    } else if (list.length > 0) {
+      sel.value = list[0].id;
+    }
+  }
+}
+
+// 페이지 로드 시 드롭다운 옵션 초기 채우기 (DOMContentLoaded 가 이미 발생한 후라면 즉시 실행)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => { try { _refreshStyleSelectOptions(); } catch {} });
+} else {
+  try { _refreshStyleSelectOptions(); } catch {}
 }
 function confirmScriptInputModal() {
   const ta = document.getElementById('scriptInputModalArea');

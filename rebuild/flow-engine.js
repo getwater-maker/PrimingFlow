@@ -293,33 +293,12 @@ class FlowAutomator {
     this._setupNetworkMonitor();
 
     let successCount = 0;
-    const STYLE_PROMPTS = {
-      'k-webtoon': 'beautiful Korean webtoon style, manhwa art, soft shading, detailed characters, emotional expressions, Korean comic illustration, clean lineart, pastel colors',
-      'webtoon-illust': 'webtoon illustration style, digital painting, semi-realistic, vivid colors, detailed background, Korean manhwa inspired, clean composition',
-      cinematic: 'cinematic film still, dramatic lighting, movie scene',
-      photorealistic: 'photorealistic photography, high detail, natural lighting, 8K',
-      illustration: 'digital illustration, clean lines, warm colors, detailed',
-      anime: 'anime style illustration, vibrant colors, expressive characters, Japanese animation',
-      watercolor: 'traditional watercolor painting, aquarelle, wet-on-wet technique, visible paper texture, soft pastel color washes, flowing translucent pigments, hand-painted on cotton paper, loose brush strokes, bleeding colors, artistic fine art, NOT digital illustration, NOT line art, NOT webtoon, NOT manhwa, NOT anime',
-      'biblical-watercolor': 'traditional watercolor painting of ancient biblical era, aquarelle, wet-on-wet technique, visible paper texture, soft earth-tone washes (ochre, sand, olive, terracotta), flowing translucent pigments, hand-painted on cotton paper, loose brush strokes, ancient Middle Eastern setting, biblical figures in flowing robes and tunics, head coverings, sandals, bearded elders, Holy Land landscape with olive trees and stone buildings, reverent atmosphere, sacred scripture illustration, fine art, NOT digital illustration, NOT line art, NOT webtoon, NOT manhwa, NOT anime, NOT modern clothing, NOT Korean historical drama',
-      ink: 'ink wash painting, traditional, minimalist, elegant brush strokes',
-      oil: 'oil painting, classical, rich colors, elegant brushwork, fine art',
-      fantasy: 'fantasy art, epic scene, magical atmosphere, detailed environment, concept art',
-      noir: 'film noir, black and white, high contrast, shadows, dramatic mood, vintage',
-      pixel: 'pixel art, retro game style, 16-bit, vibrant colors, detailed sprites',
-      comic: 'comic book style, bold outlines, dynamic composition, vivid colors, action panels',
-      '3d': '3D rendered scene, ray tracing, realistic materials, cinematic lighting, Unreal Engine',
-      minecraft: 'Minecraft game screenshot, voxel art, blocky 3D world, cubic characters, pixel textures, in-game capture',
-      stickman: 'simple stick figure drawing, black lines on white background, minimalist doodle, hand-drawn sketch style, funny stick characters',
-      simpsons: 'The Simpsons cartoon style, yellow skin characters, bold outlines, bright colors, animated TV show, Matt Groening style',
-      ghibli: 'Studio Ghibli anime style, soft watercolor backgrounds, warm lighting, detailed nature, Hayao Miyazaki inspired',
-      disney: 'Disney 3D animation style, Pixar-like rendering, expressive characters, vibrant colors, family friendly',
-      chibi: 'chibi anime style, cute super-deformed characters, big eyes, small body, kawaii, pastel colors',
-      retro: 'retro 80s synthwave, neon colors, grid landscape, sunset, VHS aesthetic, vaporwave',
-      sketch: 'pencil sketch drawing, graphite on paper, detailed cross-hatching, artistic hand-drawn',
-      pop: 'pop art style, Roy Lichtenstein, bold colors, halftone dots, comic book aesthetic, Andy Warhol inspired',
-    };
-    const stylePrompt = STYLE_PROMPTS[style] || STYLE_PROMPTS.cinematic;
+    // 스타일 프롬프트는 style-store.js 가 관리 (기본 28개 + 사용자 추가).
+    // 여기서 require — 매번 최신 사용자 추가 스타일도 자동으로 반영됨.
+    const StyleStore = require('./core/style-store');
+    const stylePrompt = StyleStore.getPrompt(style)
+                     || StyleStore.getPrompt('cinematic')
+                     || 'cinematic film still, dramatic lighting, movie scene';
 
     // 원본 대본 저장
     fs.writeFileSync(path.join(outputDir, 'original_script.txt'),
