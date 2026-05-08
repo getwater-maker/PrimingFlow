@@ -493,6 +493,13 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
     log(`[Vrew] 자막 크기 랜덤 → '${resolvedSize}px' (이 영상 전체 동일)`);
   }
 
+  // 위치 'random' — 빌드 1회당 한 번만 -0.125 / -0.15 중 결정 → 영상 안에서 일관 유지
+  let resolvedYOffset = _userCap.yOffset;
+  if (resolvedYOffset === 'random') {
+    resolvedYOffset = (Math.random() < 0.5) ? -0.125 : -0.15;
+    log(`[Vrew] 자막 위치 랜덤 → '${(resolvedYOffset * 100).toFixed(1)}%' (이 영상 전체 동일)`);
+  }
+
   const captionAttrs = {
     ...CAPTION_ATTRS,
     ...(resolvedSize          ? { size: String(resolvedSize) }                 : {}),
@@ -501,7 +508,7 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
   };
   const captionStyle = {
     ...CAPTION_STYLE,
-    ...(_userCap.yOffset != null ? { yOffset: _userCap.yOffset } : {}),
+    ...(resolvedYOffset != null ? { yOffset: resolvedYOffset } : {}),
     ...(_userCap.width   != null ? { width:   _userCap.width   } : {}),
     customAttributes: CAPTION_STYLE.customAttributes.map(a => {
       if (a.attributeName === '--textbox-align' && resolvedAlign) {

@@ -1950,8 +1950,12 @@
               <option value="random">랜덤</option>
             </select>
             <span style="color:var(--border); margin:0 2px;">|</span>
-            <span style="color:var(--text-soft); flex:none;" title="화면 하단에서 위로 올리는 비율 (%, 음수 = 위로)">위치</span>
-            <input type="number" id="captionYOffset" value="-12.5" min="-50" max="0" step="2.5" style="width:55px; flex:none; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
+            <span style="color:var(--text-soft); flex:none;" title="화면 하단에서 위로 올리는 비율 (%, 음수 = 위로). 랜덤: 빌드 시점에 -12.5%/-15% 중 한 번 정해 모든 자막에 동일 적용">위치</span>
+            <select id="captionYOffset" title="랜덤: 빌드 시점에 -12.5%/-15% 중 한 번 정해 모든 자막에 동일 적용 (영상 안에서 변하지 않음)" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
+              <option value="-12.5" selected>-12.5</option>
+              <option value="-15">-15</option>
+              <option value="random">랜덤</option>
+            </select>
             <span style="color:var(--text-muted);">%</span>
             <span style="color:var(--border); margin:0 2px;">|</span>
             <span style="color:var(--text-soft); flex:none;">너비</span>
@@ -4480,7 +4484,9 @@ function collectCaptionStyleOpts() {
   // size: 'random' (빌드 시점에 100/125 중 결정) 또는 숫자 문자열
   const size       = (sizeRaw === 'random') ? 'random' : String(parseInt(sizeRaw, 10) || 100);
   const align      = document.getElementById('captionAlign')?.value || 'start';
-  const yOffsetPct = parseFloat(document.getElementById('captionYOffset')?.value || '-12.5');
+  const yOffsetRaw = document.getElementById('captionYOffset')?.value || '-12.5';
+  // yOffset: 'random' (빌드 시점에 -0.125/-0.15 중 결정) 또는 숫자(비율, -0.125 등)
+  const yOffset    = (yOffsetRaw === 'random') ? 'random' : ((parseFloat(yOffsetRaw) || -12.5) / 100);
   const widthPct   = parseFloat(document.getElementById('captionWidth')?.value || '96');
   const fontColor    = document.getElementById('captionFontColor')?.value    || '#FFFFFF';
   const outlineColor = document.getElementById('captionOutlineColor')?.value || '#000000';
@@ -4489,7 +4495,7 @@ function collectCaptionStyleOpts() {
     fontColor,
     outlineColor,
     align,                       // 'start' | 'center' | 'random'
-    yOffset: yOffsetPct / 100,   // -12.5% → -0.125
+    yOffset,                     // -0.125 / -0.15 / 'random'
     width:   widthPct / 100,     // 96% → 0.96
   };
 }
@@ -4509,7 +4515,16 @@ function applyCaptionStyleToForm(opt) {
     }
   }
   if (o.align)                set('captionAlign', o.align);
-  if (o.yOffset != null)      set('captionYOffset', (o.yOffset * 100).toFixed(1));
+  if (o.yOffset != null) {
+    if (o.yOffset === 'random') {
+      set('captionYOffset', 'random');
+    } else {
+      // 셀렉트의 옵션(-12.5/-15/random) 중 하나로 매핑
+      const pct = parseFloat(o.yOffset) * 100;
+      // -13.75% 보다 낮으면 -15, 아니면 -12.5 (가까운 쪽)
+      set('captionYOffset', (pct <= -13.75) ? '-15' : '-12.5');
+    }
+  }
   if (o.width != null)        set('captionWidth', Math.round(o.width * 100));
   if (o.fontColor)            set('captionFontColor', o.fontColor);
   if (o.outlineColor)         set('captionOutlineColor', o.outlineColor);
