@@ -4404,6 +4404,33 @@ function _onAiNoticeStartModeChange() {
   }
 }
 
+// 프리셋에 저장된 AI 고지 옵션 → 폼 입력 필드 복원
+function applyAiNoticeToForm(opt) {
+  const o = opt || {};
+  const set = (id, val) => { const el = document.getElementById(id); if (el != null && val !== undefined) el.value = val; };
+  const setChk = (id, val) => { const el = document.getElementById(id); if (el != null) el.checked = !!val; };
+
+  // enabled (저장 안 된 프리셋은 기본 true 유지 — UI 의 checked 그대로 둠)
+  if (Object.prototype.hasOwnProperty.call(o, 'enabled')) {
+    setChk('aiNoticeEnabled', o.enabled);
+  }
+  if (typeof o.text === 'string') set('aiNoticeText', o.text);
+  if (o.startMode) set('aiNoticeStartMode', o.startMode);
+  if (o.startSeconds != null)    set('aiNoticeStartSeconds', o.startSeconds);
+  if (o.startClip != null)       set('aiNoticeStartClip', o.startClip);
+  if (o.durationSeconds != null) set('aiNoticeDurationSeconds', o.durationSeconds);
+  if (o.fontColor)    set('aiNoticeFontColor',    o.fontColor);
+  if (o.bgColor)      set('aiNoticeBgColor',      o.bgColor);
+  if (o.outlineColor) set('aiNoticeOutlineColor', o.outlineColor);
+  if (Object.prototype.hasOwnProperty.call(o, 'bgNone'))      setChk('aiNoticeBgNone',      o.bgNone);
+  if (Object.prototype.hasOwnProperty.call(o, 'outlineNone')) setChk('aiNoticeOutlineNone', o.outlineNone);
+
+  // 시작 모드 따라 초/클립 입력 표시 토글
+  if (typeof _onAiNoticeStartModeChange === 'function') {
+    try { _onAiNoticeStartModeChange(); } catch (_) {}
+  }
+}
+
 // 빌더 옵션 수집 (saveVrew 가 호출)
 function collectAiNoticeOpts() {
   const enabledEl = document.getElementById('aiNoticeEnabled');
@@ -5139,6 +5166,9 @@ function openPresetModal(presetId) {
   const lockEl = document.getElementById('presetForm_lockVoice');
   if (lockEl) lockEl.checked = true;
 
+  // AI 고지 자막 폼 채우기 — 프리셋에 저장된 색상/시작/노출 복원
+  applyAiNoticeToForm(p.aiNotice);
+
 
   // voice select 의 onchange 재바인딩 후 강제 트리거 (Clone 영역 표시 갱신)
   document.getElementById('presetForm_voice').dispatchEvent(new Event('change'));
@@ -5424,6 +5454,11 @@ function _readPresetForm() {
   preset.instruct = (engine === 'omnivoice' && preset.voice === 'default')
     ? ((_instruct && _instruct.value) || '').trim()
     : '';
+
+  // AI 고지 자막 — 색상/시작/노출 등 프리셋에 영구 저장 (collectAiNoticeOpts 가 DOM 에서 값 수집)
+  if (typeof collectAiNoticeOpts === 'function') {
+    preset.aiNotice = collectAiNoticeOpts();
+  }
   return preset;
 }
 
