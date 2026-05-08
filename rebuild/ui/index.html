@@ -1141,6 +1141,7 @@
           · 짧은 문장은 윗 그룹에 흡수<br>
           · 긴 문장은 vrew 에서 의미 단위로 분할<br>
           · 마크다운 헤더에 <span style="color:var(--info); font-weight:600;">"도입"</span> 포함 시 자동으로 도입부 그룹 (파란 카드)
+          <div id="splitGroupCountPreview" style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--border-soft); font-size:12px; font-weight:600; color:var(--text-strong);"></div>
         </div>
       </div>
 
@@ -3187,6 +3188,24 @@ function _splitScriptImpl() {
   renderTaskList(window._currentProject);
   // 발음 사전 배지 갱신
   if (typeof _updateScriptDictBadge === 'function') _updateScriptDictBadge();
+
+  // 분할 옵션 안내문 끝에 그룹 수 미리보기 갱신 (입력 변경 시마다 자동 갱신됨)
+  const previewEl = document.getElementById('splitGroupCountPreview');
+  if (previewEl) {
+    const introCnt = groups.filter(g => g.isIntro).length;
+    const mainCnt = groups.length - introCnt;
+    const sentTxt = `${sentences.length}문장`;
+    if (introCnt > 0) {
+      previewEl.innerHTML =
+        `→ ${sentTxt} → ` +
+        `<span style="color:var(--info);">📘 도입부 ${introCnt}그룹</span> + ` +
+        `📕 본론 ${mainCnt}그룹 = ` +
+        `<span style="color:var(--accent);">총 ${groups.length}그룹</span>`;
+    } else {
+      previewEl.innerHTML =
+        `→ ${sentTxt} → <span style="color:var(--accent);">총 ${groups.length}그룹</span>`;
+    }
+  }
 
   // 8-C: AI 분할 토글 — 긴 문장의 vrewClips 를 Gemini 로 재분할 (백그라운드, 비동기)
   const useAi = document.getElementById('useAiSplitter');
