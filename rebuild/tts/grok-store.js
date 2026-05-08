@@ -1,0 +1,102 @@
+/**
+ * Grok Imagine 비디오 변환 설정 store.
+ * 위치: ~/.flow-app/grok-config.json
+ *
+ * 저장 항목:
+ *   - profileId               : Grok 자동화에 쓸 X 계정 프로필 (Flow 와 별개로 분리 가능)
+ *   - defaultMotionPrompt     : 모션 프롬프트 비워뒀을 때 fallback
+ *   - videoQuality            : 'standard' | 'hd' (Grok 옵션, 미정 — 페이지 분석 후 확정)
+ *   - maxDailyVideos          : 하루 한도 (X Premium 정책 고려)
+ *
+ *   - todayCount              : 오늘 처리한 수
+ *   - lastDate                : 'YYYY-MM-DD' — 날짜 바뀌면 todayCount 리셋
+ *
+ *   - lastUsedAt              : 마지막 호출 시각 (휴먼 딜레이 계산용)
+ */
+
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+const STORE_DIR = path.join(os.homedir(), '.flow-app');
+const STORE_PATH = path.join(STORE_DIR, 'grok-config.json');
+
+const DEFAULTS = {
+  profileId: 'default',
+  defaultMotionPrompt: 'natural slow motion, cinematic feel',
+  videoResolution: '720p',     // '480p' | '720p' (사용자 정책: 720p 기본)
+  videoDuration:   '6s',       // '6s' | '10s'
+  videoAspect:     '16:9 Widescreen',  // '16:9 Widescreen' | '9:16 Vertical' | '1:1 Square' | '2:3 Tall' | '3:2 Wide'
+  maxDailyVideos: 30,
+  todayCount: 0,
+  lastDate: '',
+  lastUsedAt: 0,
+};
+
+function _today() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function load() {
+  try {
+    if (fs.existsSync(STORE_PATH)) {
+      const data = JSON.parse(fs.readFileSync(STORE_PATH, 'utf-8'));
+      const merged = { ...DEFAULTS, ...data };
+      // 날짜가 바뀌었으면 todayCount 리셋
+      if (merged.lastDate !== _today()) {
+        merged.todayCount = 0;
+        merged.lastDate = _today();
+        save(merged);
+      }
+      return merged;
+    }
+  } catch (e) {
+    console.error('[grok-store] 로드 실패:', e.message);
+  }
+  const seed = { ...DEFAULTS, lastDate: _today() };
+  save(seed);
+  return seed;
+}
+
+function save(cfg) {
+  try {
+    fs.mkdirSync(STORE_DIR, { recursive: true });
+    fs.writeFileSync(STORE_PATH, JSON.stringify(cfg, null, 2), 'utf-8');
+    return true;
+  } catch (e) {
+    console.error('[grok-store] 저장 실패:', e.message);
+    return false;
+  }
+}
+
+function update(patch) {
+  const cur = load();
+  const next = { ...cur, ...patch };
+  save(next);
+  return next;
+}
+
+/** 일일 한도 안에 있는지 확인 + 초과 시 사유 반환 */
+function checkDailyLimit() {
+  const cfg = load();
+  if (cfg.todayCount >= cfg.maxDailyVideos) {
+    return {
+      allowed: false,
+      reason: `일일 한도 초과 (${cfg.todayCount}/${cfg.maxDailyVideos}) — 내일 다시 시도하거나 maxDailyVideos 를 늘리세요`,
+      cfg,
+    };
+  }
+  return { allowed: true, cfg };
+}
+
+/** 한 번 사용 기록 */
+function markUsed() {
+  const cur = load();
+  return update({
+    todayCount: cur.todayCount + 1,
+    lastUsedAt: Date.now(),
+  });
+}
+
+module.exports = { load, save, update, checkDailyLimit, markUsed, STORE_PATH, DEFAULTS };

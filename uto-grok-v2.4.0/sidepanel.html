@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>우토그록</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
+[data-theme="dark"]{--bg0:#0D1117;--bg1:#111827;--bg2:#1F2937;--bg3:#374151;--bd:#374151;--bdl:rgba(255,255,255,0.05);--t0:#F3F4F6;--t1:#E5E7EB;--t2:#D1D5DB;--t3:#9CA3AF;--t4:#6B7280;--g4:#FBBF24;--g5:#F59E0B;--g6:#D97706;--abg:rgba(245,158,11,0.06);--abd:rgba(245,158,11,0.12);--aac:rgba(245,158,11,0.12);--dn:#EF4444;--dnbg:rgba(239,68,68,0.12);--wn:#F59E0B}
+[data-theme="light"]{--bg0:#FFF;--bg1:#F9FAFB;--bg2:#F3F4F6;--bg3:#E5E7EB;--bd:#D1D5DB;--bdl:rgba(0,0,0,0.06);--t0:#111827;--t1:#1F2937;--t2:#374151;--t3:#6B7280;--t4:#9CA3AF;--g4:#B45309;--g5:#D97706;--g6:#92400E;--abg:rgba(245,158,11,0.05);--abd:rgba(245,158,11,0.15);--aac:rgba(245,158,11,0.1);--dn:#DC2626;--dnbg:rgba(220,38,38,0.08);--wn:#D97706}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg0);color:var(--t1);min-height:100vh;display:flex;flex-direction:column;transition:background .3s,color .3s;font-size:12px}
+.hdr{padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--abd);background:var(--abg)}
+.logo{width:26px;height:26px;background:var(--g5);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;flex-shrink:0}
+.hdr-i{flex:1}.hdr h1{font-size:13px;font-weight:700;color:var(--g4)}.hdr .ver{font-size:9px;color:var(--t4)}
+.thm{width:26px;height:26px;border-radius:50%;border:1px solid var(--bd);background:var(--bg2);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center}
+.sbar{display:flex;align-items:center;gap:6px;padding:5px 14px;background:var(--abg);border-bottom:1px solid var(--bdl);flex-wrap:wrap}
+.sd{width:6px;height:6px;border-radius:50%;background:var(--t4)}.sd.on{background:var(--g4);box-shadow:0 0 5px rgba(245,158,11,.5)}.sd.run{background:var(--g4);animation:p 1.5s infinite}.sd.err{background:var(--dn)}
+@keyframes p{0%,100%{opacity:1}50%{opacity:.4}}
+.st{font-size:10px;color:var(--t3);flex:1}.eta{font-size:9px;color:var(--g4);font-weight:600}
+.step-badge{font-size:9px;padding:2px 6px;border-radius:10px;font-weight:600;margin-left:4px}
+.step-input{background:rgba(59,130,246,0.15);color:#60A5FA}.step-send{background:rgba(245,158,11,0.15);color:var(--g4)}
+.step-gen{background:rgba(245,158,11,0.15);color:var(--wn)}.step-dl{background:rgba(139,92,246,0.15);color:#A78BFA}
+.tabs{display:flex;border-bottom:1px solid var(--bdl)}
+.tab{flex:1;padding:8px 4px;text-align:center;font-size:10px;font-weight:600;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+.tab:hover{color:var(--t1)}.tab.active{color:var(--g4);border-bottom-color:var(--g5)}
+.tc{display:none;overflow-y:auto;max-height:calc(100vh - 280px)}.tc.active{display:block}
+.tc::-webkit-scrollbar{width:3px}.tc::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:2px}
+.sec{padding:10px 14px}.sec-t{font-size:10px;font-weight:600;color:var(--t2);margin-bottom:6px;display:flex;align-items:center;gap:4px}
+.sec-t .ico{font-size:11px}.field{margin-bottom:10px}.hint{font-size:9px;color:var(--t4);margin-top:3px;line-height:1.4}
+.cnt{font-size:10px;color:var(--g4);font-weight:600;text-align:right;margin-top:2px}.div{height:1px;background:var(--bdl);margin:4px 0 8px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.kbd{font-size:8px;color:var(--t4);background:var(--bg3);padding:1px 4px;border-radius:3px;border:1px solid var(--bd)}
+.inp,.sel{width:100%;background:var(--bg2);border:1px solid var(--bd);border-radius:6px;padding:7px 10px;color:var(--t0);font-family:inherit;font-size:12px;outline:none;transition:border .2s}
+.inp:focus,.sel:focus{border-color:var(--g5)}
+.sel{appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:24px}
+.inp-sm{width:60px;background:var(--bg2);border:1px solid var(--bd);border-radius:6px;padding:7px 6px;color:var(--t0);font-family:inherit;font-size:12px;outline:none;text-align:center}
+.inp-sm:focus{border-color:var(--g5)}
+textarea.inp{min-height:90px;max-height:180px;resize:vertical;line-height:1.5;font-size:11px}textarea.inp::placeholder{color:var(--t4)}
+.msel{display:flex;gap:0;margin-bottom:10px}
+.mbtn{flex:1;padding:8px 4px;text-align:center;font-size:10px;font-weight:600;cursor:pointer;border:1px solid var(--bd);background:var(--bg2);color:var(--t3);transition:all .2s;display:flex;align-items:center;justify-content:center;gap:3px}
+.mbtn:first-child{border-radius:6px 0 0 6px}.mbtn:last-child{border-radius:0 6px 6px 0}.mbtn.active{background:var(--aac);border-color:var(--g5);color:var(--g4)}
+.uz{border:2px dashed var(--bd);border-radius:8px;padding:14px 10px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg2);margin-bottom:6px}
+.uz:hover,.uz.dragover{border-color:var(--g5);background:var(--abg)}.uz .ui{font-size:22px;margin-bottom:3px}.uz .ut{font-size:10px;color:var(--t3)}.uz .ut strong{color:var(--g4)}.uz input[type="file"]{display:none}
+.il{display:flex;flex-direction:column;gap:4px;margin-bottom:4px}
+.ii{display:flex;align-items:center;gap:6px;background:var(--bg2);border:1px solid var(--bd);border-radius:5px;padding:5px 7px}
+.ii img{width:32px;height:32px;object-fit:cover;border-radius:4px;flex-shrink:0}.ii-b{flex:1;min-width:0}
+.ii-n{font-size:10px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ii-rm{width:16px;height:16px;border-radius:50%;background:var(--dnbg);border:none;color:var(--dn);cursor:pointer;font-size:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ii-grip{cursor:grab;color:var(--t4);font-size:12px;flex-shrink:0;user-select:none}.ii-grip:active{cursor:grabbing}
+.pv-card{display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--bd);border-radius:6px;padding:8px;margin-bottom:6px}
+.pv-dur{background:var(--bg3);border:1px solid var(--bd);border-radius:5px;padding:5px 8px;color:var(--t0);font-family:inherit;font-size:11px;outline:none;width:70px;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;padding-right:20px}
+.pv-dur:focus{border-color:var(--g5)}
+.pv-info{flex:1;min-width:0}
+.pv-num{font-size:10px;color:var(--g4);font-weight:700}
+.pv-prompt{font-size:10px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pv-meta{font-size:9px;color:var(--t4);margin-top:1px}
+.pv-thumb{width:40px;height:40px;border-radius:4px;object-fit:cover;flex-shrink:0}
+.dr{display:flex;align-items:center;gap:6px}.da{color:var(--t3);font-size:14px}
+.preset-row{display:flex;gap:4px;margin-bottom:6px}.preset-row .inp{flex:1;font-size:10px;padding:5px 8px}
+.preset-row .pbtn{padding:5px 8px;border-radius:5px;border:1px solid var(--bd);background:var(--bg2);color:var(--t2);font-family:inherit;font-size:9px;font-weight:600;cursor:pointer}
+.preset-row .pbtn:hover{background:var(--bg3)}
+.preset-list{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
+.preset-tag{padding:3px 8px;border-radius:12px;background:var(--bg2);border:1px solid var(--bd);font-size:9px;color:var(--t2);cursor:pointer;display:flex;align-items:center;gap:3px}
+.preset-tag:hover{border-color:var(--g5);color:var(--g4)}.preset-tag .pt-x{color:var(--dn);font-weight:700;margin-left:2px}
+.import-row{display:flex;gap:4px;margin-bottom:6px}
+.import-row .ibtn{padding:5px 10px;border-radius:5px;border:1px solid var(--bd);background:var(--bg2);color:var(--t2);font-family:inherit;font-size:9px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:3px}
+.import-row .ibtn:hover{background:var(--bg3)}
+.qs{flex:1;display:flex;flex-direction:column;border-top:1px solid var(--bdl);min-height:60px}
+.qh{display:flex;justify-content:space-between;align-items:center;padding:7px 14px;font-size:10px;font-weight:600;color:var(--t2)}
+.qh .qc{color:var(--t3);font-weight:500}
+.q-status{padding:6px 14px 8px;background:var(--bg1);border-bottom:1px solid var(--bdl)}
+.q-status-row{display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap}
+.q-status-txt{font-size:10px;color:var(--g4);font-weight:600}
+.qb{flex:1;overflow-y:auto;padding:0 14px 4px;max-height:140px}
+.qb::-webkit-scrollbar{width:3px}.qb::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:2px}
+.qi{display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--bg2);border-radius:5px;margin-bottom:3px;border:1px solid var(--bd);font-size:9px;position:relative;cursor:grab;min-height:32px}
+.qi.active{border-color:var(--g5);background:var(--aac)}.qi.done{opacity:.4}.qi.error{border-color:var(--dn)}
+.qi.dragging{opacity:.3;border-style:dashed}
+.qi-n{font-size:8px;font-weight:700;color:var(--t4);min-width:14px}.qi-thumb{width:24px;height:24px;border-radius:3px;object-fit:cover;flex-shrink:0}
+.qi-t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--t2)}
+.qi-t2{flex:1;min-width:0;overflow:hidden}
+.qi-name{font-size:9px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.qi-prompt{font-size:8px;color:var(--g4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.qi-s{font-size:11px;flex-shrink:0}
+.qi-acts{display:none;gap:2px;margin-left:4px}
+.qi:hover .qi-acts{display:flex}
+.qi-act{width:16px;height:16px;border-radius:3px;border:none;font-size:8px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.qi-act.rerun{background:rgba(245,158,11,0.15);color:var(--g4)}.qi-act.del{background:var(--dnbg);color:var(--dn)}
+.qi-err{position:absolute;bottom:-18px;left:8px;font-size:8px;color:var(--dn);background:var(--bg1);padding:1px 6px;border-radius:3px;border:1px solid var(--dn);white-space:nowrap;z-index:10;display:none}
+.qi.error:hover .qi-err{display:block}
+.prog{padding:0 14px 6px;display:none}.prog.active{display:block}
+.prog-tk{width:100%;height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-bottom:4px}
+.prog-fl{height:100%;background:linear-gradient(90deg,var(--g5),var(--g4));border-radius:2px;width:0%;transition:width .5s}
+.prog-i{display:flex;justify-content:space-between;font-size:9px;color:var(--t3)}.prog-i .done{color:var(--g4);font-weight:600}
+.bbar{display:flex;gap:4px;padding:8px 14px;border-top:1px solid var(--bdl);background:var(--bg1);position:sticky;bottom:0;z-index:10}
+.bb{padding:7px 8px;border:1px solid var(--bd);border-radius:6px;background:var(--bg2);color:var(--t2);font-family:inherit;font-size:9px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:3px;transition:all .15s}
+.bb:hover{background:var(--bg3)}
+.bb-run{flex:1;background:var(--g5);border-color:var(--g5);color:#fff;font-weight:700;font-size:11px;justify-content:center}
+.bb-run:hover{background:var(--g6)}.bb-run:disabled{background:var(--bg3);border-color:var(--bd);color:var(--t4);cursor:not-allowed}
+.bb-stop{flex:1;background:var(--dnbg);border-color:rgba(239,68,68,.3);color:var(--dn);font-weight:700;font-size:11px;justify-content:center}
+.bb-pause{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.3);color:var(--wn);font-weight:600}
+.sbtns{display:flex;gap:6px;margin-top:10px}
+.sb{flex:1;padding:8px;border-radius:6px;font-family:inherit;font-size:10px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;transition:all .15s}
+.sb-r{background:var(--bg2);border:1px solid var(--bd);color:var(--t2)}.sb-r:hover{background:var(--bg3)}
+.sb-s{background:var(--g5);border:1px solid var(--g5);color:#fff}.sb-s:hover{background:var(--g6)}
+.erow{display:flex;gap:6px;margin-top:8px}.erow .sb{font-size:9px}
+.hist-tbl{width:100%;border-collapse:collapse;font-size:9px}
+.hist-tbl th{text-align:left;padding:4px 6px;border-bottom:1px solid var(--bd);color:var(--t3);font-weight:600}
+.hist-tbl td{padding:4px 6px;border-bottom:1px solid var(--bdl);color:var(--t2);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-tbl .ok{color:var(--g4)}.hist-tbl .fail{color:var(--dn)}
+.hist-empty{text-align:center;padding:20px;color:var(--t4);font-size:11px}
+.hist-clear{margin-top:8px}
+</style>
+</head>
+<body>
+<div id="mainContent" style="display:none;flex:1;flex-direction:column;min-height:100vh">
+<div class="hdr"><div class="logo">▶</div><div class="hdr-i"><h1 data-i="appName">우토그록 Uto Grok</h1><span class="ver" data-i="appVer">최신버전 v2.4.0 · grok.com 자동화 · by 우미</span></div><button class="thm" id="themeBtn">☀️</button></div>
+<div class="sbar"><div class="sd" id="sDot"></div><span class="st" id="sTxt" data-i="statusWait">grok.com 탭을 열어주세요</span></div>
+<div class="tabs">
+<div class="tab active" data-tab="work" data-i="tabWork">🎬 작업</div>
+<div class="tab" data-tab="history" data-i="tabHistory">📊 생성 기록</div>
+<div class="tab" data-tab="settings" data-i="tabSettings">⚙️ 설정</div>
+</div>
+
+<!-- TAB: WORK -->
+<div class="tc active" id="tab-work"><div class="sec">
+<div class="sec-t" data-i="modeLabel"><span class="ico">🎬</span> 생성 모드</div>
+<div class="msel"><div class="mbtn" data-mode="text" data-i="modeText">📝 텍스트 → 비디오</div><div class="mbtn active" data-mode="image" data-i="modeImage">🖼️ 이미지 → 비디오</div></div>
+
+<!-- TEXT MODE: 프롬프트만 -->
+<div id="textSection" style="display:none">
+<div class="sec-t"><span class="ico">📝</span> <span data-i="promptLabel">프롬프트</span> <span class="kbd">Ctrl+Enter</span></div>
+<textarea class="inp" id="promptInput" data-i-placeholder="promptPlaceholder"></textarea>
+<div class="hint" data-i="promptHint">빈 줄로 프롬프트를 구분하세요.</div>
+<div class="cnt" id="promptCount">0개 프롬프트</div>
+</div>
+
+<!-- IMAGE MODE: 이미지 업로드 → 프롬프트 입력 → 미리보기 -->
+<div id="imgSection">
+<div class="sec-t"><span class="ico">🖼️</span> <span data-i="imgLabel">이미지 업로드</span></div>
+<div class="uz" id="uploadZone"><div class="ui">📁</div><div class="ut" data-i-html="imgUploadText"><strong>클릭</strong>하여 업로드하거나 <strong>드래그 앤 드롭</strong></div><div class="ut" style="font-size:9px;margin-top:2px;color:var(--t4)" data-i="imgUploadHint">PNG, JPG, GIF 각 10MB 이하</div><input type="file" id="fileInput" accept="image/png,image/jpeg,image/gif" multiple></div>
+<div class="il" id="imgList"></div>
+<div class="cnt" id="imgCount" style="display:inline">0개 이미지</div><button id="imgSortBtn" style="float:right;background:var(--bg2);border:1px solid var(--bd);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--g4);cursor:pointer;font-family:inherit">↑↓ 이름순 정렬</button>
+
+<div style="margin-top:10px">
+<div class="sec-t"><span class="ico">📝</span> <span data-i="promptLabel">프롬프트</span> <span class="kbd">Ctrl+Enter</span></div>
+<textarea class="inp" id="imgPromptInput" placeholder="예시:&#10;첫 번째 이미지에 적용할 프롬프트.&#10;&#10;두 번째 이미지에 적용할 프롬프트.&#10;&#10;세 번째 이미지에 적용할 프롬프트."></textarea>
+<div class="hint">빈 줄로 프롬프트를 구분하세요. 이미지 순서대로 매칭됩니다.</div>
+<div class="cnt" id="imgPromptCount">0개 프롬프트</div>
+</div>
+
+<!-- 프롬프트별 비디오 모드 미리보기 -->
+<div id="previewSection" style="margin-top:10px;display:none">
+<div class="sec-t"><span class="ico">⏱️</span> 프롬프트별 비디오 모드</div>
+<div id="previewList"></div>
+</div>
+</div>
+
+<!-- PRESETS -->
+<div style="margin-top:8px">
+<div class="sec-t"><span class="ico">📋</span> <span data-i="presetLabel">프리셋</span></div>
+<div class="preset-row"><input class="inp" type="text" id="presetName" data-i-placeholder="presetNamePlaceholder"><button class="pbtn" id="presetSaveBtn" data-i="presetSave">💾 저장</button></div>
+<div class="preset-list" id="presetList"></div>
+</div>
+
+<!-- CSV/TXT IMPORT -->
+<div class="import-row"><button class="ibtn" id="csvImportBtn" data-i="importFile">📄 파일 불러오기</button><input type="file" id="csvFileInput" accept=".csv,.txt" style="display:none"></div>
+<div class="hint" data-i="importFileHint">CSV 또는 TXT 파일에서 프롬프트를 불러옵니다.</div>
+
+<div class="div"></div>
+<div class="row2"><div class="field"><div class="sec-t"><span class="ico">🔢</span> <span data-i="outputLabel">프롬프트당 출력 수</span></div><input class="inp" type="number" id="outputCount" value="1" min="1" max="10"><div class="hint" data-i="outputHint">프롬프트당 생성할 비디오 수.</div></div><div class="field"><div class="sec-t"><span class="ico">📂</span> <span data-i="folderLabel">폴더에 저장</span></div><input class="inp" type="text" id="folderName" value="grok-folder-1"><div class="hint" data-i="folderHint">다운로드 하위 폴더.</div></div></div>
+<div class="field"><div class="sec-t"><span class="ico">⏱️</span> <span data-i="delayLabel">랜덤 지연</span></div><div class="dr"><input class="inp-sm" type="number" id="delayMin" value="20" min="5" max="300"><span class="da">⇄</span><input class="inp-sm" type="number" id="delayMax" value="30" min="5" max="300"></div><div class="hint" data-i="delayHint">다음 프롬프트를 처리하기 전 랜덤 대기 시간.</div></div>
+</div></div>
+
+<!-- TAB: HISTORY -->
+<div class="tc" id="tab-history"><div class="sec">
+<div class="sec-t"><span class="ico">📊</span> <span data-i="histTitle">생성 기록</span></div>
+<div id="histBody"></div>
+<button class="sb sb-r hist-clear" id="histClearBtn" data-i="histClear">🗑️ 기록 지우기</button>
+</div></div>
+
+<!-- TAB: SETTINGS -->
+<div class="tc" id="tab-settings"><div class="sec">
+<div class="field"><div class="sec-t"><span class="ico">🎬</span> <span data-i="setModeLabel">기본 모드</span></div><select class="sel" id="setMode"><option value="text-to-video" data-i="setModeText">텍스트에서 비디오</option><option value="frame-to-video" selected data-i="setModeFrame">프레임에서 비디오</option></select><div class="hint" data-i="setModeHint">새 비디오를 만들 때 기본 모드.</div></div>
+<div class="field"><div class="sec-t"><span class="ico">📐</span> <span data-i="setRatioLabel">기본 화면 비율</span></div><select class="sel" id="setRatio"><option value="16:9" selected>16:9 (가로)</option><option value="9:16">9:16 (세로)</option><option value="1:1">1:1 (정사각)</option><option value="3:2">3:2 (가로)</option><option value="2:3">2:3 (세로)</option></select><div class="hint" data-i="setRatioHint">비디오 프레임 비율.</div></div>
+<div class="field"><div class="sec-t"><span class="ico">⏱️</span> <span data-i="setDurLabel">기본 비디오 옵션</span></div><select class="sel" id="setDuration"><option value="6" selected>6초</option><option value="10">10초</option></select><div class="hint" data-i="setDurHint">프롬프트의 기본 지속 시간.</div></div>
+<div class="field"><div class="sec-t"><span class="ico">🔄</span> <span data-i="setRetryLabel">실패 시 최대 재시도 횟수</span></div><input class="inp" type="number" id="setRetry" value="5" min="1" max="20"><div class="hint" data-i="setRetryHint">비디오 생성 실패 시 재시도 횟수.</div></div>
+<div class="field"><div class="sec-t"><span class="ico">⬇️</span> <span data-i="setQualityLabel">자동 다운로드 품질</span></div><select class="sel" id="setQuality"><option value="none" data-i="setQualityNone">다운로드 안함</option><option value="480p" selected>480p</option><option value="480p-upscale">480p (업스케일)</option><option value="720p">720p (Super Grok)</option></select><div class="hint" data-i="setQualityHint">자동 다운로드 비디오 품질.</div></div>
+<div class="field"><div class="sec-t"><span class="ico">🌐</span> <span data-i="setLangLabel">언어</span></div><select class="sel" id="setLang"><option value="ko" selected>한국어</option><option value="ja">日本語</option><option value="zh">中文</option><option value="en">English</option></select><div class="hint" data-i="setLangHint">선호하는 언어를 선택하세요.</div></div>
+<div class="field"><div class="sec-t"><span class="ico">⏱️</span> <span data-i="setDelayLabel">기본 딜레이 범위 (초)</span></div><div class="dr"><input class="inp-sm" type="number" id="setDelayMin" value="20" min="5" max="300"><span class="da">⇄</span><input class="inp-sm" type="number" id="setDelayMax" value="30" min="5" max="300"></div><div class="hint" data-i="setDelayHint">프롬프트 간 대기 시간의 최소~최대.</div></div>
+<div class="field"><div class="sec-t"><span class="ico">📥</span> <span data-i="setDownloadLabel">다운로드 설정</span></div><div class="hint" style="margin-top:0" data-i="setDownloadHint">비디오는 Chrome의 다운로드 폴더에 저장됩니다.</div></div>
+<div class="sbtns"><button class="sb sb-r" id="resetBtn" data-i="btnReset">🔄 기본값으로 재설정</button><button class="sb sb-s" id="saveBtn" data-i="btnSave">✅ 설정 저장</button></div>
+<div class="div" style="margin-top:12px"></div>
+<div class="sec-t"><span class="ico">💾</span> <span data-i="exportLabel">내보내기 / 가져오기</span></div>
+<div class="hint" style="margin-bottom:5px" data-i="exportHint">설정과 생성 기록을 JSON으로 백업/복원.</div>
+<div class="erow"><button class="sb sb-r" id="exportBtn" data-i="btnExport">📤 내보내기</button><button class="sb sb-r" id="importBtn" data-i="btnImport">📥 가져오기</button></div>
+<input type="file" id="importFile" accept=".json" style="display:none">
+<div class="div" style="margin-top:12px"></div>
+<div class="sec-t"><span class="ico">⌨️</span> <span data-i="shortcutLabel">키보드 단축키</span></div>
+<div class="hint" style="line-height:1.8"><span class="kbd">Ctrl+Enter</span> <span data-i="shortcutRun">실행</span><br><span class="kbd">Esc</span> <span data-i="shortcutStop">중지</span><br><span class="kbd">Ctrl+P</span> <span data-i="shortcutPause">일시정지 / 재개</span></div>
+</div></div>
+
+<div class="qs">
+<div class="qh"><span data-i="queueTitle">☰ 프롬프트 대기열</span><span class="qc" id="qCount">0개</span></div>
+<div class="q-status" id="qStatus" style="display:none">
+<div class="q-status-row"><span class="q-status-txt" id="qStatusTxt"></span><span id="stepBadge"></span></div>
+<div class="q-status-row"><span class="eta" id="etaText"></span></div>
+<div class="prog-tk"><div class="prog-fl" id="progFill"></div></div>
+<div class="prog-i"><span class="done" id="progDone">0/0</span><span id="progPct">0%</span></div>
+</div>
+<div class="qb" id="qBody"></div>
+</div>
+<div class="bbar">
+<button class="bb" id="helpBtn">📖 도움말</button>
+<button class="bb" id="bugBtn" data-i="btnBug">🐛 버그신고</button>
+<button class="bb" id="clearBtn" data-i="btnClear">🔄 초기화</button>
+<button class="bb" id="refreshBtn">🔃 새로고침</button>
+<button class="bb bb-pause" id="pauseBtn" style="display:none" data-i="btnPause">⏸ 일시정지</button>
+<button class="bb bb-run" id="runBtn" data-i="btnRun">▶ 실행</button>
+<button class="bb bb-stop" id="stopBtn" style="display:none" data-i="btnStop">■ 중지</button>
+</div>
+</div>
+<div id="authScreen" style="display:flex;position:fixed;inset:0;background:var(--bg0);z-index:1000;align-items:center;justify-content:center;flex-direction:column">
+<div style="max-width:320px;width:90%;text-align:center;padding:32px 24px">
+<div style="font-size:32px;margin-bottom:8px">🔐</div>
+<div style="font-size:18px;font-weight:700;color:var(--t0);margin-bottom:4px">우토그록 Uto Grok</div>
+<div id="authSubtitle" style="font-size:11px;color:var(--t4);margin-bottom:20px">사용 신청이 필요합니다</div>
+<div id="authFormSection">
+<div style="text-align:left;margin-bottom:10px">
+<div style="font-size:11px;color:var(--t3);margin-bottom:4px;font-weight:600">Chrome 계정</div>
+<div id="authEmail" style="padding:8px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;font-size:13px;color:var(--g4)">이메일 감지 중...</div>
+</div>
+<div style="text-align:left;margin-bottom:10px">
+<div style="font-size:11px;color:var(--t3);margin-bottom:4px;font-weight:600">성함</div>
+<input id="authName" type="text" placeholder="실명을 입력하세요" style="width:100%;padding:9px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;font-size:13px;color:var(--t0);outline:none;text-align:center">
+</div>
+<div style="text-align:left;margin-bottom:10px">
+<div style="font-size:11px;color:var(--t3);margin-bottom:4px;font-weight:600">닉네임</div>
+<input id="authNickname" type="text" placeholder="사용하실 닉네임" style="width:100%;padding:9px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;font-size:13px;color:var(--t0);outline:none;text-align:center">
+</div>
+<div style="text-align:left;margin-bottom:10px">
+<div style="font-size:11px;color:var(--t3);margin-bottom:4px;font-weight:600">강의명</div>
+<input id="authCourse" type="text" placeholder="수강 중인 강의명" style="width:100%;padding:9px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;font-size:13px;color:var(--t0);outline:none;text-align:center">
+</div>
+<button id="authApplyBtn" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--g6);color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">신청하기</button>
+</div>
+<div id="authPendingSection" style="display:none">
+<div style="font-size:40px;margin-bottom:12px">⏳</div>
+<div style="font-size:14px;color:var(--t2);line-height:1.8;margin-bottom:16px">
+신청이 완료되었습니다.<br>
+관리자 승인 후 사용 가능합니다.
+</div>
+<button id="authCheckBtn" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--bg2);border:1px solid var(--bd);color:var(--t1);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">승인 상태 확인</button>
+</div>
+<div id="authExpiredSection" style="display:none">
+<div style="font-size:40px;margin-bottom:12px">⏰</div>
+<div style="font-size:14px;color:var(--t2);line-height:1.8;margin-bottom:8px">
+이용 기간이 만료되었습니다.
+</div>
+<div style="font-size:12px;color:var(--t4);line-height:1.6">
+연장을 원하시면 관리자에게 문의해주세요.
+</div>
+</div>
+<div id="authMsg" style="font-size:12px;margin-top:12px;min-height:18px"></div>
+</div>
+</div>
+<div id="grokModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:999;align-items:center;justify-content:center">
+<div style="background:var(--bg1);border:1px solid var(--bd);border-radius:16px;padding:28px 24px 20px;max-width:320px;width:90%;text-align:center;position:relative">
+<button id="grokModalX" style="position:absolute;top:10px;right:14px;background:none;border:none;color:var(--t4);font-size:18px;cursor:pointer;padding:4px">&times;</button>
+<div style="font-size:28px;margin-bottom:12px">⚠️</div>
+<div style="font-size:15px;font-weight:700;color:var(--t0);margin-bottom:16px;line-height:1.6">Grok 페이지가 필요합니다</div>
+<div style="font-size:13px;color:var(--t2);line-height:1.8;margin-bottom:20px">
+우토그록 도구는<br>
+<span style="color:var(--g4);font-weight:600">grok.com의 Imagine 페이지</span>에서만<br>
+작동합니다.
+</div>
+<button id="grokModalGo" style="width:100%;padding:10px;border:none;border-radius:10px;background:var(--g6);color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Grok으로 이동</button>
+</div>
+</div>
+<div id="bugModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:999;align-items:center;justify-content:center">
+<div style="background:var(--bg1);border:1px solid var(--bd);border-radius:16px;padding:28px 24px 20px;max-width:320px;width:90%;text-align:center;position:relative">
+<button id="bugModalX" style="position:absolute;top:10px;right:14px;background:none;border:none;color:var(--t4);font-size:18px;cursor:pointer;padding:4px">&times;</button>
+<div style="font-size:28px;margin-bottom:12px">🐛</div>
+<div style="font-size:15px;font-weight:700;color:var(--t0);margin-bottom:16px;line-height:1.6">버그 신고 안내</div>
+<div style="font-size:13px;color:var(--t2);line-height:1.8;margin-bottom:20px">
+카페 게시글에 버그 사항 댓글 달아주시면<br>
+오류 확인 후 최대한 빠르게 수정하겠습니다.<br><br>
+<span style="font-size:12px;color:var(--t3)">감사합니다! 🙏</span>
+</div>
+<button id="bugModalCafe" style="width:100%;padding:10px;border:none;border-radius:10px;background:var(--bg2);border:1px solid var(--bd);color:var(--g4);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:8px">☕ 카페 게시글 바로가기</button>
+<button id="bugModalOk" style="width:100%;padding:10px;border:none;border-radius:10px;background:var(--g6);color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">확인</button>
+</div>
+</div>
+<script src="i18n.js"></script>
+<script src="sidepanel.js"></script>
+</body>
+</html>

@@ -1,0 +1,303 @@
+/**
+ * vrew-builder — Project (sentences + groups) → .vrew
+ *
+ * 핵심 설계:
+ *   - 한 sentence = 1 TTS 음성 (sentence.ttsAudioPath 재사용, 다시 변환 X)
+ *   - N vrewClips 가 같은 dubMid 를 sourceIn/sourceOut 으로 시간 슬라이스 → 음성 끊김 X
+ *   - 각 vrewClip 마다 ttsMid (dummy) 별도 — Vrew 의 표준 형식
+ *   - 그룹의 imagePath 는 그룹 안 모든 클립이 assetId 공유 (Ken Burns 연속)
+ *
+ * 형식 호환성:
+ *   - flow-engine 의 _generateVrew 가 만드는 .vrew 와 같은 구조 (검증된 형식).
+ *   - sourceFileType: 'TTS' (dummy) + 'TTS_DUBBING' (실제 음성)
+ *   - ttsClipInfosMap, lastTTSSettings 등 필수 필드 모두 등록
+ */
+
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const { splitLongSentenceAlgo } = require('../core/long-sentence-splitter/algo-splitter');
+
+const TEMPLATE_PATH = path.join(__dirname, '..', 'vrew-template.json');
+const DUMMY_TTS_PATH = path.join(__dirname, '..', 'dummy-tts.mp3');
+const VREW_MAX_CHARS = 20;  // 긴 문장 분할 임계값 (사용자 UI 기본값과 일치)
+
+const uid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+  const r = Math.random() * 16 | 0;
+  return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+});
+const sid = () => uid().replace(/-/g, '').substring(0, 10);
+
+const CAPTION_ATTRS = {
+  font: 'Pretendard-Vrew_700', size: '150', color: '#ffffff',
+  'outline-on': 'true', 'outline-color': '#000000', 'outline-width': '6',
+};
+
+const DEFAULT_SPEAKER = {
+  gender: 'female', age: 'middle', provider: 'vrew', lang: 'ko-KR',
+  name: 'butter_f', speakerId: 'characteristic2', badge: 'Recommended',
+  tags: ['_characteristic', 'cheesy', 'badgirl'],
+  versions: ['v4'], isUnavailable: false,
+};
+
+const KEN_BURNS_PATTERNS = [
+  { from: { scale: 0.70, centerX: 0.53, centerY: 0.35 }, to: { scale: 1.00, centerX: 0.50, centerY: 0.50 } },
+  { from: { scale: 1.00, centerX: 0.50, centerY: 0.50 }, to: { scale: 0.65, centerX: 0.50, centerY: 0.50 } },
+  { from: { scale: 0.54, centerX: 0.51, centerY: 0.37 }, to: { scale: 1.00, centerX: 0.50, centerY: 0.50 } },
+  { from: { scale: 1.00, centerX: 0.50, centerY: 0.50 }, to: { scale: 0.55, centerX: 0.50, centerY: 0.44 } },
+  { from: { scale: 0.70, centerX: 0.65, centerY: 0.35 }, to: { scale: 0.85, centerX: 0.40, centerY: 0.55 } },
+];
+
+function ttsCleanText(text) {
+  return String(text)
+    .replace(/[–—⸻]/g, ' ')
+    .replace(/[\x00-\x19]/g, '')
+    .replace(/[ -‒―-⯿]/g, '')
+    .replace(/[〃-〿゙-゜]/g, '')
+    .replace(/[()*\/+:;<=>[\\\]^_{|}~@`]/g, '')
+    .replace(/[《》〈〉「」]/g, '')
+    .replace(/^['"]|['"]$/g, '')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function estimateAudioDuration(filePath) {
+  try {
+    const stat = fs.statSync(filePath);
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext === '.wav') return Math.max(0.5, (stat.size - 44) / 48000);
+    return Math.max(0.5, stat.size / 6000);
+  } catch { return 1.0; }
+}
+
+async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
+  const log = typeof opts.logger === 'function' ? opts.logger : () => {};
+
+  // dummy-tts.mp3 로드 (없으면 vrew 거부될 수 있음)
+  let dummyBytes = 0, dummyDur = 1;
+  if (fs.existsSync(DUMMY_TTS_PATH)) {
+    dummyBytes = fs.statSync(DUMMY_TTS_PATH).size;
+  } else {
+    log(`[Vrew] [!] dummy-tts.mp3 없음 (${DUMMY_TTS_PATH}) — TTS 클립 누락으로 vrew 거부 가능`);
+  }
+
+  let T;
+  try {
+    T = JSON.parse(fs.readFileSync(TEMPLATE_PATH, 'utf-8'));
+  } catch (e) {
+    throw new Error(`vrew-template.json 로드 실패: ${e.message}`);
+  }
+
+  const pj = JSON.parse(JSON.stringify(T));
+  const nowIso = new Date().toISOString();
+  pj.projectId = uid();
+  // Vrew 4.0.1 호환: comment + saveInfo.version 모두 4.0.1
+  pj.comment = `4.0.1\t${nowIso}`;
+  pj.statistics.saveInfo.created.date = nowIso;
+  pj.statistics.saveInfo.created.version = '4.0.1';
+  pj.statistics.saveInfo.updated.date = nowIso;
+  pj.statistics.saveInfo.updated.version = '4.0.1';
+  if (!pj.props.tracks) pj.props.tracks = {};
+  if (!pj.props.assets) pj.props.assets = {};
+  if (!pj.props.ttsClipInfosMap) pj.props.ttsClipInfosMap = {};
+  pj.props.lastTTSSettings = {
+    pitch: 0, speed: 0, volume: 0,
+    speaker: { ...DEFAULT_SPEAKER }, version: 'v4',
+  };
+  pj.transcript.clips = [];
+
+  const mediaZip = [];
+  const unifiedSceneId = sid();
+
+  // 1. 그룹 이미지 등록 (assetId 재사용)
+  const groupImageAsset = new Map();
+  let kbIdx = 0;
+  for (const g of groups) {
+    if (!g.imagePath || !fs.existsSync(g.imagePath)) continue;
+    const mid = uid(), aid = uid(), tid = sid();
+    const ext = (path.extname(g.imagePath).toLowerCase().replace('.jpeg', '.jpg').replace('.', '')) || 'png';
+    const fn = `${mid}.${ext}`;
+    const fileSize = fs.statSync(g.imagePath).size;
+    pj.files.push({
+      version: 1, mediaId: mid, sourceOrigin: 'USER', fileSize, name: fn,
+      type: 'Image', isTransparent: false, fileLocation: 'IN_MEMORY',
+    });
+    const kb = KEN_BURNS_PATTERNS[kbIdx % KEN_BURNS_PATTERNS.length];
+    kbIdx++;
+    pj.props.tracks[tid] = {
+      trackId: tid, mediaId: mid,
+      xPos: 0, yPos: 0, height: 1, width: 1,
+      rotation: 0, zIndex: 1, type: 'image',
+      sourceIn: 0, sourceOut: 60,
+      isTrimmable: false, hasAlphaChannel: false,
+      kenBurns: { from: kb.from, to: kb.to, easing: 'easeInOut' },
+      editInfo: {}, fillType: 'cover',
+    };
+    pj.props.assets[aid] = { trackIds: [tid], role: 'main' };
+    groupImageAsset.set(g.id, { aid, mid, fn });
+    mediaZip.push({ src: g.imagePath, name: fn });
+  }
+
+  // 2. 각 sentence — TTS_DUBBING 1번 등록 (한 mp3) + N개 vrewClip 펼침
+  let groupTimeOffset = 0;
+  let lastGroupId = null;
+  const missing = [];
+
+  for (const s of sentences) {
+    if (!s.ttsAudioPath || !fs.existsSync(s.ttsAudioPath)) {
+      missing.push(s.num);
+      continue;
+    }
+
+    const ttsDur = s.ttsDurationSec || estimateAudioDuration(s.ttsAudioPath);
+    const ext = (path.extname(s.ttsAudioPath).toLowerCase().replace('.', '')) || 'mp3';
+    const codec = (ext === 'wav') ? 'wav' : 'mp3';
+    // Vrew 4.0.1 단일 ttsClip 패턴 — 한 sentence의 음성 파일을 직접 가리킴 (sourceFileType: 'TTS')
+    // ttsDubbing/dummy mp3 트릭은 4.0이 인식 안 해서 빈 클립으로 표시 → 폐기.
+    // 같은 mediaId를 N개 vrewClip이 sourceIn/sourceOut으로 시간 슬라이스 (음성 끊김 X)
+    const sentenceTtsMid = sid();
+    const sentenceTtsFn = `${sentenceTtsMid}.${ext}`;
+    const sentenceTtsBytes = fs.statSync(s.ttsAudioPath).size;
+    pj.files.push({
+      version: 1, mediaId: sentenceTtsMid, sourceOrigin: 'VREW_RESOURCE',
+      fileSize: sentenceTtsBytes, name: sentenceTtsFn, type: 'AVMedia',
+      videoAudioMetaInfo: {
+        duration: ttsDur,
+        audioInfo: { sampleRate: 44100, codec: codec, channelCount: 1 },
+      },
+      sourceFileType: 'TTS', fileLocation: 'IN_MEMORY',
+    });
+    mediaZip.push({ src: s.ttsAudioPath, name: sentenceTtsFn });
+    // ttsClipInfosMap — sentence당 1 항목 (전체 텍스트, speaker 정보)
+    pj.props.ttsClipInfosMap[sentenceTtsMid] = {
+      pitch: 0, speed: 0, volume: 0,
+      speaker: { ...DEFAULT_SPEAKER }, version: 'v4',
+      text: { raw: s.text, processed: ttsCleanText(s.text), textAspectLang: 'ko-KR' },
+      duration: ttsDur,
+      errorInfo: {},
+    };
+
+    // 그룹 바뀌면 groupTimeOffset 리셋 (Ken Burns 가 그룹마다 0 시작)
+    if (lastGroupId !== null && lastGroupId !== s.groupId) {
+      groupTimeOffset = 0;
+    }
+    lastGroupId = s.groupId;
+
+    // sentence.vrewClips가 비어있으면 자동 분할 (긴 문장 → 쉼표/연결어미 기준 sub-clip)
+    let clips;
+    if (s.vrewClips && s.vrewClips.length > 0) {
+      clips = s.vrewClips;
+    } else {
+      const auto = splitLongSentenceAlgo(s.text, VREW_MAX_CHARS);
+      clips = (auto.length > 0) ? auto : [{ text: s.text, weight: 1.0 }];
+    }
+    const totalWeight = clips.reduce((sum, c) => sum + (c.weight || 1), 0) || 1;
+
+    let sourceIn = 0;
+    for (const vc of clips) {
+      const w = (vc.weight || 1) / totalWeight;
+      const clipDur = ttsDur * w;
+      const sourceOut = Math.min(sourceIn + clipDur, ttsDur);
+
+      // ttsClip 트랙 — 같은 음성 mediaId를 sourceIn/sourceOut으로 시간 슬라이스
+      const ttsTid = sid();
+      const ttsAid = uid();
+      pj.props.tracks[ttsTid] = {
+        trackId: ttsTid, mediaId: sentenceTtsMid, volume: 1,
+        sourceIn, sourceOut,
+        loop: false, playbackRate: 1, type: 'ttsClip',
+      };
+      pj.props.assets[ttsAid] = { trackIds: [ttsTid], role: 'main' };
+
+      // transcript clip — Vrew 4.0.1 호환 형식
+      const groupAsset = groupImageAsset.get(s.groupId);
+      const startWordAssetIds = [];
+      if (groupAsset) startWordAssetIds.push(groupAsset.aid);
+      startWordAssetIds.push(ttsAid);
+
+      pj.transcript.clips.push({
+        id: sid(),
+        sceneId: unifiedSceneId,
+        captionMode: 'MANUAL',
+        words: [
+          {
+            id: sid(),
+            text: '',
+            playbackRate: 1,
+            duration: clipDur,
+            aligned: false,
+            type: 7,
+            originalDuration: clipDur,
+            originalStartTime: 0,
+            truncatedWords: [],
+            assetIds: startWordAssetIds,
+          },
+          {
+            id: sid(),
+            text: '',
+            playbackRate: 1,
+            duration: 0,
+            aligned: false,
+            type: 2,
+            originalDuration: 0,
+            originalStartTime: clipDur,
+            truncatedWords: [],
+            assetIds: [],
+          },
+        ],
+        captions: [
+          { text: [{ attributes: CAPTION_ATTRS, insert: vc.text }, { insert: '\n' }] },
+          { text: [{ insert: '\n' }] },
+        ],
+        assetIds: [],
+        dirty: { blankDeleted: false, caption: false, video: false },
+        translationModified: { result: false, source: false },
+      });
+
+      sourceIn = sourceOut;
+      groupTimeOffset += clipDur;
+    }
+  }
+
+  if (pj.transcript.clips.length === 0) {
+    throw new Error('생성할 클립 없음 — TTS 가 변환된 sentence 가 하나도 없음');
+  }
+
+  // 통합 씬 등록
+  if (!pj.transcript.sceneNames) pj.transcript.sceneNames = {};
+  pj.transcript.sceneNames[unifiedSceneId] = '';
+
+  // zip 패키징
+  const tmpDir = path.join(os.tmpdir(), `vrew_build_${Date.now()}`);
+  const tmpMedia = path.join(tmpDir, 'media');
+  fs.mkdirSync(tmpMedia, { recursive: true });
+  fs.writeFileSync(path.join(tmpDir, 'project.json'), JSON.stringify(pj, null, 0), 'utf-8');
+  for (const m of mediaZip) {
+    fs.copyFileSync(m.src, path.join(tmpMedia, m.name));
+  }
+
+  const AdmZip = require('adm-zip');
+  const zip = new AdmZip();
+  zip.addLocalFile(path.join(tmpDir, 'project.json'));
+  if (fs.existsSync(tmpMedia)) {
+    for (const fn of fs.readdirSync(tmpMedia).sort()) {
+      zip.addLocalFile(path.join(tmpMedia, fn), 'media');
+    }
+  }
+  zip.writeZip(vrewPath);
+
+  log(`[Vrew] ${pj.transcript.clips.length}개 클립, ${groupImageAsset.size}개 그룹 이미지, ${sentences.length - missing.length}개 TTS → ${path.basename(vrewPath)}`);
+
+  if (opts.dumpJson !== false) {
+    try {
+      const dumpPath = vrewPath + '.debug.json';
+      fs.writeFileSync(dumpPath, JSON.stringify(pj, null, 2), 'utf-8');
+      log(`[Vrew] 진단 dump: ${path.basename(dumpPath)}`);
+    } catch {}
+  }
+
+  try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+
+  return { vrewPath, clipCount: pj.transcript.clips.length, missing };
+}
+
+module.exports = { buildVrew };

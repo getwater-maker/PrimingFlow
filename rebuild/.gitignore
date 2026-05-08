@@ -1,0 +1,68 @@
+# ── Node / 빌드 산출물 ────────────────────────────────
+node_modules/
+package-lock.json.backup
+dist/
+out/
+build/
+.electron/
+
+# ── 백업 / 임시 ───────────────────────────────────────
+*.backup
+*.backup_*
+*.simple_v40_*
+.tmp/
+.cache/
+temp/
+tmp/
+*~
+*.swp
+*.swo
+
+# ── 생성 결과물 (vrew, debug, 음성, 이미지) ──────────
+*.vrew
+*.vrew.debug.json
+*.mp3
+*.wav
+*.mpga
+# 단, dummy-tts.mp3 는 빌더 의존성이므로 추적
+!dummy-tts.mp3
+
+# ── 시크릿 / 환경 변수 / 로컬 설정 ────────────────────
+.env
+*.env
+.env.local
+.env.*.local
+config.local.json
+secrets.json
+*.key
+*.pem
+
+# ── 로그 ──────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+
+# ── 외부 빌드 .exe (커밋 X — 너무 큼) ────────────────
+DadoendayunFlow-Setup-*.exe
+*.exe
+
+# ── OS / IDE ──────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+.cursor/
+
+# ── 옴니보이스 모델 캐시 (외부 폴더라도 혹시 모를 캐시) ──
+omnivoice_cache/
+hf_cache/
+*.safetensors
+*.bin
+# 단 vrew-template/dummy 같은 작은 .json/.mp3는 위에서 이미 처리
+
+# ── Python (혹시 있다면) ──────────────────────────────
+__pycache__/
+*.pyc
+.venv/
+venv/

@@ -1,0 +1,26 @@
+# 빌드 산출물·의존성 (대용량, 재생성 가능)
+rebuild/dist/
+rebuild/node_modules/
+
+# OmniVoice 백엔드 가상환경·캐시 (있으면 제외)
+**/__pycache__/
+**/*.pyc
+
+# 작업용 영상·자막 파일 (수백 MB, 매번 변동)
+*.vrew
+
+# 설치 파일·테스트 출력
+*.exe
+*.zip
+_smoketest_out/
+
+# 시크릿·로그·임시
+*.log
+.flow-app/
+*.tmp
+
+# OS·에디터
+Thumbs.db
+.DS_Store
+.idea/
+.vscode/

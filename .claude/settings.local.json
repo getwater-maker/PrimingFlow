@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"_runSequentialMode\\\\|_buildEnglishPrompt\\\\|_runPrompt\\\\|generateImage\\\\|window\\\\\\\\._currentProject\\\\|imageStatus\\\\|group-image\\\\|groupId\\\\|grid.*group\" D:/PrimingFlow/rebuild/flow-engine.js D:/PrimingFlow/rebuild/ui/index.html)",
+      "Bash(grep -n \"async run\\\\|async runImageVideo\\\\|module.exports\\\\|this\\\\\\\\.run\\\\|^class\\\\|^  run\\\\|FlowEngine\\\\|flow-engine\\\\|imgDir\\\\|imageGen\" D:/PrimingFlow/rebuild/flow-engine.js)",
+      "Bash(grep -n \"this.send\\\\|this\\\\\\\\._send\\\\|webContents\\\\\\\\.send\\\\|^  send\" D:/PrimingFlow/rebuild/flow-engine.js)",
+      "Bash(grep -n \"\\\\\\\\.group-image\\\\\\\\|\\\\\\\\.group-card\\\\\\\\|\\\\\\\\.group-card-body\\\\\\\\|\\\\\\\\.group-sentences\\\\\\\\|\\\\\\\\.sentence-row\" D:/PrimingFlow/rebuild/ui/index.html)",
+      "Bash(grep -n \"openChannelModal\\\\|channelForm_ttsPresetId.*=\\\\|channelForm_ttsPresetId\\\\\\\\.value\" D:/PrimingFlow/rebuild/ui/index.html)",
+      "Bash(grep -n \"프리셋.*⊕\\\\|presets-header\\\\|새로\\\\\\\\\\\\\"\\\\|🎙 프리셋\\\\|class=\\\\\"side-section\\\\\"\" D:/PrimingFlow/rebuild/ui/index.html)",
+      "Bash(python)",
+      "Bash(node vrew/_smoketest.js)",
+      "Bash(mkdir -p /tmp/vrew_analysis/smoketest)",
+      "Bash(unzip -o \"D:/PrimingFlow/_smoketest_out/smoketest.vrew\")",
+      "Bash(mkdir -p /tmp/vrew_analysis/user_latest)",
+      "Bash(unzip -o \"D:/PrimingFlow/vrew_2026-05-03T21-30/vrew_2026-05-03T21-30.vrew\")",
+      "Bash(xxd \"/tmp/vrew_analysis/ref_seogi/media/a3c0c78e9a.mp3\")",
+      "Bash(xxd \"/tmp/vrew_analysis/user_latest/media/fa7a92ed8b.mp3\")",
+      "Bash(xxd \"D:/PrimingFlow/rebuild/dummy-tts.mp3\")",
+      "Bash(python -c \"import json, sys; d=json.load\\(sys.stdin\\); print\\('electron:', d.get\\('devDependencies',{}\\).get\\('electron'\\) or d.get\\('dependencies',{}\\).get\\('electron'\\)\\)\")",
+      "Bash(python -c \"import json, sys; d=json.load\\(sys.stdin\\); print\\('installed electron:', d.get\\('version'\\)\\)\")",
+      "Bash(node -e ' *)",
+      "Bash(mkdir -p /tmp/vrew_analysis/test_vrew)",
+      "Bash(unzip -o \"D:/PrimingFlow/test.vrew\")",
+      "Bash(mkdir -p D:/PrimingFlow/rebuild/vrew/dummy)",
+      "Read(//d/tmp/**)",
+      "Bash(unzip -o -d /tmp/_samguk \"D:/PrimingFlow/대본_삼국지_제001회.vrew\" \"media/uc-0010-simple-textbox.bin\")",
+      "Bash(conda tos *)",
+      "Bash(cd /d \"D:/PrimingFlow/rebuild\")",
+      "Bash(npm install *)"
+    ]
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "name": "PrimingFlow",
+  "productName": "PrimingFlow",
+  "version": "1.9.0",
+  "description": "PrimingFlow - Google Flow 자동화 + Vrew 후처리",
+  "main": "bootstrap.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --x64"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.17",
+    "electron-updater": "^6.8.3",
+    "playwright": "^1.49.1"
+  },
+  "devDependencies": {
+    "electron": "33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.user.primingflow",
+    "productName": "PrimingFlow",
+    "asar": true,
+    "asarUnpack": [
+      "tts/omnivoice-backend/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "icon/flow.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "PrimingFlow",
+      "uninstallDisplayName": "PrimingFlow",
+      "installerIcon": "icon/flow.ico",
+      "uninstallerIcon": "icon/flow.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "getwater-maker",
+        "repo": "PrimingFlow",
+        "releaseType": "release"
+      }
+    ]
+  }
+}

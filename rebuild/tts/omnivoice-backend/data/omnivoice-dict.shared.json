@@ -1,0 +1,17 @@
+[
+  {
+    "source": "정약용",
+    "pron": "정야굥",
+    "enabled": true
+  },
+  {
+    "source": "갉아",
+    "pron": "갈가",
+    "enabled": true
+  },
+  {
+    "source": "6월",
+    "pron": "유월",
+    "enabled": true
+  }
+]
