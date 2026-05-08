@@ -1154,7 +1154,7 @@
 
         <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px;">
           <!-- Row 1 -->
-          <button class="btn btn-sm-action" onclick="generateAllImages()" title="모든 그룹 이미지를 Flow 로 일괄 생성">🎨 이미지 일괄 생성</button>
+          <button class="btn btn-sm-action" onclick="generateEmptyGroupImages()" title="이미지가 비어있는 그룹만 순차적으로 Flow 로 생성">🎨 빈 그룹 이미지</button>
           <div class="range-cell">
             <span>그룹</span>
             <input type="number" id="videoRangeFrom" min="1" placeholder="시작" title="범위 시작 그룹 번호" />
@@ -1163,16 +1163,16 @@
           </div>
 
           <!-- Row 2 -->
-          <button class="btn btn-sm-action" id="imageBatchAttachBtn" onclick="openImageBatchAttach()" title="외부 이미지 파일을 그룹 제목과 매칭해서 자동 첨부">📎 이미지 일괄 첨부</button>
-          <button class="btn btn-sm-action" onclick="convertGroupRangeVideo()" title="위 입력 범위 그룹의 이미지를 Grok 으로 영상 변환">🎬 범위 영상 생성</button>
+          <button class="btn btn-sm-action" id="imageBatchAttachBtn" onclick="openImageBatchAttach()" title="외부 이미지 파일을 그룹 제목과 매칭해서 자동 첨부">📎 이미지 첨부</button>
+          <button class="btn btn-sm-action" onclick="convertGroupRangeVideo()" title="위 입력 범위 그룹의 이미지를 Grok 으로 영상 변환">🎬 범위 영상</button>
 
           <!-- Row 3 -->
-          <button class="btn btn-sm-action" onclick="generateEmptyGroupImages()" title="이미지가 비어있는 그룹만 선별해서 생성">🎨 이미지 선택 생성</button>
-          <button class="btn btn-sm-action" onclick="convertSelectedGroupsVideo()" title="좌상단 체크박스로 선택한 그룹의 이미지를 Grok 으로 영상 변환">🎬 선택 영상 생성</button>
+          <button class="btn btn-sm-action" onclick="generateSelectedGroupImages()" title="좌상단 체크박스로 선택한 그룹의 이미지를 Flow 로 생성/재생성">🎨 선택 그룹 이미지</button>
+          <button class="btn btn-sm-action" onclick="convertSelectedGroupsVideo()" title="좌상단 체크박스로 선택한 그룹의 이미지를 Grok 으로 영상 변환">🎬 선택 영상</button>
 
           <!-- Row 4 -->
           <button class="btn btn-sm-action" id="batchConvertBtn" onclick="onBatchConvertClick()" title="모든 문장 TTS 변환">🎙 TTS 변환</button>
-          <button class="btn btn-sm-action" onclick="saveVrew()" title="현재 프로젝트를 Vrew 4.0.1 호환 .vrew 파일로 저장">💾 브루생성</button>
+          <button class="btn btn-sm-action" onclick="saveVrew()" title="현재 프로젝트를 Vrew 4.0.1 호환 .vrew 파일로 저장">💾 Vrew</button>
         </div>
         <input type="file" id="imageBatchInput" multiple accept="image/*" style="display:none;">
       </div>
@@ -6407,6 +6407,24 @@ async function generateEmptyGroupImages() {
   }
   if (!confirm(`이미지가 비어있는 ${empties.length}개 그룹만 생성합니다. 진행할까요?`)) return;
   await _runGroupImageGeneration(empties.map(g => g.id), '빈그룹');
+}
+
+/** 좌상단 체크박스로 선택된 그룹들만 이미지 생성/재생성 (영상의 convertSelectedGroupsVideo 와 짝) */
+async function generateSelectedGroupImages() {
+  const proj = window._currentProject;
+  if (!proj || !proj.groups || proj.groups.length === 0) {
+    alert('먼저 대본을 분할하세요');
+    return;
+  }
+  const checked = Array.from(document.querySelectorAll('.group-select:checked'))
+    .map(cb => cb.dataset.groupId)
+    .filter(Boolean);
+  if (checked.length === 0) {
+    alert('이미지를 생성할 그룹을 좌상단 체크박스로 선택하세요');
+    return;
+  }
+  if (!confirm(`체크된 ${checked.length}개 그룹의 이미지를 Flow 로 생성합니다. 진행할까요?`)) return;
+  await _runGroupImageGeneration(checked, '선택그룹');
 }
 
 // ─── 통합 자동 제작 (이미지 + TTS) ──────────────────────────────
