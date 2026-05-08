@@ -1147,11 +1147,13 @@
 
       <!-- 실행 + 일괄 액션 (통합: 작업시작 섹션 내부) -->
       <div style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:12px;">
+        <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px; margin-bottom:8px;">
+          <button class="btn btn-sm-action" id="startBtn" onclick="generateAll()" title="이미지 + TTS 일괄 자동 제작 (.vrew는 별도 [Vrew] 버튼)" style="font-weight:700;">▶ 이미지 + TTS</button>
+          <button class="btn btn-sm-action" id="grokLoginBtn" onclick="openGrokLogin()" title="Grok 자동화 크롬을 띄우고 grok.com 로그인 페이지로 이동 (영상 생성 전 X 계정 로그인 권장)">🔑 그록 로그인</button>
+        </div>
         <div style="display:flex; gap:6px; margin-bottom:8px;">
-          <button class="btn btn-primary" id="startBtn" onclick="generateAll()" title="이미지 + TTS 일괄 자동 제작 (.vrew는 별도 [Vrew] 버튼)" style="flex:1;">▶ 이미지 + TTS</button>
-          <button class="btn btn-sm-action" id="grokLoginBtn" onclick="openGrokLogin()" title="Grok 자동화 크롬을 띄우고 grok.com 로그인 페이지로 이동 (영상 생성 전 X 계정 로그인 권장)" style="flex:1;">🔑 그록 로그인</button>
-          <button class="btn" id="pauseBtn" onclick="pauseGeneration()" style="flex:0; padding:10px 12px; background:var(--warning); color:#fff; display:none; white-space:nowrap;">일시정지</button>
-          <button class="btn" id="stopBtn" onclick="stopGeneration()" style="flex:0; padding:10px 12px; background:var(--danger); color:#fff; display:none; white-space:nowrap;">중지</button>
+          <button class="btn" id="pauseBtn" onclick="pauseGeneration()" style="flex:1; padding:8px 12px; background:var(--warning); color:#fff; display:none; white-space:nowrap;">일시정지</button>
+          <button class="btn" id="stopBtn" onclick="stopGeneration()" style="flex:1; padding:8px 12px; background:var(--danger); color:#fff; display:none; white-space:nowrap;">중지</button>
         </div>
 
         <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px;">
