@@ -3087,6 +3087,16 @@ function autoSplitDebounced() {
 
 // 분할 옵션 — 대본 → 문장 단위 작업 목록 변환
 function splitScript() {
+  try {
+    return _splitScriptImpl();
+  } catch (e) {
+    console.error('[splitScript ERROR]', e.stack || e);
+    addLog(`[splitScript 오류] ${e.message} — 콘솔(F12)에서 stack 확인`, 'err');
+    alert('분할 중 오류:\n' + (e.stack || e.message).toString().slice(0, 600));
+  }
+}
+
+function _splitScriptImpl() {
   const text = (window._scriptText || '').trim();
   if (!text) {
     alert('대본을 먼저 입력해 주세요 (📂 대본 첨부 또는 ✏️ 직접 입력)');
