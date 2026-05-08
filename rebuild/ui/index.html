@@ -1138,8 +1138,7 @@
         </div>
 
         <div style="font-size:11px; color:var(--text-muted); margin-top:6px; line-height:1.5;">
-          · 짧은 문장은 윗 그룹에 흡수<br>
-          · 긴 문장은 vrew 에서 의미 단위로 분할<br>
+          · 짧은 문장은 윗 그룹에 흡수
           · 마크다운 헤더에 <span style="color:var(--info); font-weight:600;">"도입"</span> 포함 시 자동으로 도입부 그룹 (파란 카드)
           <div id="splitGroupCountPreview" style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--border-soft); font-size:12px; font-weight:600; color:var(--text-strong);"></div>
         </div>
@@ -1258,19 +1257,21 @@
           </div>
         </div>
 
-        <div class="setting">
-          <label>비율</label>
-          <div class="chip-group" id="videoRatioChips">
-            <div class="chip active" data-val="16:9">16:9</div>
-            <div class="chip" data-val="9:16">9:16</div>
+        <!-- 비율 + 매수 한 줄 (이미지 섹션과 동일한 정렬) -->
+        <div style="display:flex; gap:12px;">
+          <div class="setting" style="flex:1;">
+            <label>비율</label>
+            <div class="chip-group" id="videoRatioChips">
+              <div class="chip active" data-val="16:9">16:9</div>
+              <div class="chip" data-val="9:16">9:16</div>
+            </div>
           </div>
-        </div>
-
-        <div class="setting">
-          <label>매수</label>
-          <div class="chip-group" id="videoCountChips">
-            <div class="chip active" data-val="x1">x1</div>
-            <div class="chip" data-val="x2">x2</div>
+          <div class="setting" style="flex:1;">
+            <label>매수</label>
+            <div class="chip-group" id="videoCountChips">
+              <div class="chip active" data-val="x1">x1</div>
+              <div class="chip" data-val="x2">x2</div>
+            </div>
           </div>
         </div>
 
@@ -1484,7 +1485,7 @@
       </div>
       <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
         <div style="font-size:13px; color:var(--text-muted);">
-          마크다운 헤더(#, ##)와 [섹션] 마커, 따옴표는 자동으로 제외됩니다.
+          마크다운 헤더(#, ##)와 [섹션] 마커, 따옴표는 자동으로 제외됩니다. · 긴 문장은 vrew 에서 의미 단위로 분할됩니다.
         </div>
         <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-soft); cursor:pointer; flex:none;">
           <input type="checkbox" id="scriptShowSyntax" checked onchange="_toggleScriptSyntax()">
@@ -2592,9 +2593,43 @@ function _getProjectOutputDir() {
   };
 })();
 
+/** 자체 input 다이얼로그 (Electron renderer 에서 native prompt() 가 차단되는 경우 대비).
+ *  callback(value:string|null) 호출 — null = 취소, 문자열 = 확인. */
+function _showInputDialog(title, defaultValue, callback) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed; inset:0; background:rgba(58,52,46,0.5); z-index:99999; display:flex; align-items:center; justify-content:center;';
+  const dialog = document.createElement('div');
+  dialog.style.cssText = 'background:var(--bg-elevated); border:1px solid var(--border); border-radius:10px; padding:18px 20px; min-width:380px; max-width:92vw; box-shadow:var(--shadow-lg);';
+  const titleEsc = escapeHtml(title);
+  const valEsc = String(defaultValue || '').replace(/"/g, '&quot;');
+  dialog.innerHTML =
+    `<div style="font-size:13px; white-space:pre-wrap; margin-bottom:10px; color:var(--text-strong); line-height:1.5;">${titleEsc}</div>` +
+    `<input type="text" id="_inputDialogField" value="${valEsc}" style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:14px;">` +
+    `<div style="display:flex; gap:6px; margin-top:12px; justify-content:flex-end;">` +
+    `<button class="btn-sm" id="_inputDialogCancel" type="button">취소</button>` +
+    `<button class="btn-sm" id="_inputDialogOk" type="button" style="background:var(--info); color:#fff; font-weight:600;">확인</button>` +
+    `</div>`;
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+  const input = document.getElementById('_inputDialogField');
+  input.focus();
+  input.select();
+  const close = (val) => {
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    callback(val);
+  };
+  document.getElementById('_inputDialogOk').onclick = () => close(input.value);
+  document.getElementById('_inputDialogCancel').onclick = () => close(null);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); close(input.value); }
+    else if (e.key === 'Escape') { e.preventDefault(); close(null); }
+  });
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(null); });
+}
+
 /**
  * 갤러리에서 이미지/비디오 파일 → 작업 목록의 특정 그룹에 첨부.
- * 그룹 번호 입력 prompt 띄움. 비디오 확장자면 videoPath, 아니면 imagePath 로 분기.
+ * 자체 input 다이얼로그로 그룹 번호 입력. 비디오 확장자면 videoPath, 아니면 imagePath.
  * 디스크 파일은 이동하지 않음 — 그룹의 path 만 업데이트.
  */
 function _attachGalleryFileToGroup(filePath, fileName) {
@@ -2603,38 +2638,37 @@ function _attachGalleryFileToGroup(filePath, fileName) {
     alert('먼저 대본을 분할하세요');
     return;
   }
-  // 빈 그룹 우선 안내
   const emptyGroups = proj.groups.filter(g => !g.imagePath);
   const hint = emptyGroups.length > 0
     ? `\n빈 이미지 그룹: ${emptyGroups.slice(0, 10).map(g => g.num).join(', ')}${emptyGroups.length > 10 ? ` 외 ${emptyGroups.length - 10}개` : ''}`
     : '\n(모든 그룹에 이미지 있음 — 덮어쓰기됩니다)';
-  const choice = prompt(
-    `"${fileName}" 을 어느 그룹에 첨부할까요?\n` +
-    `그룹 번호 입력 (1 ~ ${proj.groups.length})${hint}`,
-    String(emptyGroups[0]?.num || 1)
+  const defaultVal = String(emptyGroups[0]?.num || 1);
+  _showInputDialog(
+    `"${fileName}" 을 어느 그룹에 첨부할까요?\n그룹 번호 입력 (1 ~ ${proj.groups.length})${hint}`,
+    defaultVal,
+    (choice) => {
+      if (choice === null) return;
+      const num = parseInt(String(choice).trim(), 10);
+      if (isNaN(num) || num < 1 || num > proj.groups.length) {
+        alert(`유효하지 않은 그룹 번호 (1 ~ ${proj.groups.length})`);
+        return;
+      }
+      const g = proj.groups.find(grp => grp.num === num);
+      if (!g) { alert('그룹을 찾을 수 없습니다'); return; }
+      const isVideo = /\.(mp4|webm|mkv|mov)$/i.test(fileName);
+      if (isVideo) {
+        g.videoPath = filePath;
+        g.videoStatus = 'done';
+        g.videoSourceImage = g.imagePath || null;
+        addLog(`[갤러리→그룹] 그룹 ${g.num} ← ${fileName} 비디오 첨부 완료`, 'ok');
+      } else {
+        g.imagePath = filePath;
+        g.imageStatus = 'done';
+        addLog(`[갤러리→그룹] 그룹 ${g.num} ← ${fileName} 이미지 첨부 완료`, 'ok');
+      }
+      renderTaskList(proj);
+    }
   );
-  if (choice === null) return;
-  const num = parseInt(String(choice).trim(), 10);
-  if (isNaN(num) || num < 1 || num > proj.groups.length) {
-    alert(`유효하지 않은 그룹 번호 (1 ~ ${proj.groups.length})`);
-    return;
-  }
-  const g = proj.groups.find(grp => grp.num === num);
-  if (!g) { alert('그룹을 찾을 수 없습니다'); return; }
-
-  const isVideo = /\.(mp4|webm|mkv|mov)$/i.test(fileName);
-  if (isVideo) {
-    g.videoPath = filePath;
-    g.videoStatus = 'done';
-    g.videoSourceImage = g.imagePath || null;
-    addLog(`[갤러리→그룹] 그룹 ${g.num} ← ${fileName} 비디오 첨부 완료`, 'ok');
-  } else {
-    g.imagePath = filePath;
-    g.imageStatus = 'done';
-    addLog(`[갤러리→그룹] 그룹 ${g.num} ← ${fileName} 이미지 첨부 완료`, 'ok');
-  }
-  renderTaskList(proj);
-  // 갤러리 닫지 않음 — 사용자가 여러 이미지 연속 첨부 가능
 }
 
 // 갤러리 모달 열기/닫기
@@ -3552,12 +3586,15 @@ function renderTaskList(project) {
     img.dataset.groupId = g.id;
     img.dataset.groupNum = g.num;
     // 비디오가 완성됐으면 비디오 미리보기 (자동재생 안 함, 첫 프레임만), 아니면 이미지
+    // 휴지통 버튼 HTML (이미지/비디오 좌상단 — 클릭 시 즉시 제거)
+    const TRASH_STYLE = 'position:absolute; top:4px; left:4px; width:24px; height:24px; padding:0; background:rgba(0,0,0,0.55); color:#fff; border:none; border-radius:4px; font-size:13px; cursor:pointer; z-index:5; line-height:1; display:flex; align-items:center; justify-content:center;';
     if (g.videoPath && g.videoStatus === 'done') {
       const vUrl = 'file:///' + encodeURI(g.videoPath.replace(/\\/g, '/'));
       img.innerHTML =
         `<video class="group-video" src="${vUrl}" muted playsinline preload="metadata" style="width:100%; height:100%; object-fit:cover; border-radius:6px;"></video>` +
         `<div class="group-video-overlay" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.25); border-radius:6px; pointer-events:none; transition:opacity 0.2s;">` +
         `<span style="font-size:32px; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,0.7);">▶</span></div>` +
+        `<button class="group-media-trash" type="button" title="비디오 제거" style="${TRASH_STYLE}">🗑</button>` +
         `<div style="position:absolute; top:4px; right:4px; background:rgba(80,180,120,0.85); color:#fff; font-size:11px; padding:2px 6px; border-radius:4px; font-weight:600; pointer-events:none;">🎬 비디오</div>`;
       img.style.position = 'relative';
       img.style.cursor = 'pointer';
@@ -3577,6 +3614,9 @@ function renderTaskList(project) {
           if (ov) ov.style.opacity = '1';
         }
       };
+      // 휴지통 — 비디오 즉시 제거
+      const trashBtn = img.querySelector('.group-media-trash');
+      if (trashBtn) trashBtn.onclick = (e) => { e.stopPropagation(); removeGroupVideo(g.id); };
       // 자연 종료 시 오버레이 다시 보이기
       setTimeout(() => {
         const v = img.querySelector('video.group-video');
@@ -3593,10 +3633,20 @@ function renderTaskList(project) {
       img.classList.add('has-image');
     } else if (g.imagePath) {
       const url = 'file:///' + encodeURI(g.imagePath.replace(/\\/g, '/'));
-      img.innerHTML = `<img src="${url}" alt="그룹 ${g.num}" style="width:100%; height:100%; object-fit:cover; border-radius:6px;">`;
+      img.innerHTML =
+        `<img src="${url}" alt="그룹 ${g.num}" style="width:100%; height:100%; object-fit:cover; border-radius:6px;">` +
+        `<button class="group-media-trash" type="button" title="이미지 제거" style="${TRASH_STYLE}">🗑</button>`;
+      img.style.position = 'relative';
       img.classList.add('has-image');
+      // 휴지통 — 이미지 즉시 제거
+      const trashBtn = img.querySelector('.group-media-trash');
+      if (trashBtn) trashBtn.onclick = (e) => { e.stopPropagation(); removeGroupImage(g.id); };
     } else {
-      img.innerHTML = '🖼<br>미생성';
+      // 미생성 — 클릭 시 attachGroupMedia 호출 (이미지/비디오 파일 첨부)
+      img.innerHTML = '🖼<br>미생성<div style="font-size:10px; color:var(--text-muted); margin-top:6px;">📎 클릭하여 첨부</div>';
+      img.style.cursor = 'pointer';
+      img.title = '이미지(jpg/png/webp) 또는 동영상(mp4/webm/mkv/mov) 파일 첨부';
+      img.onclick = (e) => { e.stopPropagation(); attachGroupMedia(g.id); };
     }
 
     // 그룹 TTS 음성 길이 배지
@@ -3713,36 +3763,20 @@ function renderTaskList(project) {
                        : g.videoStatus === 'generating' ? '⏳ 비디오 생성중'
                        : g.videoStatus === 'fail' ? '🎬 비디오 다시'
                        : '🎬 비디오 변환';
-    // 미디어 제거 버튼은 첨부된 게 있을 때만 표시
-    const hasImage = !!g.imagePath;
-    const hasVideo = !!g.videoPath && g.videoStatus === 'done';
-    const removeImgBtn = hasImage
-      ? `<button class="btn-sm group-remove-img-btn" data-group-id="${g.id}" title="이 그룹의 첨부 이미지 제거 (디스크 파일은 유지)" style="color:var(--danger);">🗑 이미지 제거</button>`
-      : '';
-    const removeVideoBtn = hasVideo
-      ? `<button class="btn-sm group-remove-video-btn" data-group-id="${g.id}" title="이 그룹의 첨부 비디오 제거 (디스크 파일은 유지)" style="color:var(--danger);">🗑 비디오 제거</button>`
-      : '';
-
+    // 미디어 첨부 / 이미지 제거 / 비디오 제거 버튼은 그룹 카드의 이미지 영역으로 이전:
+    //  - 미생성 박스 클릭 → attachGroupMedia
+    //  - 이미지/비디오 좌상단 🗑 → removeGroupImage / removeGroupVideo
     actions.innerHTML =
-      `<button class="btn-sm group-attach-btn" data-group-id="${g.id}" title="이미지(jpg/png/webp) 또는 동영상(mp4/webm/mkv/mov) 파일을 직접 첨부">📎 미디어 첨부</button>` +
-      removeImgBtn +
-      removeVideoBtn +
       `<button class="btn-sm group-regen-btn" data-group-id="${g.id}" title="이 그룹만 이미지 재생성 (기존 첨부 자동 제거 후 새로 생성)">🔄 이미지 재생성</button>` +
       `<button class="btn-sm group-preview-btn" data-group-id="${g.id}" title="이 그룹의 TTS 음성 순차 재생 (다시 클릭 시 중지)">▶ 그룹 미리듣기</button>` +
       `<button class="btn-sm group-tts-btn" data-group-id="${g.id}" title="이 그룹의 모든 문장 TTS 재변환">🎙 그룹 TTS 변환</button>` +
       `<button class="btn-sm group-video-btn" data-group-id="${g.id}" title="이 그룹의 이미지를 Grok 으로 비디오 변환 (이미지 자리에 비디오가 들어감)">${videoBtnLabel}</button>`;
-    const attachBtn = actions.querySelector('.group-attach-btn');
     const regenBtn = actions.querySelector('.group-regen-btn');
-    const removeImgBtnEl = actions.querySelector('.group-remove-img-btn');
-    const removeVideoBtnEl = actions.querySelector('.group-remove-video-btn');
     const previewBtn = actions.querySelector('.group-preview-btn');
     const ttsBtn2 = actions.querySelector('.group-tts-btn');
     const videoBtn = actions.querySelector('.group-video-btn');
     const groupId = g.id;
-    attachBtn.onclick = (e) => { e.stopPropagation(); attachGroupMedia(groupId); };
     regenBtn.onclick = (e) => { e.stopPropagation(); regenerateGroups([groupId]); };
-    if (removeImgBtnEl) removeImgBtnEl.onclick = (e) => { e.stopPropagation(); removeGroupImage(groupId); };
-    if (removeVideoBtnEl) removeVideoBtnEl.onclick = (e) => { e.stopPropagation(); removeGroupVideo(groupId); };
     previewBtn.onclick = (e) => { e.stopPropagation(); previewGroupAudio(groupId, previewBtn); };
     ttsBtn2.onclick = (e) => { e.stopPropagation(); convertGroupSentences(groupId); };
     videoBtn.onclick = (e) => { e.stopPropagation(); convertGroupVideo(groupId); };
@@ -5637,15 +5671,26 @@ function _updateScriptDictBadge() {
   try {
     const ScriptDictStore = require('../core/script-dict-store');
     const OmniDictStore   = require('../tts/omnivoice-dict-store');
-    const ttsOnlyText = (proj.scriptText || '').split('\n')
-      .filter(l => !/^\s*\[[^\]]+\]\s*$/.test(l)).join('\n');
-    const detected   = ScriptDictStore.detectNumbers(ttsOnlyText);
+    // 모달의 자동 감지와 동일한 기준 사용 — sentences 기반 detectNumbersBySentence.
+    // 이전엔 detectNumbers(ttsOnlyText) 였는데 ttsOnlyText 에 마크다운 헤더 등이
+    // 포함돼 모달엔 안 보이는 숫자가 잡혀 배지 숫자가 안 줄어드는 문제 있었음.
+    const detectedItems = ScriptDictStore.detectNumbersBySentence(proj.sentences || []);
+    const detectedSources = new Set();
+    for (const item of (detectedItems || [])) {
+      if (item && item.source) detectedSources.add(item.source);
+    }
     const globalDict = OmniDictStore.loadAll();
     const registered = new Set(globalDict.map(e => e.source));
-    const missing = detected.filter(s => !registered.has(s)).length;
+    let missing = 0;
+    const missingList = [];
+    for (const src of detectedSources) {
+      if (!registered.has(src)) { missing++; missingList.push(src); }
+    }
     if (missing > 0) {
       badge.textContent = missing;
       badge.style.display = '';
+      // 디버깅용: 누락된 source 목록 (콘솔만, 평소엔 무시 가능)
+      if (window._debugScriptDict) console.log('[발음사전] 미등록:', missingList);
     } else {
       badge.style.display = 'none';
     }
@@ -7149,13 +7194,9 @@ async function saveVrew(opts = {}) {
     !g.imagePath || typeof g.imagePath !== 'string' || !fsImg.existsSync(g.imagePath)
   );
   if (noImg.length > 0) {
-    addLog(`[Vrew] 이미지 누락 그룹 ${noImg.length}/${proj.groups.length}개`, 'info');
+    addLog(`[Vrew] 이미지 누락 그룹 ${noImg.length}/${proj.groups.length}개 — 빈 슬라이드로 저장`, 'info');
     if (opts.silent) return { skipped: true, missingImages: noImg.length };
-    if (!confirm(
-      `이미지 없는 그룹 ${noImg.length}개 포함됩니다.\n` +
-      `(이미지 없는 그룹은 .vrew 에서 빈 슬라이드로 처리됩니다)\n\n` +
-      `계속 저장할까요?`
-    )) return { cancelled: true };
+    // confirm 팝업 제거 — 이미지 누락은 빈 슬라이드로 자동 처리하고 저장 진행
   }
   fs.mkdirSync(finalDir, { recursive: true });
   // vrew 파일명 = 첨부한 대본 파일명 > proj.vrewFileName > 폴더명 폴백
