@@ -478,24 +478,26 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
         sourceFileType: 'ASSET_VIDEO', fileLocation: 'IN_MEMORY',
       });
 
-      // 비디오 트랙 — 영상.vrew (사용자 의도) 형식과 일치:
-      //   - fillType: 'cut' 이 stats 안이 아닌 트랙 직속 (이미지와 다름)
-      //   - xPos/yPos/width/height = 0/0/1/1 (Vrew 가 비율에 맞춰 자동 cover)
-      //   - 흰 letterbox 바 발생 방지
+      // 비디오 트랙 — 5% 확대 + 가운데 정렬로 letterbox 띠 제거.
+      // (사용자가 Vrew 에서 수동으로 하던 "영상 키우고 가운데 정렬" 자동화)
+      // 영상 비율(예: 1280x704=1.818) 과 화면 16:9(=1.778) 비율 차이 ≈ 2.3% 라
+      // 5% 마진이면 letterbox 완전 가림 + 좌우 살짝(2.5%)만 화면 밖으로 잘림.
+      const SCALE  = 1.05;
+      const OFFSET = (1 - SCALE) / 2;      // = -0.025 (가운데 정렬)
       pj.props.tracks[videoTid] = {
         trackId: videoTid, mediaId: mid,
-        xPos: 0, yPos: 0, height: 1, width: 1,
+        xPos: OFFSET, yPos: OFFSET, height: SCALE, width: SCALE,
         rotation: 0, zIndex: groupIdx, type: 'video',
         sourceIn: 0, sourceOut: dur,
         originalWidthHeightRatio: videoWidth / videoHeight,
         isTrimmable: true, hasAlphaChannel: false,
         editInfo: {},
-        fillType: 'cut',                 // 트랙 직속 (영상.vrew 형식)
+        fillType: 'cut',                 // 트랙 직속 (영상.vrew 형식, cover 모드)
       };
-      // 비디오 오디오 트랙 — 영상.vrew 와 일치 (volume:0.5)
+      // 비디오 오디오 트랙 — volume:0 (PrimingFlow TTS 만 들리도록 음소거)
       pj.props.tracks[audioTid] = {
         trackId: audioTid, mediaId: mid,
-        volume: 0.5, sourceIn: 0, sourceOut: dur,
+        volume: 0, sourceIn: 0, sourceOut: dur,
         loop: true, playbackRate: 1, type: 'videoAudio',
       };
       pj.props.assets[aid] = { trackIds: [videoTid, audioTid], role: 'sub' };
