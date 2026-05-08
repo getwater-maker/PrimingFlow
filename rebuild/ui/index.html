@@ -1951,9 +1951,10 @@
             </select>
             <span style="color:var(--border); margin:0 2px;">|</span>
             <span style="color:var(--text-soft); flex:none;" title="화면 하단에서 위로 올리는 비율 (%, 음수 = 위로). 랜덤: 빌드 시점에 -12.5%/-15% 중 한 번 정해 모든 자막에 동일 적용">위치</span>
-            <select id="captionYOffset" title="랜덤: 빌드 시점에 -12.5%/-15% 중 한 번 정해 모든 자막에 동일 적용 (영상 안에서 변하지 않음)" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
+            <select id="captionYOffset" title="랜덤: 빌드 시점에 -12.5/-15/-17.5% 중 한 번 정해 모든 자막에 동일 적용 (영상 안에서 변하지 않음)" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
               <option value="-12.5" selected>-12.5</option>
               <option value="-15">-15</option>
+              <option value="-17.5">-17.5</option>
               <option value="random">랜덤</option>
             </select>
             <span style="color:var(--text-muted);">%</span>
@@ -4519,10 +4520,13 @@ function applyCaptionStyleToForm(opt) {
     if (o.yOffset === 'random') {
       set('captionYOffset', 'random');
     } else {
-      // 셀렉트의 옵션(-12.5/-15/random) 중 하나로 매핑
+      // 셀렉트의 옵션(-12.5/-15/-17.5/random) 중 가장 가까운 값으로 매핑
       const pct = parseFloat(o.yOffset) * 100;
-      // -13.75% 보다 낮으면 -15, 아니면 -12.5 (가까운 쪽)
-      set('captionYOffset', (pct <= -13.75) ? '-15' : '-12.5');
+      let mapped;
+      if (pct >= -13.75)      mapped = '-12.5';
+      else if (pct >= -16.25) mapped = '-15';
+      else                    mapped = '-17.5';
+      set('captionYOffset', mapped);
     }
   }
   if (o.width != null)        set('captionWidth', Math.round(o.width * 100));
