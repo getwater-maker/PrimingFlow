@@ -1755,8 +1755,9 @@
       <div>
         <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">엔진</label>
         <div class="chip-group" id="presetForm_engineChips">
-          <div class="chip active" data-val="omnivoice" style="flex:1; text-align:center;">OmniVoice</div>
-          <div class="chip"        data-val="gemini"    style="flex:1; text-align:center;">Gemini</div>
+          <div class="chip active" data-val="omnivoice"  style="flex:1; text-align:center;">OmniVoice</div>
+          <div class="chip"        data-val="gemini"     style="flex:1; text-align:center;">Gemini</div>
+          <div class="chip"        data-val="supertonic" style="flex:1; text-align:center;" title="Supertonic-3 (CPU 로컬 — GPU 없이도 작동)">Supertonic</div>
         </div>
       </div>
       <div>
@@ -3976,15 +3977,37 @@ function renderPresets() {
     const reasonLabel = !usable ?
       (p.engine === 'gemini' ? ' · 키 미입력' :
        p.engine === 'omnivoice' && p.voice === 'clone' ? ' · 참조음성 X' :
-       p.engine === 'omnivoice' ? ' · 서버 대기' : '') : '';
+       p.engine === 'omnivoice' ? ' · 서버 대기' :
+       p.engine === 'supertonic' ? ' · 백엔드 대기' : '') : '';
+
+    // Gemini 사용량 뱃지 — 오늘 호출수 / 한도초과(429) 분리 표시
+    let usageBadge = '';
+    if (p.engine === 'gemini') {
+      try {
+        const stats = require('../tts/gemini-usage-store').todayStats();
+        const ok = (stats.tts_ok || 0) + (stats.split_ok || 0);
+        const err = (stats.tts_429 || 0) + (stats.split_429 || 0);
+        const tip = `오늘 Gemini 호출 — TTS ${stats.tts_ok || 0} · 분할 ${stats.split_ok || 0}` +
+                    (err > 0 ? ` · 한도초과(429) ${err}` : '');
+        const errPart = err > 0 ? `<span style="color:var(--danger);"> · ⚠️ ${err}</span>` : '';
+        usageBadge =
+          `<span class="preset-usage" title="${escapeHtml(tip)}" ` +
+            `style="margin-left:auto; flex:none; font-size:11px; color:var(--text-soft); ` +
+                   `padding:2px 6px; border:1px solid var(--border-soft); border-radius:8px; ` +
+                   `background:var(--bg-soft);">` +
+            `오늘 ${ok}회${errPart}` +
+          `</span>`;
+      } catch (_) {}
+    }
 
     card.innerHTML =
       `<span class="preset-drag-handle" title="드래그해서 순서 변경">⠿</span>` +
       `<div class="preset-item-content">` +
         `<div class="preset-name">${escapeHtml(p.name)}</div>` +
-        `<div class="preset-meta">` +
+        `<div class="preset-meta" style="display:flex; align-items:center; gap:6px;">` +
           `<span class="preset-engine ${engineClass}${lockClass}">${p.engine}</span>` +
           `<span style="color:var(--text-muted);">${escapeHtml(voiceLabel)}${speedLabel}${reasonLabel}</span>` +
+          usageBadge +
         `</div>` +
       `</div>` +
       `<button class="preset-edit-icon" data-preset-id="${p.id}" title="편집">⚙</button>`;
@@ -4915,8 +4938,9 @@ function onLockVoiceToggle() {
 }
 
 const VOICES_BY_ENGINE = {
-  gemini:    () => require('../tts/providers/gemini-provider').GeminiProvider.getVoices(),
-  omnivoice: () => require('../tts/providers/omnivoice-provider').OmniVoiceProvider.getVoices(),
+  gemini:     () => require('../tts/providers/gemini-provider').GeminiProvider.getVoices(),
+  omnivoice:  () => require('../tts/providers/omnivoice-provider').OmniVoiceProvider.getVoices(),
+  supertonic: () => require('../tts/providers/supertonic-provider').SupertonicProvider.getVoices(),
 };
 
 function _setPresetEngine(engine) {
@@ -4959,7 +4983,9 @@ function _setPresetEngine(engine) {
   document.getElementById('presetForm_geminiSection').style.display = (engine === 'gemini') ? '' : 'none';
   const isGpuEngine = engine === 'omnivoice';
   document.getElementById('presetForm_omniParamsRow').style.display  = isGpuEngine ? 'grid' : 'none';
-  document.getElementById('presetForm_previewSection').style.display = isGpuEngine ? '' : 'none';
+  // 미리듣기는 omnivoice / supertonic 모두 지원 (gemini 는 별도 섹션)
+  const supportsPreview = (engine === 'omnivoice' || engine === 'supertonic');
+  document.getElementById('presetForm_previewSection').style.display = supportsPreview ? '' : 'none';
 
   const _updateOmniVoiceMode = () => {
     const v = select.value;
@@ -6051,6 +6077,10 @@ function _buildSynthesizeOpts(preset, channel) {
     if (preset.language) opts.language = preset.language;
     if (preset.inferenceTimesteps != null) opts.inferenceTimesteps = preset.inferenceTimesteps;
     if (preset.seed != null && preset.seed !== '') opts.seed = preset.seed;
+  }
+  if (preset.engine === 'supertonic') {
+    opts.language = preset.language || 'ko';
+    opts.silenceDuration = preset.silenceSec != null ? preset.silenceSec : 0.5;
   }
   opts.silenceSec = preset.silenceSec != null ? preset.silenceSec : 0;
   return opts;
