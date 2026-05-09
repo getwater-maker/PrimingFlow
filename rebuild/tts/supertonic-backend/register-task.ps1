@@ -1,14 +1,16 @@
-# Supertonic-3 자동기동 — Windows 작업 스케줄러 등록 스크립트
+# Supertonic-3 autorun registration (Windows Task Scheduler)
+# ASCII only — PowerShell 5.1 reads .ps1 as CP949 on Korean Windows;
+# Korean inside Write-Host strings becomes "?" and breaks the parser.
 #
-# 사용법 (관리자 PowerShell 로 실행):
+# Usage (run as Administrator):
 #   cd D:\PrimingFlow\rebuild\tts\supertonic-backend
 #   PowerShell -ExecutionPolicy Bypass -File .\register-task.ps1
 #
-# 등록 후:
-#   Start-ScheduledTask -TaskName "Supertonic_Backend"      # 즉시 실행 테스트
-#   Get-ScheduledTask  -TaskName "Supertonic_Backend" | Get-ScheduledTaskInfo
-#   Stop-ScheduledTask  -TaskName "Supertonic_Backend"      # 중지
-#   Unregister-ScheduledTask -TaskName "Supertonic_Backend" -Confirm:$false  # 삭제
+# After registration:
+#   Start-ScheduledTask        -TaskName 'Supertonic_Backend'   # immediate test
+#   Get-ScheduledTask          -TaskName 'Supertonic_Backend' | Get-ScheduledTaskInfo
+#   Stop-ScheduledTask         -TaskName 'Supertonic_Backend'   # stop
+#   Unregister-ScheduledTask   -TaskName 'Supertonic_Backend' -Confirm:$false  # remove
 
 #Requires -RunAsAdministrator
 
@@ -18,16 +20,16 @@ $TaskName  = "Supertonic_Backend"
 $BatchPath = Join-Path $PSScriptRoot "start-autorun.bat"
 
 if (-not (Test-Path $BatchPath)) {
-    Write-Error "start-autorun.bat 을 찾을 수 없습니다: $BatchPath"
+    Write-Error "start-autorun.bat not found: $BatchPath"
     exit 1
 }
 
-Write-Host "[Supertonic] 작업 스케줄러 등록: $TaskName"
-Write-Host "[Supertonic] 실행 대상: $BatchPath"
+Write-Host "[Supertonic] Registering scheduled task: $TaskName"
+Write-Host "[Supertonic] Target script: $BatchPath"
 
 $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
 if ($existing) {
-    Write-Host "[Supertonic] 기존 작업 제거 중..."
+    Write-Host "[Supertonic] Removing existing task..."
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
 }
 
@@ -56,16 +58,16 @@ Register-ScheduledTask `
     -Trigger $trigger `
     -Principal $principal `
     -Settings $settings `
-    -Description "Supertonic-3 TTS FastAPI 서버 (PrimingFlow 보조 백엔드, CPU, 포트 9882)" | Out-Null
+    -Description "Supertonic-3 TTS FastAPI server (PrimingFlow auxiliary backend, CPU, port 9882)" | Out-Null
 
-Write-Host "[Supertonic] 등록 완료." -ForegroundColor Green
+Write-Host "[Supertonic] Registration complete." -ForegroundColor Green
 Write-Host ""
-Write-Host "다음 단계:"
-Write-Host "  1) 즉시 실행 테스트:"
+Write-Host "Next steps:"
+Write-Host "  1) Start the task immediately:"
 Write-Host "     Start-ScheduledTask -TaskName '$TaskName'"
 Write-Host ""
-Write-Host "  2) 1~2분 후 헬스체크 (첫 실행은 모델 다운로드 ~99M):"
-Write-Host "     Invoke-WebRequest http://localhost:9882/health"
+Write-Host "  2) After 1-2 min (first run downloads ~99M model), health-check:"
+Write-Host "     Invoke-WebRequest http://localhost:9882/health -UseBasicParsing"
 Write-Host ""
-Write-Host "  3) 로그 확인:"
+Write-Host "  3) View latest log:"
 Write-Host "     Get-ChildItem '$PSScriptRoot\logs' | Sort LastWriteTime -Desc | Select -First 1"
