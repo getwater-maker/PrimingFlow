@@ -1146,6 +1146,12 @@
           <button class="btn btn-sm-action" id="startBtn" onclick="generateAll()" title="이미지 + TTS 일괄 자동 제작 (.vrew는 별도 [Vrew] 버튼)" style="font-weight:700;">▶ 이미지 + TTS</button>
           <button class="btn btn-sm-action" id="grokLoginBtn" onclick="openGrokLogin()" title="Grok 자동화 크롬을 띄우고 grok.com 로그인 페이지로 이동 (영상 생성 전 X 계정 로그인 권장)">🔑 그록 로그인</button>
         </div>
+        <div style="margin-bottom:8px; font-size:12px; color:var(--text-muted);">
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;" title="[▶ 이미지 + TTS] 클릭 시 도입부 그룹 이미지가 완성되는 즉시 Grok 으로 순차 영상 변환을 시작합니다. 본론은 이미지 그대로.">
+            <input type="checkbox" id="autoIntroVideoToggle" checked />
+            <span>도입부 자동 영상화 (이미지 완성 시 Grok 으로 순차 변환)</span>
+          </label>
+        </div>
         <div style="display:flex; gap:6px; margin-bottom:8px;">
           <button class="btn" id="pauseBtn" onclick="pauseGeneration()" style="flex:1; padding:8px 12px; background:var(--warning); color:#fff; display:none; white-space:nowrap;">일시정지</button>
           <button class="btn" id="stopBtn" onclick="stopGeneration()" style="flex:1; padding:8px 12px; background:var(--danger); color:#fff; display:none; white-space:nowrap;">중지</button>
@@ -6750,6 +6756,86 @@ async function _convertGroupListToVideo(groupIds, label) {
   }
 }
 
+/** 도입부 그룹 자동 영상화 — 각 그룹의 imagePath 가 디스크에 나타나는 즉시 순차 변환.
+ *  generateAll() 의 imageTask/ttsTask 와 병렬로 동작하며, 도입부 이미지 1개가 완성되는 즉시
+ *  Grok 변환을 시작하므로 본론 이미지 생성과 도입부 비디오 변환이 자연스럽게 겹친다.
+ *  영상 간 20~40초 anti-detect 대기는 _convertGroupListToVideo 패턴 그대로. */
+async function _convertIntroGroupsProgressively(proj, introGroups) {
+  const fs = require('fs');
+  if (!introGroups || introGroups.length === 0) return { success: 0, fail: 0, skipped: 0 };
+  addLog(`[Grok] 도입부 자동 영상화 — ${introGroups.length}개 대기열 (이미지 완성 시 즉시 변환)`, 'info');
+  window._grokConvertActive = true;
+  let success = 0, fail = 0, skipped = 0;
+  const POLL_INTERVAL = 2000;
+  const PER_GROUP_TIMEOUT = 7 * 60 * 1000;  // 그룹당 이미지 대기 최대 7분
+
+  try {
+    for (let i = 0; i < introGroups.length; i++) {
+      if (!window._grokConvertActive) break;
+      const g = introGroups[i];
+
+      // 이 그룹의 imagePath 가 준비될 때까지 대기 (이미지 task 가 채워줌)
+      const waitStart = Date.now();
+      while (Date.now() - waitStart < PER_GROUP_TIMEOUT) {
+        if (!window._grokConvertActive) return { success, fail, skipped };
+        if (g.imageStatus === 'fail') break;             // 이미지 실패 → 비디오 스킵
+        if (g.imagePath && fs.existsSync(g.imagePath)) break;
+        await new Promise(r => setTimeout(r, POLL_INTERVAL));
+      }
+      if (!g.imagePath || !fs.existsSync(g.imagePath)) {
+        skipped++;
+        addLog(`[Grok] 그룹 ${g.num} 이미지 미완성/실패 — 비디오 스킵`, 'err');
+        continue;
+      }
+
+      // 이미 비디오 있으면 스킵 (중복 변환 방지 — 사용자가 사전에 만들었거나 재실행 케이스)
+      if (g.videoPath && fs.existsSync(g.videoPath) && g.videoStatus === 'done') {
+        skipped++;
+        addLog(`[Grok] 그룹 ${g.num} 이미 비디오 있음 — 스킵`, 'info');
+        continue;
+      }
+
+      // 변환 (motion 미지정 → grok-engine 기본값 사용)
+      const ok = await convertGroupVideo(g.id, { silent: true });
+      if (ok) success++; else fail++;
+
+      // 마지막이 아니면 anti-detect 대기 (사용자 중지 시 빠르게 빠져나감)
+      if (i < introGroups.length - 1 && window._grokConvertActive) {
+        const waitMs = 20000 + Math.floor(Math.random() * 20001);
+        addLog(`[Grok] 다음 도입부 영상 전 ${(waitMs / 1000).toFixed(1)}초 대기 (휴먼타이밍)`, 'info');
+        const startWait = Date.now();
+        while (Date.now() - startWait < waitMs) {
+          if (!window._grokConvertActive) return { success, fail, skipped };
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+    }
+  } finally {
+    window._grokConvertActive = false;
+    try {
+      renderTaskList(window._currentProject);
+      await new Promise(r => setTimeout(r, 1500));   // 마지막 비디오 첨부 UI 반영 시간
+    } catch (e) {
+      console.error('[intro-video wrap-up]', e);
+    }
+    // Grok Chrome 자동 닫기 — _convertGroupListToVideo 와 동일 패턴
+    try {
+      if (_grokEngineInstance) {
+        await _grokEngineInstance.stop();
+        _grokEngineInstance = null;
+        addLog(`[Grok] 자동화 Chrome 창 닫음`, 'info');
+      }
+    } catch (e) {
+      console.error('[grok stop]', e);
+    }
+  }
+  addLog(
+    `[Grok] 도입부 자동 영상화 종료 — 성공 ${success} / 실패 ${fail} / 스킵 ${skipped}`,
+    fail ? 'err' : 'ok'
+  );
+  return { success, fail, skipped };
+}
+
 /**
  * 그록 자동화 크롬을 띄우고 grok.com/login 페이지로 이동.
  * 사용자가 미리 X 계정 로그인해두면 이후 영상 생성 시 자동 인증 그대로 활용됨.
@@ -7245,15 +7331,40 @@ async function generateAll() {
     }
   })();
 
-  // 두 작업 동시 진행
-  await Promise.all([imageTask, ttsTask]);
+  // 도입부 비디오 task — 토글 ON 이고 isIntro 그룹 1개 이상일 때만
+  // 도입부 이미지가 1개 완성되는 즉시 Grok 변환 큐 시작 (이미지/TTS task 와 오버랩)
+  const autoIntro = document.getElementById('autoIntroVideoToggle')?.checked ?? true;
+  const introGroups = proj.groups.filter(g => g.isIntro);
+  const introVideoTask = (async () => {
+    if (!autoIntro) {
+      if (introGroups.length > 0) addLog(`[Grok] 도입부 자동 영상화 — 토글 OFF (스킵)`, 'info');
+      return;
+    }
+    if (introGroups.length === 0) return;  // 도입부 없으면 조용히 스킵
+    if (window._grokConvertActive) {
+      addLog('[Grok] 이미 다른 비디오 작업 진행 중 — 도입부 자동 영상화 스킵', 'info');
+      return;
+    }
+    try {
+      await _convertIntroGroupsProgressively(proj, introGroups);
+    } catch (e) {
+      addLog(`[Grok] 도입부 자동 영상화 예외: ${e.message} — 다른 작업 계속`, 'err');
+    }
+  })();
+
+  // 세 작업 동시 진행
+  await Promise.all([imageTask, ttsTask, introVideoTask]);
 
   const imgDone = proj.groups.filter(g => g.imagePath).length;
   const ttsDone = proj.sentences.filter(s => s.ttsStatus === 'done').length;
   // 추가 검증 — 실제 mp3 파일이 디스크에 있는 sentence 수
   const fsVerify = require('fs');
   const ttsFileOk = proj.sentences.filter(s => s.ttsAudioPath && fsVerify.existsSync(s.ttsAudioPath)).length;
-  addLog(`[병렬 완료] 이미지 ${imgDone}/${groupCount} · TTS ${ttsDone}/${sentenceCount} (디스크 mp3=${ttsFileOk})`, 'ok');
+  const videoDone = introGroups.filter(g => g.videoPath && fsVerify.existsSync(g.videoPath)).length;
+  const videoLine = (autoIntro && introGroups.length > 0)
+    ? ` · 도입부 영상 ${videoDone}/${introGroups.length}`
+    : '';
+  addLog(`[병렬 완료] 이미지 ${imgDone}/${groupCount} · TTS ${ttsDone}/${sentenceCount} (디스크 mp3=${ttsFileOk})${videoLine}`, 'ok');
 
   // status 'done' 인데 ttsAudioPath 가 비어있는 비정상 케이스 진단
   const ghostDone = proj.sentences.filter(s => s.ttsStatus === 'done' && (!s.ttsAudioPath || !fsVerify.existsSync(s.ttsAudioPath)));
@@ -7270,7 +7381,10 @@ async function generateAll() {
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   const m = Math.floor(elapsed / 60);
   const s = elapsed % 60;
-  addLog(`━━━ 자동 제작 완료 (${m}분 ${s}초) — 이미지 ${imgDone}/${groupCount}, TTS ${ttsDone}/${sentenceCount} ━━━`, 'ok');
+  const videoSummary = (autoIntro && introGroups.length > 0)
+    ? `, 도입부 영상 ${videoDone}/${introGroups.length}`
+    : '';
+  addLog(`━━━ 자동 제작 완료 (${m}분 ${s}초) — 이미지 ${imgDone}/${groupCount}, TTS ${ttsDone}/${sentenceCount}${videoSummary} ━━━`, 'ok');
   addLog(`💡 검토 후 [💾 브루생성] 버튼으로 .vrew 파일을 빌드하세요.`, 'info');
   addLog(`💡 Flow 자동화 Chrome 창은 다음 작업 빠른 재사용을 위해 유지됩니다. 더 안 쓰시면 수동으로 X 버튼 닫으셔도 OK`, 'info');
 }
@@ -7905,6 +8019,22 @@ async function vrewWatchLoop(filePath) {
   // chip-group 의 공통 클릭 핸들러가 active 토글한 직후 저장
   document.querySelectorAll('#antiDetectPresetChips .chip, #onLimitReachedChips .chip').forEach(c => {
     c.addEventListener('click', () => setTimeout(persist, 50));
+  });
+})();
+
+// ─── 도입부 자동 영상화 토글 영속화 (localStorage) ─────
+(function setupAutoIntroVideoPersistence() {
+  const KEY = 'autoIntroVideo';
+  const el = document.getElementById('autoIntroVideoToggle');
+  if (!el) return;
+  try {
+    const saved = localStorage.getItem(KEY);
+    if (saved === '0') el.checked = false;
+    else if (saved === '1') el.checked = true;
+    // 저장값 없으면 기본 checked 그대로 유지
+  } catch {}
+  el.addEventListener('change', () => {
+    try { localStorage.setItem(KEY, el.checked ? '1' : '0'); } catch {}
   });
 })();
 
