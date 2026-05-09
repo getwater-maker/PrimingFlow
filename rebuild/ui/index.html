@@ -5729,14 +5729,22 @@ async function previewPreset() {
     // Buffer → Blob → audio src
     const ext = result.format === 'wav' ? 'wav' : 'mp3';
     const mime = ext === 'wav' ? 'audio/wav' : 'audio/mpeg';
-    const blob = new Blob([result.mp3Buffer], { type: mime });
+    // 무음 패딩 — convertSentence 와 동일 정책. silenceSec 슬라이더 효과를 미리듣기에서도 검증 가능.
+    let previewBuf = result.mp3Buffer;
+    const silSec = (typeof opts.silenceSec === 'number' ? opts.silenceSec : 0);
+    if (silSec > 0 && ext === 'wav') {
+      try { previewBuf = _appendSilenceToWav(result.mp3Buffer, silSec); }
+      catch (e) { addLog(`[미리듣기] 무음 패딩 실패: ${e.message}`, 'err'); }
+    }
+    const blob = new Blob([previewBuf], { type: mime });
     const url = URL.createObjectURL(blob);
     const audio = document.getElementById('presetForm_audio');
     audio.src = url;
     audio.style.display = '';
     audio.play().catch(() => {});
 
-    addLog(`미리듣기: ${preset.engine} ${preset.voice} (${result.durationSec.toFixed(1)}초)`, 'ok');
+    const totalDur = result.durationSec + (ext === 'wav' ? silSec : 0);
+    addLog(`미리듣기: ${preset.engine} ${preset.voice} (${result.durationSec.toFixed(1)}초 + 무음 ${silSec.toFixed(1)}초 = ${totalDur.toFixed(1)}초)`, 'ok');
   } catch (e) {
     addLog(`미리듣기 실패: ${e.message}`, 'err');
     alert('미리듣기 실패: ' + e.message);
@@ -6254,6 +6262,59 @@ function _fmtDuration(sec) {
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
+/**
+ * WAV 버퍼 끝에 silenceSec 만큼 무음(0) 추가.
+ * 헤더에서 sample rate / 채널 / 비트수 / data chunk 위치를 동적으로 읽어
+ * 비표준 chunk 가 끼어있어도 안전하게 동작.
+ *
+ * @param {Buffer} wavBuf — RIFF/WAVE/fmt /data 표준 PCM WAV
+ * @param {number} silenceSec — 추가할 무음 길이(초)
+ * @returns {Buffer} silence 가 data chunk 끝에 append 된 새 WAV 버퍼
+ * @throws Error — non-WAV 또는 'data' chunk 미발견 시
+ */
+function _appendSilenceToWav(wavBuf, silenceSec) {
+  if (!Buffer.isBuffer(wavBuf) || wavBuf.length < 44) throw new Error('너무 작은 WAV');
+  if (wavBuf.toString('ascii', 0, 4) !== 'RIFF' || wavBuf.toString('ascii', 8, 12) !== 'WAVE') {
+    throw new Error('non-WAV 헤더');
+  }
+
+  // chunk 순회로 fmt / data 위치 찾기 (offset 가정 없이)
+  let sampleRate = 0, numChannels = 1, bitsPerSample = 16;
+  let dataOffset = -1, dataSize = 0;
+  let pos = 12;
+  while (pos + 8 <= wavBuf.length) {
+    const id = wavBuf.toString('ascii', pos, pos + 4);
+    const sz = wavBuf.readUInt32LE(pos + 4);
+    if (id === 'fmt ') {
+      // fmt 데이터: 0:format(2) 2:channels(2) 4:sampleRate(4) 8:byteRate(4) 12:blockAlign(2) 14:bitsPerSample(2)
+      numChannels   = wavBuf.readUInt16LE(pos + 8 + 2);
+      sampleRate    = wavBuf.readUInt32LE(pos + 8 + 4);
+      bitsPerSample = wavBuf.readUInt16LE(pos + 8 + 14);
+    } else if (id === 'data') {
+      dataOffset = pos;          // 'data' 식별자 시작 위치
+      dataSize = sz;
+      break;
+    }
+    pos += 8 + sz + (sz % 2);    // chunk 는 word align — 홀수 size 면 +1 padding
+  }
+  if (dataOffset < 0) throw new Error("'data' chunk 미발견");
+  if (sampleRate <= 0) throw new Error('fmt chunk 미파싱');
+
+  const bytesPerFrame = (bitsPerSample / 8) * numChannels;
+  const silenceFrames = Math.round(silenceSec * sampleRate);
+  const silenceBytes = silenceFrames * bytesPerFrame;
+
+  const silence = Buffer.alloc(silenceBytes, 0);
+  const newBuf = Buffer.concat([wavBuf, silence]);
+
+  // data chunk size 갱신 (id 4byte + size 4byte 후 +4 = pos+4)
+  newBuf.writeUInt32LE(dataSize + silenceBytes, dataOffset + 4);
+  // RIFF chunk size 갱신 (= 전체 길이 - 8)
+  newBuf.writeUInt32LE(newBuf.length - 8, 4);
+
+  return newBuf;
+}
+
 async function convertSentence(sid, _opts = {}) {
   const proj = window._currentProject;
   if (!proj) return false;
@@ -6339,15 +6400,10 @@ async function convertSentence(sid, _opts = {}) {
     let finalBuf = result.mp3Buffer;
     if (opts.silenceSec > 0 && ext === 'wav') {
       try {
-        const sampleRate = 24000;
-        const silenceLen = Math.round(opts.silenceSec * sampleRate) * 2; // 16-bit mono
-        const silence = Buffer.alloc(silenceLen, 0);
-        const newBuf = Buffer.concat([result.mp3Buffer, silence]);
-        const newDataSize = result.mp3Buffer.readUInt32LE(40) + silenceLen;
-        newBuf.writeUInt32LE(36 + newDataSize, 4);   // RIFF chunk size
-        newBuf.writeUInt32LE(newDataSize, 40);        // data chunk size
-        finalBuf = newBuf;
-      } catch {}
+        finalBuf = _appendSilenceToWav(result.mp3Buffer, opts.silenceSec);
+      } catch (e) {
+        addLog(`[!] [${sentence.num}] 무음 패딩 실패 (${e.message}) — 무음 없이 저장`, 'err');
+      }
     }
     fs.writeFileSync(outPath, finalBuf);
 
