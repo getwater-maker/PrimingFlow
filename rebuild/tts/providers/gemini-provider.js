@@ -13,6 +13,7 @@
  */
 
 const SecretStore = require('../secret-store');
+const Usage = require('../gemini-usage-store');
 
 const PROVIDER_ID = 'gemini';
 
@@ -96,6 +97,7 @@ class GeminiProvider {
     });
 
     if (!response.ok) {
+      if (response.status === 429) Usage.bump('tts_429');
       const errText = await response.text().catch(() => '');
       throw new Error(`Gemini TTS 실패 (${response.status}): ${errText.substring(0, 200)}`);
     }
@@ -105,6 +107,8 @@ class GeminiProvider {
     if (!audioData) {
       throw new Error('Gemini 응답에 오디오 데이터 없음');
     }
+
+    Usage.bump('tts_ok');
 
     const pcmBuffer = Buffer.from(audioData, 'base64');
     const wavBuffer = this._pcmToWav(pcmBuffer, 24000);

@@ -17,6 +17,7 @@
  */
 
 const { splitLongSentenceAlgo, koSpeechWeight } = require('./algo-splitter');
+const Usage = require('../../tts/gemini-usage-store');
 
 // 'gemini-flash-latest' = Google 이 항상 최신 안정 flash 모델로 자동 매핑.
 // 모델 deprecation 시에도 코드 변경 없이 자동 전환됨.
@@ -84,6 +85,7 @@ async function splitLongSentenceAI(text, opts = {}) {
     }
 
     if (!response.ok) {
+      if (response.status === 429) Usage.bump('split_429');
       const errText = await response.text().catch(() => '');
       log(`[ai-splitter] HTTP ${response.status} — 알고리즘 폴백 (${errText.substring(0, 100)})`);
       return splitLongSentenceAlgo(text, maxChars);
@@ -96,6 +98,8 @@ async function splitLongSentenceAI(text, opts = {}) {
       log('[ai-splitter] 응답 비어있음 — 알고리즘 폴백');
       return splitLongSentenceAlgo(text, maxChars);
     }
+
+    Usage.bump('split_ok');
 
     // 줄바꿈 기준 파싱. 빈 줄·번호·기호 제거
     const lines = raw
