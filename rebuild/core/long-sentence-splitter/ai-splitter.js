@@ -18,10 +18,17 @@
 
 const { splitLongSentenceAlgo, koSpeechWeight } = require('./algo-splitter');
 const Usage = require('../../tts/gemini-usage-store');
+const { quietPostJson } = require('../../tts/quiet-http');
 
 // 'gemini-flash-latest' = Google 이 항상 최신 안정 flash 모델로 자동 매핑.
 // 모델 deprecation 시에도 코드 변경 없이 자동 전환됨.
 const DEFAULT_MODEL = 'gemini-flash-latest';
+
+// Circuit breaker — 한 번 429 받으면 60초간 Gemini 호출 자체 스킵.
+// 일일 quota 초과 상황에서 30+ 문장 연속 호출하다 모두 429 받는 일을 방지.
+// 각 호출이 즉시 algo 폴백 → 네트워크 round-trip 자체 안 함.
+let _gemini429Until = 0;
+const CIRCUIT_BREAKER_MS = 60_000;
 
 // 한 문장씩 호출 — 한 batch 로 묶을 수도 있지만 안정성·debugging 우선
 const PROMPT_TEMPLATE = (text, maxChars) =>
@@ -59,6 +66,11 @@ async function splitLongSentenceAI(text, opts = {}) {
     return splitLongSentenceAlgo(text, maxChars);
   }
 
+  // Circuit breaker — 최근 429 받았으면 60초간 호출 자체 스킵
+  if (_gemini429Until > Date.now()) {
+    return splitLongSentenceAlgo(text, maxChars);
+  }
+
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const body = {
@@ -69,25 +81,18 @@ async function splitLongSentenceAI(text, opts = {}) {
       },
     };
 
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeout);
-
-    let response;
-    try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: ctrl.signal,
-      });
-    } finally {
-      clearTimeout(timer);
-    }
+    // quietPostJson — fetch 대신 Node http 사용 (DevTools 콘솔에 빨간 에러 안 찍힘)
+    const response = await quietPostJson(url, body, { timeoutMs: timeout });
 
     if (!response.ok) {
-      if (response.status === 429) Usage.bump('split_429');
-      const errText = await response.text().catch(() => '');
-      log(`[ai-splitter] HTTP ${response.status} — 알고리즘 폴백 (${errText.substring(0, 100)})`);
+      if (response.status === 429) {
+        Usage.bump('split_429');
+        _gemini429Until = Date.now() + CIRCUIT_BREAKER_MS;
+        log(`[ai-splitter] Gemini 429 (일일 quota 초과) — 60초간 algo 분할로 직행`);
+      } else {
+        const errText = await response.text().catch(() => '');
+        log(`[ai-splitter] HTTP ${response.status} — 알고리즘 폴백 (${errText.substring(0, 100)})`);
+      }
       return splitLongSentenceAlgo(text, maxChars);
     }
 

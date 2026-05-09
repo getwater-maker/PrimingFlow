@@ -14,8 +14,14 @@
 
 const SecretStore = require('../secret-store');
 const Usage = require('../gemini-usage-store');
+const { quietPostJson } = require('../quiet-http');
 
 const PROVIDER_ID = 'gemini';
+
+// Circuit breaker (TTS 측) — 한 번 429 받으면 60초간 호출 스킵, 즉시 throw.
+// generateAll() 이 30+ 문장을 연속 합성하다 모두 429 받는 일을 방지.
+let _gemini429Until = 0;
+const CIRCUIT_BREAKER_MS = 60_000;
 
 class GeminiProvider {
   constructor(opts = {}) {
@@ -73,6 +79,13 @@ class GeminiProvider {
   async synthesize(text, opts = {}) {
     if (!this.ready) throw new Error('Gemini provider not ready — API 키 미설정');
 
+    // Circuit breaker — 최근 429 받았으면 60초간 호출 자체 스킵.
+    // 일일 quota 초과 후 generateAll() 가 30+ 문장 다 시도하는 cascading 방지.
+    if (_gemini429Until > Date.now()) {
+      const wait = Math.ceil((_gemini429Until - Date.now()) / 1000);
+      throw new Error(`Gemini 일일 quota 초과 — ${wait}초 후 자동 재시도 가능 (또는 다른 엔진/키 사용)`);
+    }
+
     const voice = opts.voice || this.voice;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
 
@@ -90,14 +103,14 @@ class GeminiProvider {
       },
     };
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    // quietPostJson — fetch 대신 Node http 사용 (DevTools 콘솔에 빨간 에러 안 찍힘)
+    const response = await quietPostJson(url, body, { timeoutMs: 60000 });
 
     if (!response.ok) {
-      if (response.status === 429) Usage.bump('tts_429');
+      if (response.status === 429) {
+        Usage.bump('tts_429');
+        _gemini429Until = Date.now() + CIRCUIT_BREAKER_MS;
+      }
       const errText = await response.text().catch(() => '');
       throw new Error(`Gemini TTS 실패 (${response.status}): ${errText.substring(0, 200)}`);
     }

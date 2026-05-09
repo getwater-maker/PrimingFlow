@@ -55,4 +55,57 @@ function quietGet(url, opts = {}) {
   });
 }
 
-module.exports = { quietGet };
+/**
+ * POST + JSON body 헬퍼 — fetch 대용, 콘솔 에러 안 찍힘 (Node 소켓 사용).
+ * 429/500 같은 응답도 throw 하지 않고 그대로 status 반환.
+ *
+ * @param {string} url
+ * @param {object} jsonBody
+ * @param {{ timeoutMs?: number, headers?: object }} [opts]
+ * @returns {Promise<{status:number, ok:boolean, json:()=>Promise<any>, text:()=>Promise<string>, error?:string}>}
+ */
+function quietPostJson(url, jsonBody, opts = {}) {
+  return new Promise(resolve => {
+    let u;
+    try { u = new URL(url); } catch (e) {
+      return resolve({ status: 0, ok: false, error: 'invalid url' });
+    }
+    const isHttps = u.protocol === 'https:';
+    const lib = isHttps ? https : http;
+    const defaultPort = isHttps ? 443 : 80;
+
+    const payload = Buffer.from(JSON.stringify(jsonBody || {}), 'utf-8');
+    const req = lib.request({
+      method: 'POST',
+      hostname: u.hostname,
+      port: u.port ? Number(u.port) : defaultPort,
+      path: (u.pathname || '/') + (u.search || ''),
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': payload.length,
+        ...(opts.headers || {}),
+      },
+      timeout: opts.timeoutMs || 15000,
+    }, res => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        const body = Buffer.concat(chunks);
+        resolve({
+          status: res.statusCode,
+          ok: res.statusCode >= 200 && res.statusCode < 300,
+          json: async () => JSON.parse(body.toString('utf-8')),
+          text: async () => body.toString('utf-8'),
+        });
+      });
+      res.on('error', e => resolve({ status: 0, ok: false, error: e.message }));
+    });
+
+    req.on('error',   e => resolve({ status: 0, ok: false, error: e.code || e.message }));
+    req.on('timeout', () => { req.destroy(); resolve({ status: 0, ok: false, error: 'timeout' }); });
+    req.write(payload);
+    req.end();
+  });
+}
+
+module.exports = { quietGet, quietPostJson };
