@@ -6186,6 +6186,18 @@ function _commitSentenceEdit(sid, textEl) {
       tagEl.style.color = tagColor;
     }
   }
+
+  // vrewClips 변경 → sub-clip 자막 미리보기 / 그룹 헤더 자막 카운트 / 평탄 번호
+  // 모두 다시 계산해야 함. 풀 리렌더가 가장 정확. 스크롤 위치는 보존.
+  try {
+    const scroller = document.querySelector('#taskListGroups')?.parentElement || document.scrollingElement;
+    const savedScrollTop = scroller ? scroller.scrollTop : 0;
+    if (typeof renderTaskList === 'function') {
+      renderTaskList(proj);
+      if (scroller) scroller.scrollTop = savedScrollTop;
+    }
+  } catch (_) {}
+
   // 원본 대본 텍스트도 동기화 (모달에서 수정 시 덮어쓰지 않게 — 대본은 별도)
   // _scriptText 는 그대로 유지 (재분할 시 사용자가 모달로 명시 변경한 것이 우선)
 }
@@ -6293,7 +6305,9 @@ async function convertSentence(sid, _opts = {}) {
         ? ` ref=${opts.refAudioPath.split(/[\\/]/).pop()}`
         : ' ref=(없음)';
       const seedTag = opts.seed != null ? ` seed=${opts.seed}` : '';
-      addLog(`[${sentence.num}] ${preset.name} (${preset.engine}/${opts.voice})${refTag}${seedTag}`, 'info');
+      // 실제 합성 텍스트 첫 40자도 함께 — 인라인 편집 후 합성 결과를 사용자가 검증 가능
+      const textPreview = (sentence.text || '').slice(0, 40) + (sentence.text.length > 40 ? '…' : '');
+      addLog(`[${sentence.num}] ${preset.name} (${preset.engine}/${opts.voice})${refTag}${seedTag} · "${textPreview}"`, 'info');
     }
     const _ttsStartedAt = Date.now();
     const result = await mgr.synthesize(sentence.text, { provider: preset.engine, ...opts });
