@@ -105,10 +105,14 @@ function splitLongSentenceAlgo(text, maxChars = 30) {
   // 그래도 부족하면 띄어쓰기 기준 강제 절반 분할
   if (parts.length === 1) parts = _splitByMidSpace(trimmed);
 
-  // 너무 긴 클립은 재귀 1회만 더 분할 (유효 글자수 기준)
+  // 너무 긴 클립은 재귀 분할.
+  // 안전장치: 이번 단계에서 분할 진척이 없으면 (parts.length === 1) 재귀 금지 —
+  // 모든 splitter 가 [text] 만 반환하는 입력(공백·구두점 없는 긴 단어 등)이 들어오면
+  // 같은 문자열로 무한 재귀에 빠짐 (RangeError: Maximum call stack size exceeded).
+  const madeProgress = parts.length > 1;
   const expanded = [];
   for (const p of parts) {
-    if (_meaningful(p) > maxChars * SOFT_MAX_FACTOR) {
+    if (madeProgress && _meaningful(p) > maxChars * SOFT_MAX_FACTOR) {
       const sub = splitLongSentenceAlgo(p, maxChars);
       if (sub.length > 1) expanded.push(...sub.map(c => c.text));
       else expanded.push(p);
