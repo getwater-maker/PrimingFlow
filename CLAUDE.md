@@ -39,11 +39,12 @@ GPU 컴퓨터(192.168.219.157)는 **Windows 만 켜져있으면 됨**. PrimingFl
 - **`core/project-model.js`** — Sentence/Group/Project 클래스
 - **`core/channel-store.js`** — 채널 프리셋 (refAudioFolder/outputFolder/profileId/logoPath)
 - **`core/ref-audio-scanner.js`** — WAV+TXT 묶음 자동 매칭
-- **`tts/tts-manager.js`** — TTS provider 추상화 (OmniVoice 원격 + Gemini)
+- **`tts/tts-manager.js`** — TTS provider 추상화 (OmniVoice 원격 + Gemini + Supertonic 로컬 CPU)
 - **`tts/preset-store.js`** — 음성 프리셋 (~/.flow-app/tts-presets.json)
 - **`tts/secret-store.js`** — Gemini API 키 (~/.flow-app/tts-secrets.json)
-- **`tts/providers/{omnivoice,gemini}-provider.js`**
+- **`tts/providers/{omnivoice,gemini,supertonic}-provider.js`**
 - **`tts/omnivoice-backend/api.py`** — FastAPI 백엔드 (포트 9881, GPU 머신에 자동 시동)
+- **`tts/supertonic-backend/api.py`** — FastAPI 백엔드 (포트 9882, 로컬 CPU 99M ONNX, 자동 시동)
 - **`vrew/vrew-builder.js`** — sentence + vrewClips → .vrew (TTS≠자막 분리, sourceIn/sourceOut)
 
 ## 절대 건드리지 말 것
@@ -57,11 +58,12 @@ GPU 컴퓨터(192.168.219.157)는 **Windows 만 켜져있으면 됨**. PrimingFl
 **vrewClips**: 자막 단위 (긴 문장은 N개로 분할). 같은 sentence 의 vrewClips 는 같은 dub mp3 를 sourceIn/sourceOut 으로 시간 슬라이스 → 음성은 자연스럽고 자막은 N번 바뀜
 **Group**: N개 sentences. 그룹별로 Flow 이미지 1장. 그룹 안 모든 vrewClip 이 같은 이미지 공유 → 그룹 단위 Ken Burns
 
-## TTS Provider (2종 — OmniVoice 근간 + Gemini 보조)
-| Provider | 비용 | 키 | 한국어 | 용도 |
-|---|---|---|---|---|
-| **OmniVoice** | 무료 (GPU 서버) | 불필요 | Voice Clone + Voice Design | **근간 엔진** — 주력 |
-| Gemini | 무료 quota | API 키 | 좋음 (30 voices) | 보조 / 백업 |
+## TTS Provider (3종 — OmniVoice 근간 + Gemini/Supertonic 보조)
+| Provider | 비용 | 키 | 한국어 | 위치 | 용도 |
+|---|---|---|---|---|---|
+| **OmniVoice** | 무료 (GPU 서버) | 불필요 | Voice Clone + Voice Design | GPU PC 9881 | **근간 엔진** — 주력 |
+| Gemini | 무료 quota | API 키 | 좋음 (30 voices) | 클라우드 | 보조 / 백업 |
+| Supertonic-3 | 무료 (CPU 99M ONNX) | 불필요 | pre-defined M1/F1/M2/F2 | **로컬 CPU 9882** | 보조 — GPU PC 없이 작동 (출장지 대비) · 31 언어 |
 
 ## 인증 상태
 - 단독 사용 모드 (auth-manager.js 는 더미 — 항상 활성 사용자 반환)
@@ -81,6 +83,7 @@ GPU 컴퓨터(192.168.219.157)는 **Windows 만 켜져있으면 됨**. PrimingFl
 - 개발: `cd D:\PrimingFlow && npm start`
 - 인스톨러: `cd D:\PrimingFlow && npm run dist` → dist/PrimingFlow Setup.exe
 - OmniVoice 의존: conda env `D:/miniconda3/envs/OmniVoice/python.exe` (api.py 자동 spawn)
+- Supertonic 의존: conda env `D:/miniconda3/envs/Supertonic/python.exe` (CPU 전용, `tts/supertonic-backend/README.md` 참고)
 
 ## 알려진 한계
 - **Flow 미디어 설정 클릭** — Google UI 변경에 따라 selector 가 안 맞을 수 있음. 로그 dump 로 진단.
