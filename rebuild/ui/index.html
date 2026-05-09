@@ -4058,9 +4058,26 @@ function renderPresets() {
     };
 
     // 카드 본문 클릭 → 활성 프리셋으로
-    card.onclick = (e) => {
+    card.onclick = async (e) => {
       if (e.target.classList.contains('preset-edit-icon')) return;  // 편집 아이콘 클릭은 별도
       if (!usable) {
+        // race condition 안전망: 백엔드 살아있는데 매니저 ready=false 인 경우만 즉시 재연결 시도.
+        // 참조음성 X / API 키 X 같은 데이터 부재는 refreshProvider 로 해결 안 되므로 그대로 안내.
+        if ((p.engine === 'omnivoice' || p.engine === 'supertonic') &&
+            mgr && !mgr.isAvailable(p.engine)) {
+          try { await mgr.refreshProvider(p.engine); } catch {}
+          if (mgr.isAvailable(p.engine)) {
+            // 재연결 성공 → 다시 isUsable 체크 (clone 모드일 땐 refAudio 도 필요)
+            const { isUsable: _isUsable } = require('../tts/preset-store');
+            if (_isUsable(p, mgr)) {
+              addLog(`[TTS] ${p.engine} 재연결 — "${p.name}" 활성화`, 'ok');
+              _activePresetId = p.id;
+              _applyActivePresetToMainScreen(p);
+              renderPresets();
+              return;
+            }
+          }
+        }
         addLog(`"${p.name}" 미준비 — ⚙ 클릭하여 편집 모달에서 설정`, 'info');
         return;
       }
@@ -5693,6 +5710,10 @@ async function previewPreset() {
     const { getInstance } = require('../tts/tts-manager');
     const mgr = getInstance();
     if (preset.engine === 'gemini') {
+      await mgr.refreshProvider(preset.engine);
+    } else if ((preset.engine === 'omnivoice' || preset.engine === 'supertonic') && !mgr.isAvailable(preset.engine)) {
+      // race condition 안전망: 백엔드는 살아있는데 매니저 ready=false 인 경우 즉시 재연결.
+      // (PrimingFlow 부팅이 백엔드 준비보다 빨라서 init 실패한 채 남아있는 케이스)
       await mgr.refreshProvider(preset.engine);
     }
     if (!mgr.isAvailable(preset.engine)) {
