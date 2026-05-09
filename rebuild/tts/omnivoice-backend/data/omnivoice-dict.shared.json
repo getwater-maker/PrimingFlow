@@ -13,5 +13,90 @@
     "source": "6월",
     "pron": "유월",
     "enabled": true
+  },
+  {
+    "source": "38년",
+    "pron": "삼십팔년",
+    "enabled": true
+  },
+  {
+    "source": "4대",
+    "pron": "사대",
+    "enabled": true
+  },
+  {
+    "source": "1번",
+    "pron": "일번",
+    "enabled": true
+  },
+  {
+    "source": "2번",
+    "pron": "이번",
+    "enabled": true
+  },
+  {
+    "source": "1395년",
+    "pron": "천삼백구십오년",
+    "enabled": true
+  },
+  {
+    "source": "3년",
+    "pron": "삼년",
+    "enabled": true
+  },
+  {
+    "source": "1408년",
+    "pron": "천사백팔년",
+    "enabled": true
+  },
+  {
+    "source": "1418년",
+    "pron": "천사백십팔년",
+    "enabled": true
+  },
+  {
+    "source": "8월",
+    "pron": "팔월",
+    "enabled": true
+  },
+  {
+    "source": "1446년",
+    "pron": "천사백사십육년",
+    "enabled": true
+  },
+  {
+    "source": "4년",
+    "pron": "사년",
+    "enabled": true
+  },
+  {
+    "source": "1년",
+    "pron": "일년",
+    "enabled": true
+  },
+  {
+    "source": "28년",
+    "pron": "이십팔년",
+    "enabled": true
+  },
+  {
+    "source": "500년",
+    "pron": "오백년",
+    "enabled": true
+  },
+  {
+    "source": "600년",
+    "pron": "육백년",
+    "enabled": true
+  },
+  {
+    "source": "400년",
+    "pron": "사백년",
+    "enabled": true
+  },
+  {
+    "source": "쉰여덟",
+    "pron": "쉰여덜",
+    "enabled": true
   }
 ]
