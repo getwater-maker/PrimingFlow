@@ -18,10 +18,14 @@ const { quietPostJson } = require('../quiet-http');
 
 const PROVIDER_ID = 'gemini';
 
-// Circuit breaker (TTS 측) — 한 번 429 받으면 60초간 호출 스킵, 즉시 throw.
-// generateAll() 이 30+ 문장을 연속 합성하다 모두 429 받는 일을 방지.
+// Circuit breaker (단계형) — TTS 측. ai-splitter 와 동일 정책:
+//   첫 429   → 1시간 대기  (시간당 한도 또는 burst)
+//   연속 429 → 24시간 대기 (일일 한도 — 다음날 자정에 reset)
+// 60초 짧은 cycle 로 자동 재시도하면 사용자 PrimingFlow 띄워둔 시간만큼 누적됨.
 let _gemini429Until = 0;
-const CIRCUIT_BREAKER_MS = 60_000;
+let _gemini429Streak = 0;
+const SHORT_BREAKER_MS = 60 * 60 * 1000;       // 1시간
+const LONG_BREAKER_MS  = 24 * 60 * 60 * 1000;  // 24시간
 
 class GeminiProvider {
   constructor(opts = {}) {
@@ -79,11 +83,13 @@ class GeminiProvider {
   async synthesize(text, opts = {}) {
     if (!this.ready) throw new Error('Gemini provider not ready — API 키 미설정');
 
-    // Circuit breaker — 최근 429 받았으면 60초간 호출 자체 스킵.
-    // 일일 quota 초과 후 generateAll() 가 30+ 문장 다 시도하는 cascading 방지.
+    // Circuit breaker — 최근 429 받았으면 호출 자체 스킵 (네트워크 round-trip 안 함).
     if (_gemini429Until > Date.now()) {
-      const wait = Math.ceil((_gemini429Until - Date.now()) / 1000);
-      throw new Error(`Gemini 일일 quota 초과 — ${wait}초 후 자동 재시도 가능 (또는 다른 엔진/키 사용)`);
+      const remainSec = Math.ceil((_gemini429Until - Date.now()) / 1000);
+      const remainHuman = remainSec >= 3600
+        ? `${Math.ceil(remainSec / 3600)}시간`
+        : `${Math.ceil(remainSec / 60)}분`;
+      throw new Error(`Gemini 한도 초과 — ${remainHuman} 후 자동 재시도 가능 (또는 OmniVoice / Supertonic 사용)`);
     }
 
     const voice = opts.voice || this.voice;
@@ -109,13 +115,16 @@ class GeminiProvider {
     if (!response.ok) {
       if (response.status === 429) {
         Usage.bump('tts_429');
-        _gemini429Until = Date.now() + CIRCUIT_BREAKER_MS;
+        _gemini429Streak++;
+        const breakerMs = (_gemini429Streak >= 2) ? LONG_BREAKER_MS : SHORT_BREAKER_MS;
+        _gemini429Until = Date.now() + breakerMs;
       }
       const errText = await response.text().catch(() => '');
       throw new Error(`Gemini TTS 실패 (${response.status}): ${errText.substring(0, 200)}`);
     }
 
     const json = await response.json();
+    _gemini429Streak = 0;  // 성공했으니 streak 초기화
     const audioData = json?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     if (!audioData) {
       throw new Error('Gemini 응답에 오디오 데이터 없음');

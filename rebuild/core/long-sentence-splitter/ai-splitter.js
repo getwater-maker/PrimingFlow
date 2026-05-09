@@ -24,11 +24,16 @@ const { quietPostJson } = require('../../tts/quiet-http');
 // 모델 deprecation 시에도 코드 변경 없이 자동 전환됨.
 const DEFAULT_MODEL = 'gemini-flash-latest';
 
-// Circuit breaker — 한 번 429 받으면 60초간 Gemini 호출 자체 스킵.
-// 일일 quota 초과 상황에서 30+ 문장 연속 호출하다 모두 429 받는 일을 방지.
-// 각 호출이 즉시 algo 폴백 → 네트워크 round-trip 자체 안 함.
+// Circuit breaker (단계형) — 429 받으면 점점 더 길게 대기.
+// Google quota 는 분당/시간당/일일 여러 단위가 있어 단계형이 맞음:
+//   첫 429        → 1시간 대기  (시간당 한도 또는 burst — 한 시간 후 회복 가능)
+//   연속 429      → 24시간 대기 (일일 한도 — 다음날 자정에 reset)
+// 60초 같은 짧은 cycle 로 자동 재시도하면 PrimingFlow 띄워둔 시간만큼
+// 콘솔 에러/카운트가 누적됨 (사용자 케이스: 12시간 → 695회 시도).
 let _gemini429Until = 0;
-const CIRCUIT_BREAKER_MS = 60_000;
+let _gemini429Streak = 0;
+const SHORT_BREAKER_MS = 60 * 60 * 1000;       // 1시간
+const LONG_BREAKER_MS  = 24 * 60 * 60 * 1000;  // 24시간
 
 // 한 문장씩 호출 — 한 batch 로 묶을 수도 있지만 안정성·debugging 우선
 const PROMPT_TEMPLATE = (text, maxChars) =>
@@ -87,8 +92,11 @@ async function splitLongSentenceAI(text, opts = {}) {
     if (!response.ok) {
       if (response.status === 429) {
         Usage.bump('split_429');
-        _gemini429Until = Date.now() + CIRCUIT_BREAKER_MS;
-        log(`[ai-splitter] Gemini 429 (일일 quota 초과) — 60초간 algo 분할로 직행`);
+        _gemini429Streak++;
+        const breakerMs = (_gemini429Streak >= 2) ? LONG_BREAKER_MS : SHORT_BREAKER_MS;
+        _gemini429Until = Date.now() + breakerMs;
+        const human = _gemini429Streak >= 2 ? '24시간' : '1시간';
+        log(`[ai-splitter] Gemini 429 (한도 초과, 연속 ${_gemini429Streak}회) — ${human}간 algo 분할로 직행`);
       } else {
         const errText = await response.text().catch(() => '');
         log(`[ai-splitter] HTTP ${response.status} — 알고리즘 폴백 (${errText.substring(0, 100)})`);
@@ -105,6 +113,7 @@ async function splitLongSentenceAI(text, opts = {}) {
     }
 
     Usage.bump('split_ok');
+    _gemini429Streak = 0;  // 성공했으니 streak 초기화 (다음 429 는 1시간 짧은 대기부터)
 
     // 줄바꿈 기준 파싱. 빈 줄·번호·기호 제거
     const lines = raw
