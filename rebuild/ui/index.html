@@ -4701,6 +4701,7 @@ function deleteChannel() {
 // ─── OmniVoice 모니터링 바 ──────────────────────────────
 let _omnivoiceMonitorTimer = null;
 let _omnivoiceMonitorMisses = 0;
+let _omnivoiceWasReady = false;   // 첫 ready 진입 감지 — 매니저 자동 동기화
 
 async function _pollOmnivoiceStatus() {
   const TtsConfig = require('../tts/tts-config');
@@ -4716,12 +4717,29 @@ async function _pollOmnivoiceStatus() {
     _omnivoiceMonitorMisses = 0;
     if (res.status === 200) {
       _renderOmnivoiceMonitor({ ready: true });
+      // 백엔드가 살아났는데 매니저 provider.ready 가 false 면 (시작 시 race condition —
+      // PrimingFlow 부팅이 GPU 백엔드 준비보다 빠른 경우) 자동으로 재연결 + 프리셋 갱신.
+      if (!_omnivoiceWasReady) {
+        _omnivoiceWasReady = true;
+        try {
+          const { getInstance } = require('../tts/tts-manager');
+          const mgr = getInstance();
+          if (mgr && !mgr.isAvailable('omnivoice')) {
+            await mgr.refreshProvider('omnivoice');
+            if (typeof addLog === 'function') addLog('[TTS] OmniVoice 자동 재연결 — 프리셋 활성화', 'ok');
+            if (typeof renderPresets === 'function') renderPresets();
+          }
+        } catch (_) {}
+      }
     } else if (res.status === 503) {
+      _omnivoiceWasReady = false;
       _renderOmnivoiceMonitor({ loading: true });
     } else {
+      _omnivoiceWasReady = false;
       _renderOmnivoiceMonitor({ off: true, reason: `응답 ${res.status}` });
     }
   } else {
+    _omnivoiceWasReady = false;
     _omnivoiceMonitorMisses++;
     const soft = _omnivoiceMonitorMisses < 2;
     _renderOmnivoiceMonitor({
