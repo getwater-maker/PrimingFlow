@@ -62,6 +62,7 @@ class Group {
     this.num = num;                     // 1부터 시작하는 표시 번호
     this.title = null;                  // 대괄호 섹션 제목 (없으면 null)
     this.isIntro = false;               // 도입부 그룹 여부 (UI 색상 구분용)
+    this.isBracket = false;             // 대괄호 섹션 그룹 — 이미지 프롬프트는 한국어 + 스타일 그대로
     this.sentenceIds = sentenceIds || [];
 
     // 이미지 (그룹 = 이미지 1장)

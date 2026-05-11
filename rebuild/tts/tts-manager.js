@@ -21,7 +21,13 @@ class TTSManager {
     this.providers = new Map();
     this.logger = typeof opts.logger === 'function' ? opts.logger : () => {};
     this._started = false;
-    this._dictCache = [];
+    // 디스크 캐시 즉시 로드 — 첫 합성에서도 사전 적용되도록 (이전: 빈 [] 로 시작 →
+    // fire-and-forget refresh 가 끝날 때까지 첫 합성은 사전 미적용)
+    try {
+      this._dictCache = require('./omnivoice-dict-store').loadAll();
+    } catch (_) {
+      this._dictCache = [];
+    }
     this._dictRefreshAt = 0;
     this._DICT_TTL_MS = 60_000;
   }
@@ -175,7 +181,13 @@ class TTSManager {
    * @param {object} opts - { provider, voice, speed, ... }
    */
   async synthesize(text, opts = {}) {
-    this._maybeRefreshDictAsync(); // fire-and-forget
+    // 첫 호출(앱 시작 직후) 은 서버 동기화를 기다림 — 다른 노트북에서 LAN 으로 갱신된 사전 반영.
+    // 이후 호출은 fire-and-forget (TTL 60초 안이면 refresh 도 스킵).
+    if (this._dictRefreshAt === 0) {
+      await this._maybeRefreshDictAsync();
+    } else {
+      this._maybeRefreshDictAsync();
+    }
     const { applyOmniVoiceDict, normalizeForTTS } = require('./text-pronouncer');
     const normalized = normalizeForTTS(text);
     const processed = applyOmniVoiceDict(normalized, this._dictCache);

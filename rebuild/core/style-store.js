@@ -14,6 +14,7 @@ const os = require('os');
 
 const STORE_DIR = path.join(os.homedir(), '.flow-app');
 const STORE_PATH = path.join(STORE_DIR, 'styles.json');
+const ORDER_PATH = path.join(STORE_DIR, 'style-order.json');
 
 // 기본 28개 스타일 — flow-engine.js 의 옛 STYLE_PROMPTS 객체에서 이관
 const BUILT_IN_STYLES = [
@@ -34,13 +35,16 @@ const BUILT_IN_STYLES = [
   { id: '3d',                name: '3D 렌더링',           prompt: '3D rendered scene, ray tracing, realistic materials, cinematic lighting, Unreal Engine' },
   { id: 'minecraft',         name: '마인크래프트',        prompt: 'Minecraft game screenshot, voxel art, blocky 3D world, cubic characters, pixel textures, in-game capture' },
   { id: 'stickman',          name: '졸라맨 (스틱맨)',     prompt: 'simple stick figure drawing, black lines on white background, minimalist doodle, hand-drawn sketch style, funny stick characters' },
-  { id: 'simpsons',          name: '심슨 가족',           prompt: 'The Simpsons cartoon style, yellow skin characters, bold outlines, bright colors, animated TV show, Matt Groening style' },
   { id: 'ghibli',            name: '지브리 (미야자키)',   prompt: 'Studio Ghibli anime style, soft watercolor backgrounds, warm lighting, detailed nature, Hayao Miyazaki inspired' },
   { id: 'disney',            name: '디즈니/픽사',         prompt: 'Disney 3D animation style, Pixar-like rendering, expressive characters, vibrant colors, family friendly' },
   { id: 'chibi',             name: '치비 (귀여운)',       prompt: 'chibi anime style, cute super-deformed characters, big eyes, small body, kawaii, pastel colors' },
   { id: 'retro',             name: '레트로 80s',          prompt: 'retro 80s synthwave, neon colors, grid landscape, sunset, VHS aesthetic, vaporwave' },
   { id: 'sketch',            name: '연필 스케치',         prompt: 'pencil sketch drawing, graphite on paper, detailed cross-hatching, artistic hand-drawn' },
   { id: 'pop',               name: '팝아트',              prompt: 'pop art style, Roy Lichtenstein, bold colors, halftone dots, comic book aesthetic, Andy Warhol inspired' },
+  { id: 'monochrome',        name: '모노크롬',            prompt: 'monochrome digital painting, smooth grayscale shading, black and white, strong contrast, dramatic cinematic lighting, realistic idealized llustration, detailed rendering, 4K' },
+  { id: 'infographic-3d',    name: '인포그래픽 3D',       prompt: '아래 내용의 대표이미지 한컷을 3D인포그래픽 작성, 한글로 작성, 어른들이 보기 편하게 작성' },
+  { id: 'infographic-2d',    name: '인포그래픽 2D',       prompt: '아래 내용의 대표이미지 한컷을 2D인포그래픽 작성, 한글로 작성, 어른들이 보기 편하게 작성' },
+  { id: 'biblical-chibi',    name: '치비 (성경시대)',     prompt: 'chibi anime style, cute super-deformed characters with big sparkling eyes and small bodies, kawaii, soft pastel earth tones (ochre, sand, olive, terracotta), ancient biblical era setting, characters wearing flowing robes and tunics, simple head coverings, leather sandals, bearded elders, Holy Land scenery with olive trees and stone buildings, gentle reverent atmosphere, hand-drawn anime illustration, NOT modern clothing, NOT Korean historical drama, NOT photorealistic' },
 ];
 
 function _loadUserStyles() {
@@ -66,14 +70,49 @@ function _saveUserStyles(userStyles) {
   }
 }
 
-/** 기본 + 사용자 모든 스타일 반환. 각 항목에 isBuiltIn 플래그 포함. */
+function _loadOrder() {
+  try {
+    if (fs.existsSync(ORDER_PATH)) {
+      const data = JSON.parse(fs.readFileSync(ORDER_PATH, 'utf-8'));
+      if (Array.isArray(data)) return data;
+    }
+  } catch (e) {
+    console.error('[style-store] 순서 로드 실패:', e.message);
+  }
+  return [];
+}
+
+function _saveOrder(orderIds) {
+  try {
+    fs.mkdirSync(STORE_DIR, { recursive: true });
+    fs.writeFileSync(ORDER_PATH, JSON.stringify(orderIds, null, 2), 'utf-8');
+    return true;
+  } catch (e) {
+    console.error('[style-store] 순서 저장 실패:', e.message);
+    return false;
+  }
+}
+
+/** 기본 + 사용자 모든 스타일 반환. 각 항목에 isBuiltIn 플래그 포함.
+ *  ~/.flow-app/style-order.json 이 있으면 그 순서대로, 없는 항목은 뒤에 (기본 → 사용자). */
 function loadAll() {
   const user = _loadUserStyles();
-  const result = BUILT_IN_STYLES.map(s => ({ ...s, isBuiltIn: true }));
-  for (const u of user) {
-    result.push({ ...u, isBuiltIn: false });
-  }
-  return result;
+  const all = [
+    ...BUILT_IN_STYLES.map(s => ({ ...s, isBuiltIn: true })),
+    ...user.map(u => ({ ...u, isBuiltIn: false })),
+  ];
+  const order = _loadOrder();
+  const indexOf = id => {
+    const i = order.indexOf(id);
+    return i < 0 ? Infinity : i;
+  };
+  all.sort((a, b) => {
+    const ia = indexOf(a.id), ib = indexOf(b.id);
+    if (ia !== ib) return ia - ib;
+    if (a.isBuiltIn !== b.isBuiltIn) return a.isBuiltIn ? -1 : 1;
+    return 0;
+  });
+  return all;
 }
 
 function getById(id) {
@@ -129,4 +168,22 @@ function remove(id) {
   return true;
 }
 
-module.exports = { loadAll, getById, getPrompt, isBuiltIn, add, update, remove, STORE_PATH, BUILT_IN_STYLES };
+/** 전체 순서를 한 번에 저장. orderIds 는 스타일 ID 문자열 배열. */
+function setOrder(orderIds) {
+  if (!Array.isArray(orderIds)) return false;
+  return _saveOrder(orderIds.filter(x => typeof x === 'string'));
+}
+
+/** id 한 개를 'up' / 'down' 으로 한 칸 이동. 현재 loadAll() 결과 순서 기준. */
+function moveStyle(id, direction) {
+  const all = loadAll();
+  const idx = all.findIndex(s => s.id === id);
+  if (idx < 0) return false;
+  const target = direction === 'up' ? idx - 1 : idx + 1;
+  if (target < 0 || target >= all.length) return false;
+  const ids = all.map(s => s.id);
+  [ids[idx], ids[target]] = [ids[target], ids[idx]];
+  return _saveOrder(ids);
+}
+
+module.exports = { loadAll, getById, getPrompt, isBuiltIn, add, update, remove, setOrder, moveStyle, STORE_PATH, BUILT_IN_STYLES };

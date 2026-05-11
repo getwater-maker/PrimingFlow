@@ -174,4 +174,74 @@ function splitIntoSentencesWithIntro(text) {
   return { items, hasIntro };
 }
 
-module.exports = { splitIntoSentences, splitWithSections, splitIntoSentencesWithIntro };
+/**
+ * 하이브리드 분할 — md 헤더 + 대괄호 마커 동시 인식.
+ *
+ * 동작:
+ *  - 줄 단위 스캔
+ *  - 마크다운 헤더 (#, ##, ...) 발견 → md 블록 시작 (도입 키워드 있으면 isIntro=true)
+ *  - 대괄호 마커 [제목] 발견 → bracket 블록 시작 (sectionTitle 저장)
+ *  - 그 외 줄은 현재 블록 본문에 누적
+ *
+ *  각 sentence 에 mode/isIntro/sectionTitle 부여. 대괄호 마커 자체는 sentence 에서
+ *  제외 (헤더와 동일 처리).
+ *
+ * @param {string} text
+ * @returns {{
+ *   items: Array<{text:string, mode:'md'|'bracket', isIntro:boolean, sectionTitle:string|null}>,
+ *   hasBrackets: boolean,
+ *   hasMdIntro: boolean
+ * }}
+ */
+function splitHybrid(text) {
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    return { items: [], hasBrackets: false, hasMdIntro: false };
+  }
+  const lines = text.split(/\r?\n/);
+
+  // 블록: { mode, isIntro, sectionTitle, lines }
+  const blocks = [];
+  let cur = { mode: 'md', isIntro: false, sectionTitle: null, lines: [] };
+  const flush = () => {
+    if (cur.lines.length > 0 || cur.mode === 'bracket') blocks.push(cur);
+  };
+
+  for (const line of lines) {
+    const bracketM = line.match(BRACKET_SECTION_RE);
+    const headerM = line.match(HEADER_LINE_CAPTURE);
+    if (bracketM) {
+      flush();
+      cur = { mode: 'bracket', isIntro: false, sectionTitle: bracketM[1].trim(), lines: [] };
+    } else if (headerM) {
+      flush();
+      cur = { mode: 'md', isIntro: /도입/.test(headerM[1]), sectionTitle: null, lines: [] };
+    } else {
+      cur.lines.push(line);
+    }
+  }
+  flush();
+
+  const items = [];
+  let hasBrackets = false;
+  let hasMdIntro = false;
+  for (const blk of blocks) {
+    const sents = _paragraphsToSentences(blk.lines.join('\n'));
+    if (sents.length === 0 && blk.mode === 'bracket') {
+      // 대괄호 섹션이 본문 비어있을 수 있음 — 빈 그룹은 만들지 않음 (그룹화 단계에서 자연스럽게 빠짐)
+      continue;
+    }
+    for (const t of sents) {
+      items.push({
+        text: t,
+        mode: blk.mode,
+        isIntro: blk.isIntro,
+        sectionTitle: blk.sectionTitle,
+      });
+    }
+    if (blk.mode === 'bracket' && sents.length > 0) hasBrackets = true;
+    if (blk.mode === 'md' && blk.isIntro && sents.length > 0) hasMdIntro = true;
+  }
+  return { items, hasBrackets, hasMdIntro };
+}
+
+module.exports = { splitIntoSentences, splitWithSections, splitIntoSentencesWithIntro, splitHybrid };

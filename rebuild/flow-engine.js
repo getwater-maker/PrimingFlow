@@ -167,6 +167,9 @@ class FlowAutomator {
   async run(config) {
     const {
       paragraphs,
+      // 하이브리드 분할 — 대괄호 그룹은 한국어+스타일 그대로 입력 (번역 스킵).
+      // null 인 idx 는 기존 영문 변환 흐름. 길이는 paragraphs 와 1:1.
+      customPrompts = null,
       mediaType = 'image',
       style = 'cinematic',
       ratio = '16:9',
@@ -337,16 +340,25 @@ class FlowAutomator {
     const sceneContext = await this._analyzeSceneContext(paragraphs, stylePrompt, style);
     this.debug(`[분석] 컨텍스트: ${sceneContext.substring(0, 80)}...`);
 
-    // 번역 + 프롬프트 미리 생성
+    // 번역 + 프롬프트 미리 생성.
+    // customPrompts[i] 가 비어있지 않으면 그대로 사용 (대괄호 그룹 — 한국어+스타일 직접).
+    // null 또는 미지정 idx 는 기존 영문 변환 흐름.
     const translations = [];
     const prompts = [];
     let prevTranslated = null;
     for (let i = 0; i < paragraphs.length; i++) {
       const num = String(i + 1).padStart(2, '0');
-      const prompt = await this._buildEnglishPrompt(paragraphs[i], stylePrompt, ratio, sceneContext, prevTranslated, presetEnglish);
+      const custom = (customPrompts && customPrompts[i]) ? String(customPrompts[i]) : null;
+      let prompt;
+      if (custom) {
+        prompt = custom;
+        this.log(`[프롬프트 ${num}] 대괄호 그룹 — 한국어+스타일 직접 (번역 스킵)`);
+      } else {
+        prompt = await this._buildEnglishPrompt(paragraphs[i], stylePrompt, ratio, sceneContext, prevTranslated, presetEnglish);
+        prevTranslated = this._lastTranslated || null;
+      }
       translations.push({ num, original: paragraphs[i].substring(0, 100), prompt });
       prompts.push(prompt);
-      prevTranslated = this._lastTranslated || null;
     }
 
     // ─── 배치 모드 vs 순차 모드 ───
@@ -2803,18 +2815,13 @@ class FlowAutomator {
     const westernHints = ['공주', '왕자', '난쟁이', '마법사', '드래곤', '기사', '요정', '동화', '마녀', '유리관', '성에서', '왕국'];
     // 한국 전통 키워드 (애매한 '왕', '성' 제거)
     const koreanHints = ['사찰', '스님', '궁궐', '한복', '조선', '관리들', '전통 의복', '단청', '향로', '기와', '대감', '상궁', '내시'];
-    // 성경시대 키워드 — 구약/신약 인물, 지명, 기물
-    const biblicalHints = [
-      '예수', '그리스도', '성령', '여호와', '하나님', '하느님', '주님', '성경', '복음', '사도', '제자', '선지자', '예언자',
-      '모세', '아브라함', '이삭', '야곱', '요셉', '다윗', '솔로몬', '노아', '엘리야', '다니엘', '사무엘', '여호수아',
-      '마리아', '요한', '베드로', '바울', '바리새', '랍비', '세례', '십자가', '부활', '천사', '가브리엘', '미가엘',
-      '예루살렘', '베들레헴', '나사렛', '갈릴리', '가나안', '이집트', '애굽', '바벨론', '시내산', '시나이', '요단강',
-      '이스라엘', '유대', '성전', '회당', '방주', '광야', '말씀', '기적', '구원', '안식일', '유월절',
-    ];
 
-    // 성경시대 수채화 스타일은 무조건 성경 문화권 태그 적용
-    const isBiblicalStyle = style === 'biblical-watercolor';
-    const isBiblical = isBiblicalStyle || biblicalHints.some(k => fullSample.includes(k));
+    // biblical cultureTag 는 사용자가 'biblical-' 접두사 스타일을 명시 선택했을 때만 적용
+    // (현재: biblical-watercolor, biblical-chibi. 향후 biblical-oil 등 추가 시 자동 매칭).
+    // 자동 키워드 판별을 제거한 이유: '말씀, 구원, 천사, 사도, 제자, 주님' 같은 단어가 일반
+    // 한국어 대본에도 자주 나와 false positive 빈발 (공영장례 대본 같은 모던 한국 콘텐츠가
+    // 갑자기 성경시대 설정으로 끼어드는 사고 발생).
+    const isBiblical = typeof style === 'string' && style.startsWith('biblical-');
     const isWestern = !isBiblical && westernHints.some(k => fullSample.includes(k));
     const isKorean = !isBiblical && !isWestern && koreanHints.some(k => fullSample.includes(k));
 

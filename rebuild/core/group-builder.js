@@ -227,4 +227,92 @@ function buildGroupsWithIntro(items, thresholds) {
   return { sentences, groups };
 }
 
-module.exports = { buildGroups, buildGroupsWithSections, buildGroupsWithIntro };
+/**
+ * 하이브리드 그룹화 — md 영역은 도입/본론 사이즈로, 대괄호 영역은 한 그룹씩.
+ *
+ * 동작:
+ *  - mode='bracket' 문장: 같은 sectionTitle 끼리 한 그룹 (groupSize 무시)
+ *  - mode='md' 문장: isIntro 면 introSentenceSize, 아니면 mainSentenceSize 로 그룹화
+ *  - 모드 경계 (md→bracket 또는 bracket→md) 또는 대괄호 sectionTitle 변경 → 항상 새 그룹
+ *  - 짧은 문장 (md 그룹에서만) 흡수 규칙은 기존 buildGroupsWithIntro 와 동일
+ *
+ * @param {Array<{text:string, mode:'md'|'bracket', isIntro:boolean, sectionTitle:string|null}>} items
+ * @param {{
+ *   shortLen: number,
+ *   longLen: number,
+ *   introSentenceSize: number,
+ *   mainSentenceSize: number,
+ *   vrewMaxChars?: number
+ * }} thresholds
+ */
+function buildGroupsHybrid(items, thresholds) {
+  const { shortLen, longLen, introSentenceSize, mainSentenceSize } = thresholds;
+  const vrewMaxChars = thresholds.vrewMaxChars || longLen;
+
+  const sentences = items.map((item, i) => {
+    const s = new Sentence({ num: i + 1, text: item.text });
+    s.isShort = s.charCount < shortLen;
+    s.isLong = s.charCount > longLen;
+    s.isIntro = !!item.isIntro;
+    s.sectionTitle = item.sectionTitle || null;
+    s.mode = item.mode;
+    s.vrewClips = s.isLong
+      ? splitLongSentenceAlgo(item.text, vrewMaxChars)
+      : [{ text: item.text, weight: 1.0 }];
+    return s;
+  });
+
+  const groups = [];
+  let gNum = 0;
+  let currentGroup = null;
+  let currentCount = 0;
+  let currentMode = null;          // 'md-intro' | 'md-main' | 'bracket'
+  let currentSectionTitle = null;
+
+  const targetModeOf = (s) => {
+    if (s.mode === 'bracket') return 'bracket';
+    return s.isIntro ? 'md-intro' : 'md-main';
+  };
+
+  const startNewGroup = (s) => {
+    gNum++;
+    currentGroup = new Group({ num: gNum, sentenceIds: [] });
+    currentGroup.isIntro = !!s.isIntro;
+    currentGroup.isBracket = s.mode === 'bracket';
+    currentGroup.title = s.sectionTitle || null;
+    groups.push(currentGroup);
+    currentCount = 0;
+    currentMode = targetModeOf(s);
+    currentSectionTitle = s.sectionTitle || null;
+  };
+
+  for (const s of sentences) {
+    const tm = targetModeOf(s);
+    const sectionChanged = (s.mode === 'bracket') && (s.sectionTitle !== currentSectionTitle);
+
+    if (!currentGroup || currentMode !== tm || sectionChanged) {
+      startNewGroup(s);
+    }
+
+    if (s.mode === 'bracket') {
+      // 대괄호: 같은 섹션의 모든 문장을 흡수, 사이즈 무시
+      currentGroup.sentenceIds.push(s.id);
+      s.groupId = currentGroup.id;
+    } else {
+      // md: 도입 N문장 / 본론 M문장
+      const groupSize = s.isIntro ? (introSentenceSize || 2) : (mainSentenceSize || 3);
+      if (s.isShort && currentGroup.sentenceIds.length > 0) {
+        currentGroup.sentenceIds.push(s.id);
+        s.groupId = currentGroup.id;
+      } else {
+        if (currentCount >= groupSize) startNewGroup(s);
+        currentGroup.sentenceIds.push(s.id);
+        s.groupId = currentGroup.id;
+        currentCount++;
+      }
+    }
+  }
+  return { sentences, groups };
+}
+
+module.exports = { buildGroups, buildGroupsWithSections, buildGroupsWithIntro, buildGroupsHybrid };

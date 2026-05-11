@@ -439,14 +439,22 @@ class GrokEngine {
           }
         }
 
-        // 다운로드 버튼이 있으면 클릭 → mp4 수신
+        // 다운로드 버튼이 있으면 enabled 인 경우에만 클릭 → mp4 수신
+        // (DOM 에 등장해도 disabled 인 사이클이 있음 — 그럴 때 click 하면 30초씩 까먹어
+        //  5분 timeout 까지 도달. enabled 가 될 때까지 폴링으로 넘김.)
         const dlBtn = await this.page.$(GROK_SELECTORS.downloadButton);
+        let dlEnabled = false;
         if (dlBtn) {
+          try { dlEnabled = await dlBtn.isEnabled(); } catch { dlEnabled = false; }
+        }
+        if (dlBtn && dlEnabled) {
           this.log('[Grok] 다운로드 버튼 클릭 (대기 90초)');
           try {
             const [download] = await Promise.all([
               this.page.waitForEvent('download', { timeout: 90000 }),  // 30초 → 90초
-              dlBtn.click(),
+              // click 자체는 5초 안에 안 되면 다음 폴링 사이클로 빠르게 복귀
+              // (Playwright 기본 actionTimeout 30초가 disabled 상태에서 까먹는 시간 줄임)
+              dlBtn.click({ timeout: 5000 }),
             ]);
             await download.saveAs(outputPath);
             GrokStore.markUsed();
