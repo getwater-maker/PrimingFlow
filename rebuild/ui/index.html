@@ -2085,11 +2085,14 @@
     <!-- 음색 설명 (instruct) -->
     <div style="margin-bottom:14px;">
       <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">
-        음색 설명 (instruct) — <span style="color:var(--text-muted);">영문 표현이 가장 안정적</span>
+        음색 설명 (instruct) — <b style="color:var(--accent);">콤마(,)로 구분</b>, 영문 표현이 가장 안정적
       </label>
       <textarea id="vdForm_instruct" rows="2"
         placeholder="예: female, low pitch, warm tone, british accent"
         style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:8px 10px; border-radius:6px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.4;"></textarea>
+      <div style="font-size:11px; color:var(--text-muted); margin-top:6px; line-height:1.4;">
+        💡 아래 칩을 클릭하면 자동으로 콤마가 들어가니 직접 타이핑하지 않아도 됩니다. <b>female 과 male, low/medium/high pitch 는 동시에 쓰지 마세요</b> (모순 → 합성 실패).
+      </div>
       <div id="vdForm_chips" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;"></div>
     </div>
 
@@ -5851,11 +5854,37 @@ async function vdSynthesize() {
     if (typeof addLog === 'function') addLog(`[Voice Design] 합성 완료 (${result.durationSec.toFixed(1)}초, seed=${f.seed ?? '-'})`, 'ok');
   } catch (e) {
     if (typeof addLog === 'function') addLog(`[Voice Design] 합성 실패: ${e.message}`, 'err');
-    alert('합성 실패: ' + e.message);
+    alert(_vdFriendlyError(e.message));
   } finally {
     btn.disabled = false;
     btn.textContent = '🔊 합성하기';
   }
+}
+
+// 백엔드의 instruct 파싱 에러를 한국어 가이드로 변환.
+// 'Unsupported instruct items' / 'did you mean ...' 패턴 감지.
+function _vdFriendlyError(msg) {
+  const m = String(msg || '');
+  if (!/Unsupported instruct items/i.test(m)) {
+    return '합성 실패: ' + m;
+  }
+  // 'did you mean ...' 추천 추출
+  const suggestions = [];
+  const re = /did you mean '([^']+)'/g;
+  let match;
+  while ((match = re.exec(m)) !== null) suggestions.push(match[1]);
+  const tip = suggestions.length
+    ? `\n\n추천 토큰: ${suggestions.join(', ')}`
+    : '';
+  return (
+    '합성 실패 — 음색 설명(instruct) 형식 오류\n\n' +
+    '각 속성은 콤마(,)로 구분해야 합니다.\n' +
+    '예) female, low pitch, warm tone\n\n' +
+    '또한 다음은 동시에 쓰면 모순입니다:\n' +
+    '  • female 과 male / man / boy\n' +
+    '  • low pitch / medium pitch / high pitch (셋 중 하나만)\n\n' +
+    '👉 위 칩들을 클릭만 해도 안전하게 입력됩니다.' + tip
+  );
 }
 
 function vdSaveToVault() {
