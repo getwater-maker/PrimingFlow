@@ -1808,7 +1808,11 @@
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px; align-items:end;">
       <div>
         <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">성우 / Voice</label>
-        <select id="presetForm_voice" style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 10px; border-radius:6px; font-size:14px;"></select>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <select id="presetForm_voice" style="flex:1; min-width:0; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 10px; border-radius:6px; font-size:14px;"></select>
+          <button class="btn-sm" id="presetForm_voiceQuickPreview" onclick="quickPreviewSelectedVoice()"
+            title="선택한 성우로 짧게 들어보기" style="display:none; padding:6px 10px; flex:none;">▶</button>
+        </div>
       </div>
       <div>
         <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">스타일 (이미지 생성)</label>
@@ -1885,11 +1889,14 @@
     <div id="presetForm_designSection" style="display:none; padding-top:12px; border-top:1px solid var(--border-soft); margin-top:12px;">
       <div style="font-size:13px; font-weight:600; color:var(--text-strong); margin-bottom:8px;">🎨 Voice Design — 음색 설명</div>
       <textarea id="presetForm_instruct" rows="2"
-        placeholder="예: 자연스러운 한국어 여성 목소리, 차분하고 따뜻한 톤"
+        placeholder="예: female, low pitch, warm tone"
         style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.4;"></textarea>
       <div style="font-size:11px; color:var(--text-muted); margin-top:6px; line-height:1.4;">
-        ※ 참조 음성 없이 텍스트 설명만으로 음색을 만듭니다. 매번 다른 목소리가 나올 수 있어 일관성이 필요하면 아래 🔒 <b>음성 고정</b> 을 켜세요.
+        ※ 참조 음성 없이 텍스트 설명만으로 음색을 만듭니다. 영문 표현(female / male / low pitch / whisper / british ...) 이 가장 안정적.
       </div>
+      <button class="btn btn-primary" onclick="openVoiceDesignStudio()" style="margin-top:10px; width:100%;">
+        🎨 Voice Design 작업실 열기 — 모든 파라미터 + 참조음성 저장
+      </button>
     </div>
 
     <!-- 미리듣기 (Voice Design / Clone 양쪽에서 공통 사용) -->
@@ -2060,6 +2067,124 @@
     <div style="display:flex; gap:6px; margin-top:14px;">
       <button class="btn btn-primary" onclick="savePreset()" style="flex:1;">💾 저장</button>
       <button class="btn-sm" onclick="deletePreset()" id="presetForm_deleteBtn" style="background:var(--bg-soft); color:var(--danger); border:1px solid var(--border); display:none;">🗑 삭제</button>
+    </div>
+  </div>
+</div>
+
+<!-- Voice Design 작업실 모달 (프리셋 모달 위에 풀모달로 뜸) -->
+<div id="voiceDesignModal" style="display:none; position:fixed; inset:0; background:rgba(58,52,46,0.62); z-index:1010; align-items:center; justify-content:center;" onclick="if(event.target===this)closeVoiceDesignStudio()">
+  <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:14px; width:820px; max-width:94vw; max-height:94vh; overflow-y:auto; padding:24px; box-shadow:var(--shadow-lg);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <h2 style="font-size:18px; color:var(--accent); margin:0;">🎨 Voice Design 작업실</h2>
+      <button class="btn-sm" onclick="closeVoiceDesignStudio()" style="font-size:15px;">✕</button>
+    </div>
+    <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px; line-height:1.5;">
+      텍스트 설명만으로 새로운 목소리를 만듭니다. 결과가 맘에 들면 <b>참조음성 보관소에 저장</b> → Voice Clone 에서 바로 사용할 수 있습니다.
+    </div>
+
+    <!-- 음색 설명 (instruct) -->
+    <div style="margin-bottom:14px;">
+      <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">
+        음색 설명 (instruct) — <span style="color:var(--text-muted);">영문 표현이 가장 안정적</span>
+      </label>
+      <textarea id="vdForm_instruct" rows="2"
+        placeholder="예: female, low pitch, warm tone, british accent"
+        style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:8px 10px; border-radius:6px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.4;"></textarea>
+      <div id="vdForm_chips" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;"></div>
+    </div>
+
+    <!-- 시범 텍스트 -->
+    <div style="margin-bottom:14px;">
+      <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">
+        시범 텍스트 — <span style="color:var(--text-muted);">이 문장으로 새 목소리를 시연. 보관소에 저장하면 그대로 .txt 가 됨</span>
+      </label>
+      <textarea id="vdForm_text" rows="2"
+        style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:8px 10px; border-radius:6px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.4;">우리 갉아 먹히는 마음을 정약용의 가르침으로 회복해요.</textarea>
+    </div>
+
+    <!-- 파라미터 그리드 -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; margin-bottom:14px;">
+      <!-- 언어 -->
+      <div style="display:flex; gap:8px; align-items:center;">
+        <label style="font-size:12px; color:var(--text-soft); flex:0 0 72px;" title="합성 텍스트의 언어. None=자동감지">언어</label>
+        <select id="vdForm_language" style="flex:1; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 8px; border-radius:6px; font-size:13px;">
+          <option value="ko" selected>한국어</option>
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+          <option value="zh">中文</option>
+          <option value="">자동감지</option>
+        </select>
+      </div>
+
+      <!-- 속도 -->
+      <div style="display:flex; gap:8px; align-items:center;">
+        <label style="font-size:12px; color:var(--text-soft); flex:0 0 72px;" title="속도 배율 (>1.0 빠름)">속도</label>
+        <input type="range" id="vdForm_speed" min="0.7" max="1.5" step="0.05" value="1.0" style="flex:1; accent-color:var(--accent);"
+          oninput="document.getElementById('vdForm_speedLabel').textContent = parseFloat(this.value).toFixed(2) + 'x'">
+        <span id="vdForm_speedLabel" style="font-size:13px; color:var(--text-strong); width:46px; text-align:right;">1.00x</span>
+      </div>
+
+      <!-- 디퓨전 스텝 -->
+      <div style="display:flex; gap:8px; align-items:center;">
+        <label style="font-size:12px; color:var(--text-soft); flex:0 0 72px;" title="디퓨전 스텝 수 — 16=빠름, 32=품질">스텝</label>
+        <div class="chip-group" id="vdForm_numStepChips" style="flex:1;">
+          <div class="chip" data-val="16" style="flex:1; text-align:center;">16 (빠름)</div>
+          <div class="chip active" data-val="32" style="flex:1; text-align:center;">32 (품질)</div>
+        </div>
+      </div>
+
+      <!-- guidance_scale -->
+      <div style="display:flex; gap:8px; align-items:center;">
+        <label style="font-size:12px; color:var(--text-soft); flex:0 0 72px;" title="음색 일치도 (높을수록 instruct 충실 / 낮으면 자유로움)">일치도</label>
+        <input type="range" id="vdForm_guidance" min="1.0" max="4.0" step="0.1" value="2.0" style="flex:1; accent-color:var(--accent);"
+          oninput="document.getElementById('vdForm_guidanceLabel').textContent = parseFloat(this.value).toFixed(1)">
+        <span id="vdForm_guidanceLabel" style="font-size:13px; color:var(--text-strong); width:46px; text-align:right;">2.0</span>
+      </div>
+
+      <!-- t_shift -->
+      <div style="display:flex; gap:8px; align-items:center;">
+        <label style="font-size:12px; color:var(--text-soft); flex:0 0 72px;" title="시간 이동 — 디퓨전 노이즈 스케줄 조정 (고급)">t_shift</label>
+        <input type="range" id="vdForm_tShift" min="0.0" max="0.3" step="0.01" value="0.1" style="flex:1; accent-color:var(--accent);"
+          oninput="document.getElementById('vdForm_tShiftLabel').textContent = parseFloat(this.value).toFixed(2)">
+        <span id="vdForm_tShiftLabel" style="font-size:13px; color:var(--text-strong); width:46px; text-align:right;">0.10</span>
+      </div>
+
+      <!-- class_temperature -->
+      <div style="display:flex; gap:8px; align-items:center;">
+        <label style="font-size:12px; color:var(--text-soft); flex:0 0 72px;" title="샘플링 온도 — 0=결정적, 높을수록 다양">온도</label>
+        <input type="range" id="vdForm_temperature" min="0.0" max="2.0" step="0.1" value="0.0" style="flex:1; accent-color:var(--accent);"
+          oninput="document.getElementById('vdForm_temperatureLabel').textContent = parseFloat(this.value).toFixed(1)">
+        <span id="vdForm_temperatureLabel" style="font-size:13px; color:var(--text-strong); width:46px; text-align:right;">0.0</span>
+      </div>
+    </div>
+
+    <!-- 시드 -->
+    <div style="display:flex; gap:8px; align-items:center; padding:10px 12px; background:var(--bg-soft); border:1px solid var(--border-soft); border-radius:8px; margin-bottom:14px;">
+      <label style="font-size:12px; color:var(--text-soft); flex:0 0 56px;">시드</label>
+      <input type="number" id="vdForm_seed" placeholder="비워두면 매번 랜덤"
+        style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 8px; border-radius:6px; font-size:13px;">
+      <button class="btn-sm" onclick="vdRandomSeed()" title="랜덤 시드 채우기" style="padding:5px 10px;">🎲 랜덤</button>
+      <button class="btn-sm" onclick="document.getElementById('vdForm_seed').value=''" title="시드 비우기 (매번 새 목소리)" style="padding:5px 10px;">∅ 비움</button>
+    </div>
+
+    <!-- 합성 + 결과 -->
+    <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+      <button class="btn btn-primary" onclick="vdSynthesize()" id="vdForm_synthBtn" style="flex:1;">🔊 합성하기</button>
+    </div>
+    <audio id="vdForm_audio" controls style="width:100%; display:none; height:32px; margin-bottom:14px;"></audio>
+
+    <!-- 보관소 저장 -->
+    <div style="padding:12px 14px; background:var(--bg-soft); border:1px solid var(--border-soft); border-radius:8px; margin-top:6px;">
+      <div style="font-size:13px; font-weight:600; color:var(--text-strong); margin-bottom:8px;">💾 참조음성 보관소에 저장</div>
+      <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px; line-height:1.4;">
+        합성 결과를 <code>~/.flow-app/ref-audio/</code> 에 <b>이름.wav</b> + <b>이름.txt</b> 페어로 저장합니다. Voice Clone 의 참조음성 드롭다운에 즉시 노출됩니다.
+      </div>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <input type="text" id="vdForm_saveName" placeholder="파일명 (확장자 제외)"
+          style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px;">
+        <button class="btn btn-primary" onclick="vdSaveToVault()" id="vdForm_saveBtn">💾 저장</button>
+      </div>
+      <div id="vdForm_saveHint" style="font-size:11px; color:var(--text-muted); margin-top:6px;">먼저 🔊 합성하기 로 음성을 생성하세요.</div>
     </div>
   </div>
 </div>
@@ -5070,6 +5195,8 @@ window.addEventListener('DOMContentLoaded', () => {
   // ESC 로 모달 닫기 (프리셋 / 채널)
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      const vd = document.getElementById('voiceDesignModal');
+      if (vd && vd.style.display === 'flex') { closeVoiceDesignStudio(); return; }
       const pm = document.getElementById('presetModal');
       if (pm && pm.style.display === 'flex') { closePresetModal(); return; }
       const cm = document.getElementById('channelModal');
@@ -5164,6 +5291,9 @@ function _setPresetEngine(engine) {
   // 미리듣기는 omnivoice / supertonic 모두 지원 (gemini 는 별도 섹션)
   const supportsPreview = (engine === 'omnivoice' || engine === 'supertonic');
   document.getElementById('presetForm_previewSection').style.display = supportsPreview ? '' : 'none';
+  // Supertonic 일 때만 성우 옆 ▶ 빠른 미리듣기 (pre-defined voice 들을 빠르게 비교)
+  const quickBtn = document.getElementById('presetForm_voiceQuickPreview');
+  if (quickBtn) quickBtn.style.display = (engine === 'supertonic') ? '' : 'none';
 
   const _updateOmniVoiceMode = () => {
     const v = select.value;
@@ -5546,6 +5676,215 @@ function closePresetModal() {
   _editingPresetId = null;
 }
 
+// ─── Voice Design 작업실 ────────────────────────────────
+const VD_CHIP_PRESETS = [
+  // 성별·나이
+  { token: 'female',        ko: '여성' },
+  { token: 'male',          ko: '남성' },
+  { token: 'child',         ko: '어린이' },
+  { token: 'young adult',   ko: '청년' },
+  { token: 'middle-aged',   ko: '중년' },
+  { token: 'elderly',       ko: '노년' },
+  // 음높이
+  { token: 'low pitch',     ko: '저음' },
+  { token: 'medium pitch',  ko: '중음' },
+  { token: 'high pitch',    ko: '고음' },
+  // 톤·스타일
+  { token: 'warm tone',     ko: '따뜻한' },
+  { token: 'calm',          ko: '차분한' },
+  { token: 'energetic',     ko: '활기찬' },
+  { token: 'soft',          ko: '부드러운' },
+  { token: 'whisper',       ko: '속삭임' },
+  { token: 'breathy',       ko: '호흡감' },
+  // 액센트
+  { token: 'american accent', ko: '미국식' },
+  { token: 'british accent',  ko: '영국식' },
+];
+
+let _vdLastResultBuffer = null;
+let _vdLastSynthText = '';
+
+function _vdRenderChips() {
+  const wrap = document.getElementById('vdForm_chips');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  for (const it of VD_CHIP_PRESETS) {
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.style.cursor = 'pointer';
+    chip.style.padding = '4px 10px';
+    chip.style.fontSize = '12px';
+    chip.title = it.ko;
+    chip.textContent = it.token;
+    chip.onclick = () => vdAddInstructToken(it.token);
+    wrap.appendChild(chip);
+  }
+}
+
+function vdAddInstructToken(token) {
+  const ta = document.getElementById('vdForm_instruct');
+  if (!ta) return;
+  const cur = ta.value.trim();
+  if (cur && cur.split(/,\s*/).map(s => s.toLowerCase()).includes(token.toLowerCase())) return; // 중복 방지
+  ta.value = cur ? cur.replace(/,\s*$/, '') + ', ' + token : token;
+  ta.focus();
+}
+
+function _vdBindNumStepChips() {
+  const grp = document.getElementById('vdForm_numStepChips');
+  if (!grp || grp.dataset.bound === '1') return;
+  grp.dataset.bound = '1';
+  grp.querySelectorAll('.chip').forEach(c => {
+    c.onclick = () => {
+      grp.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
+      c.classList.add('active');
+    };
+  });
+}
+
+function _vdReadForm() {
+  const grp = document.getElementById('vdForm_numStepChips');
+  const numStepEl = grp ? grp.querySelector('.chip.active') : null;
+  const numStep = numStepEl ? parseInt(numStepEl.dataset.val, 10) : 32;
+  const seedRaw = document.getElementById('vdForm_seed').value.trim();
+  return {
+    instruct: document.getElementById('vdForm_instruct').value.trim(),
+    text:     document.getElementById('vdForm_text').value.trim(),
+    language: document.getElementById('vdForm_language').value,
+    speed:    parseFloat(document.getElementById('vdForm_speed').value),
+    numStep,
+    guidance: parseFloat(document.getElementById('vdForm_guidance').value),
+    tShift:   parseFloat(document.getElementById('vdForm_tShift').value),
+    temperature: parseFloat(document.getElementById('vdForm_temperature').value),
+    seed: seedRaw === '' ? null : parseInt(seedRaw, 10),
+  };
+}
+
+function openVoiceDesignStudio() {
+  _vdRenderChips();
+  _vdBindNumStepChips();
+
+  // 프리셋 모달의 instruct textarea 값을 작업실로 prefill (사용자가 이미 적어둔 음색 설명 유지)
+  const presetInstruct = (document.getElementById('presetForm_instruct') || {}).value || '';
+  document.getElementById('vdForm_instruct').value = presetInstruct;
+
+  // 기본 저장명 시드
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  document.getElementById('vdForm_saveName').value = `design_${stamp}`;
+
+  // 직전 합성 결과 초기화
+  _vdLastResultBuffer = null;
+  _vdLastSynthText = '';
+  const audio = document.getElementById('vdForm_audio');
+  if (audio) { audio.pause(); audio.removeAttribute('src'); audio.style.display = 'none'; }
+  document.getElementById('vdForm_saveHint').textContent = '먼저 🔊 합성하기 로 음성을 생성하세요.';
+  document.getElementById('vdForm_saveHint').style.color = 'var(--text-muted)';
+
+  document.getElementById('voiceDesignModal').style.display = 'flex';
+}
+
+function closeVoiceDesignStudio() {
+  // 작업실의 instruct 값을 프리셋 모달의 textarea 로 동기화
+  const vdInstruct = document.getElementById('vdForm_instruct').value.trim();
+  const presetInstructEl = document.getElementById('presetForm_instruct');
+  if (presetInstructEl) presetInstructEl.value = vdInstruct;
+
+  const audio = document.getElementById('vdForm_audio');
+  if (audio) { audio.pause(); audio.removeAttribute('src'); }
+  document.getElementById('voiceDesignModal').style.display = 'none';
+}
+
+function vdRandomSeed() {
+  const v = Math.floor(Math.random() * 0x7fffffff);
+  document.getElementById('vdForm_seed').value = String(v);
+}
+
+async function vdSynthesize() {
+  const f = _vdReadForm();
+  if (!f.text) { alert('시범 텍스트를 입력하세요'); return; }
+  if (!f.instruct) { alert('음색 설명(instruct)을 입력하세요 — 칩을 눌러도 됩니다'); return; }
+
+  const btn = document.getElementById('vdForm_synthBtn');
+  btn.disabled = true;
+  btn.textContent = '생성 중...';
+
+  try {
+    const { getInstance } = require('../tts/tts-manager');
+    const mgr = getInstance();
+    if (!mgr.isAvailable('omnivoice')) {
+      await mgr.refreshProvider('omnivoice');
+    }
+    if (!mgr.isAvailable('omnivoice')) {
+      alert('OmniVoice 백엔드 미준비 — GPU 서버를 확인하세요');
+      return;
+    }
+
+    const opts = {
+      instruct: f.instruct,
+      cfgValue: f.guidance,
+      inferenceTimesteps: f.numStep,
+      speed: f.speed,
+      language: f.language || undefined,
+      tShift: f.tShift,
+      classTemperature: f.temperature,
+    };
+    if (f.seed != null && !Number.isNaN(f.seed)) opts.seed = f.seed;
+
+    if (typeof _stopAllPreviews === 'function') _stopAllPreviews();
+
+    const result = await mgr.synthesize(f.text, { provider: 'omnivoice', ...opts });
+    _vdLastResultBuffer = result.mp3Buffer;
+    _vdLastSynthText = f.text;
+
+    const blob = new Blob([result.mp3Buffer], { type: result.format === 'wav' ? 'audio/wav' : 'audio/mpeg' });
+    const url = URL.createObjectURL(blob);
+    const audio = document.getElementById('vdForm_audio');
+    audio.src = url;
+    audio.style.display = '';
+    audio.play().catch(() => {});
+
+    const hint = document.getElementById('vdForm_saveHint');
+    hint.textContent = `✓ 합성 완료 (${result.durationSec.toFixed(1)}초). 맘에 들면 파일명을 확인하고 💾 저장 을 누르세요.`;
+    hint.style.color = 'var(--accent)';
+    if (typeof addLog === 'function') addLog(`[Voice Design] 합성 완료 (${result.durationSec.toFixed(1)}초, seed=${f.seed ?? '-'})`, 'ok');
+  } catch (e) {
+    if (typeof addLog === 'function') addLog(`[Voice Design] 합성 실패: ${e.message}`, 'err');
+    alert('합성 실패: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔊 합성하기';
+  }
+}
+
+function vdSaveToVault() {
+  if (!_vdLastResultBuffer) {
+    alert('먼저 🔊 합성하기 로 음성을 생성하세요');
+    return;
+  }
+  const nameRaw = document.getElementById('vdForm_saveName').value.trim();
+  if (!nameRaw) { alert('파일명을 입력하세요'); return; }
+
+  try {
+    const RefVault = require('../core/ref-audio-vault');
+    const result = RefVault.saveItem(nameRaw, _vdLastResultBuffer, _vdLastSynthText);
+
+    const hint = document.getElementById('vdForm_saveHint');
+    hint.textContent = `✓ 저장 완료 → ${result.basename}.wav / .txt`;
+    hint.style.color = 'var(--accent)';
+
+    // 프리셋 모달의 참조음성 드롭다운 새로고침 (방금 저장한 항목 자동 선택)
+    if (typeof refreshRefAudioVault === 'function') {
+      refreshRefAudioVault(result.wavPath);
+    }
+    if (typeof addLog === 'function') addLog(`[Voice Design] 보관소 저장: ${result.basename}.wav (+.txt)`, 'ok');
+  } catch (e) {
+    if (typeof addLog === 'function') addLog(`[Voice Design] 저장 실패: ${e.message}`, 'err');
+    alert('저장 실패: ' + e.message);
+  }
+}
+
 
 // ─── TTS 서버 설정 모달 ───────────────────────────────
 // ── TTS 서버 URL 슬롯 (집 LAN / 출장 Tailscale 빠른 전환) ───────────
@@ -5826,6 +6165,53 @@ function _readPresetForm() {
   const _styleEl = document.getElementById('presetForm_styleId');
   preset.styleId = (_styleEl && _styleEl.value) || '';
   return preset;
+}
+
+// Supertonic 빠른 미리듣기 — 성우 드롭다운 옆 ▶ 버튼이 호출.
+// 미리듣기 textarea 의 텍스트(있으면) 또는 짧은 기본 문장으로 즉시 합성·재생.
+async function quickPreviewSelectedVoice() {
+  const btn = document.getElementById('presetForm_voiceQuickPreview');
+  if (!btn) return;
+  const QUICK_SAMPLE = '안녕하세요, 이 목소리는 어떠세요?';
+  const inputEl = document.getElementById('presetForm_previewText');
+  const text = ((inputEl && inputEl.value && inputEl.value.trim()) || QUICK_SAMPLE);
+
+  btn.disabled = true;
+  const origLabel = btn.textContent;
+  btn.textContent = '⏳';
+
+  try {
+    const preset = _readPresetForm();
+    const { getInstance } = require('../tts/tts-manager');
+    const mgr = getInstance();
+    if (!mgr.isAvailable(preset.engine)) {
+      await mgr.refreshProvider(preset.engine);
+    }
+    if (!mgr.isAvailable(preset.engine)) {
+      alert(`${preset.engine} 미준비 — 백엔드 확인`);
+      return;
+    }
+
+    const opts = _buildSynthesizeOpts(preset, null);
+    const result = await mgr.synthesize(text, { provider: preset.engine, ...opts });
+
+    if (typeof _stopAllPreviews === 'function') _stopAllPreviews();
+    const ext = result.format === 'wav' ? 'wav' : 'mp3';
+    const blob = new Blob([result.mp3Buffer], { type: ext === 'wav' ? 'audio/wav' : 'audio/mpeg' });
+    const url = URL.createObjectURL(blob);
+    const audio = document.getElementById('presetForm_audio');
+    audio.src = url;
+    audio.style.display = '';
+    audio.play().catch(() => {});
+
+    if (typeof addLog === 'function') addLog(`[빠른 미리듣기] ${preset.engine} ${preset.voice} (${result.durationSec.toFixed(1)}초)`, 'ok');
+  } catch (e) {
+    if (typeof addLog === 'function') addLog(`[빠른 미리듣기] 실패: ${e.message}`, 'err');
+    alert('미리듣기 실패: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origLabel || '▶';
+  }
 }
 
 async function previewPreset() {

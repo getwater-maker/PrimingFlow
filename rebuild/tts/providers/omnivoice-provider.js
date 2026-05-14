@@ -65,6 +65,9 @@ class OmniVoiceProvider {
    *   inferenceTimesteps {number}  num_step (16/32, 기본 32)
    *   speed              {number}  속도 배율 (네이티브 지원)
    *   language           {string}  'ko' | 'en' | ...
+   *   tShift             {number}  t_shift (0.0~0.3, 기본 0.1)
+   *   classTemperature   {number}  class_temperature (0=결정적, 기본 0.0)
+   *   seed               {number}  시드 (지정 시 결정적 합성)
    */
   async synthesize(text, opts = {}) {
     if (!this.ready) throw new Error('OmniVoice 백엔드 미준비');
@@ -77,6 +80,9 @@ class OmniVoiceProvider {
     };
 
     if (opts.language) payload.language = opts.language;
+    if (opts.tShift != null) payload.t_shift = parseFloat(opts.tShift);
+    if (opts.classTemperature != null) payload.class_temperature = parseFloat(opts.classTemperature);
+    if (opts.seed != null && opts.seed !== '') payload.seed = parseInt(opts.seed, 10);
 
     // Voice Clone 모드 — 로컬 파일을 합성 직전 서버에 업로드 후 토큰화
     if (opts.refAudioPath && opts.refText) {

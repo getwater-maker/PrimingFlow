@@ -56,4 +56,50 @@ function openInExplorer() {
   return Promise.resolve('shell unavailable');
 }
 
-module.exports = { VAULT_DIR, ensureVault, getVaultDir, listItems, openInExplorer };
+/**
+ * 파일명 안전화 — Windows/Unix 양쪽 금지 문자 제거, 공백 단정리, 확장자 제거.
+ * 빈 문자열이면 'voice-design' 으로 대체.
+ */
+function _sanitizeBasename(name) {
+  let s = String(name || '').trim();
+  // 확장자 제거 (마지막 .xxx)
+  s = s.replace(/\.[a-zA-Z0-9]{1,5}$/, '');
+  // 윈도우 금지 문자 + 제어문자 제거
+  s = s.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+  // 연속 공백·언더스코어 정리
+  s = s.replace(/\s+/g, ' ').trim();
+  if (!s) s = 'voice-design';
+  return s;
+}
+
+/** 보관소 내에 이미 같은 basename 의 wav/mp3 가 있으면 ` (2)`, ` (3)` ... 접미사 */
+function _uniqueBasename(basename) {
+  const exts = ['.wav', '.mp3', '.txt'];
+  const taken = (suffix) => exts.some(ext => fs.existsSync(path.join(VAULT_DIR, basename + suffix + ext)));
+  if (!taken('')) return basename;
+  for (let i = 2; i < 1000; i++) {
+    const suffix = ` (${i})`;
+    if (!taken(suffix)) return basename + suffix;
+  }
+  return basename + '_' + Date.now();
+}
+
+/**
+ * Voice Design 등으로 생성한 음성을 보관소에 저장.
+ * @param {string} filename - 사용자가 입력한 이름 (확장자 무시)
+ * @param {Buffer|Uint8Array} wavBuffer - WAV 바이트
+ * @param {string} refText - 합성에 사용된 텍스트 (참조음성 대본으로 그대로 사용)
+ * @returns {{ basename: string, wavPath: string, txtPath: string }}
+ */
+function saveItem(filename, wavBuffer, refText) {
+  ensureVault();
+  const safe = _sanitizeBasename(filename);
+  const basename = _uniqueBasename(safe);
+  const wavPath = path.join(VAULT_DIR, basename + '.wav');
+  const txtPath = path.join(VAULT_DIR, basename + '.txt');
+  fs.writeFileSync(wavPath, Buffer.isBuffer(wavBuffer) ? wavBuffer : Buffer.from(wavBuffer));
+  fs.writeFileSync(txtPath, String(refText || ''), 'utf8');
+  return { basename, wavPath, txtPath };
+}
+
+module.exports = { VAULT_DIR, ensureVault, getVaultDir, listItems, openInExplorer, saveItem };

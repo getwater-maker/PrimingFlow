@@ -127,6 +127,21 @@ def _resolve_ref_audio(ref_token, ref_audio):
     return ref_audio
 
 
+def _apply_seed(seed):
+    """결정적 합성을 위해 모든 RNG 시드 동기화. seed 가 None 이면 no-op."""
+    if seed is None:
+        return
+    import random as _random
+    try:
+        torch.manual_seed(int(seed))
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(int(seed))
+        np.random.seed(int(seed) & 0xFFFFFFFF)
+        _random.seed(int(seed))
+    except Exception as e:
+        logger.warning("시드 적용 실패: %s", e)
+
+
 # ── 요청/응답 모델 ─────────────────────────────────
 
 class TTSRequest(BaseModel):
@@ -149,6 +164,7 @@ class TTSRequest(BaseModel):
     layer_penalty_factor: float = Field(5.0, description="레이어 페널티 (고급)")
     position_temperature: float = Field(5.0, description="위치 온도 (고급)")
     postprocess_output: bool = Field(True, description="생성 후처리")
+    seed: int = Field(None, description="시드 (지정 시 결정적 합성 — 같은 입력 + 같은 시드 = 같은 결과)")
 
 
 class TTSBatchRequest(BaseModel):
@@ -171,6 +187,7 @@ class TTSBatchRequest(BaseModel):
     layer_penalty_factor: float = Field(5.0, description="레이어 페널티 (고급)")
     position_temperature: float = Field(5.0, description="위치 온도 (고급)")
     postprocess_output: bool = Field(True, description="생성 후처리")
+    seed: int = Field(None, description="시드 (배치 전체 공유)")
 
 
 class ASRRequest(BaseModel):
@@ -300,9 +317,11 @@ async def synthesize(req: TTSRequest):
             kwargs["instruct"] = req.instruct
 
         mode = "Voice Clone" if "ref_audio" in kwargs else "Voice Design" if "instruct" in kwargs else "Auto"
+        _apply_seed(req.seed)
         logger.info(
-            "TTS 합성 시작 [%s]: text=%s, speed=%.1f, num_step=%d",
+            "TTS 합성 시작 [%s]: text=%s, speed=%.1f, num_step=%d, seed=%s",
             mode, req.text[:50], req.speed, req.num_step,
+            req.seed if req.seed is not None else "-",
         )
 
         audio_list = _model.generate(**kwargs)
@@ -380,9 +399,11 @@ async def synthesize_batch(req: TTSBatchRequest):
             kwargs["instruct"] = req.instruct
 
         mode = "Voice Clone" if "ref_audio" in kwargs else "Voice Design" if "instruct" in kwargs else "Auto"
+        _apply_seed(req.seed)
         logger.info(
-            "TTS 배치 합성 시작 [%s]: %d문장, speed=%.1f, num_step=%d",
+            "TTS 배치 합성 시작 [%s]: %d문장, speed=%.1f, num_step=%d, seed=%s",
             mode, len(req.texts), req.speed, req.num_step,
+            req.seed if req.seed is not None else "-",
         )
 
         t0 = _time.time()
@@ -452,6 +473,7 @@ class TTSBatchSaveRequest(BaseModel):
     layer_penalty_factor: float = Field(5.0)
     position_temperature: float = Field(5.0)
     postprocess_output: bool = Field(True)
+    seed: int = Field(None, description="시드 (배치 전체 공유)")
 
 
 @app.post("/tts-batch-save")
@@ -499,9 +521,11 @@ async def synthesize_batch_save(req: TTSBatchSaveRequest):
             kwargs["instruct"] = req.instruct
 
         mode = "Voice Clone" if "ref_audio" in kwargs else "Voice Design" if "instruct" in kwargs else "Auto"
+        _apply_seed(req.seed)
         logger.info(
-            "TTS 배치→디스크 저장 시작 [%s]: %d문장, dir=%s",
+            "TTS 배치→디스크 저장 시작 [%s]: %d문장, dir=%s, seed=%s",
             mode, len(req.texts), req.output_dir,
+            req.seed if req.seed is not None else "-",
         )
 
         t0 = _time.time()
