@@ -91,14 +91,22 @@ class TaskQueue {
   /**
    * 특정 projectId 의 대기 task 모두 제거. 실행 중(running) 은 그대로 둠.
    * (실행 중인 결과는 디스크에 이미 부분 저장될 수 있어 abort 보다 자연 종료가 안전)
+   * 취소된 task 의 onError(err) 를 호출하여, 호출자가 await/Promise 로 기다리는 경우 해소.
    */
   cancelProject(projectId) {
     if (!projectId) return 0;
-    const before = this.queue.length;
+    const cancelled = this.queue.filter(t => t.projectId === projectId);
     this.queue = this.queue.filter(t => t.projectId !== projectId);
-    const removed = before - this.queue.length;
-    if (removed > 0) this._emit();
-    return removed;
+    for (const t of cancelled) {
+      t.status = 'cancelled';
+      t.finishedAt = Date.now();
+      if (typeof t.onError === 'function') {
+        try { t.onError(new Error('cancelled')); }
+        catch (e) { console.error(`[TaskQueue:${this.name}] onError(cancel)`, e); }
+      }
+    }
+    if (cancelled.length > 0) this._emit();
+    return cancelled.length;
   }
 
   /** 현재 큐 상태 스냅샷 — UI 갱신용. */

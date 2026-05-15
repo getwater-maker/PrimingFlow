@@ -2907,26 +2907,31 @@ async function saveProjectFile() {
 }
 
 // 자동 저장 (debounce) — 출력 폴더 없으면 조용히 skip, 실패해도 사용자 흐름 방해 X
-function _autoSaveProject() {
+// (PR4) projectId 인자 — 큐 task 가 활성 탭이 아닌 자기 프로젝트를 명시 저장 가능
+function _autoSaveProject(projectId) {
   if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
-  _updateAutoSaveIndicator('pending');
+  // 활성 프로젝트만 인디케이터 갱신 (다른 탭 자동저장은 silent)
+  const isActive = !projectId || projectId === window._activeProjectId;
+  if (isActive) _updateAutoSaveIndicator('pending');
   _autoSaveTimer = setTimeout(() => {
     _autoSaveTimer = null;
-    const proj = window._currentProject;
+    const proj = projectId
+      ? window._projects.find(p => p.id === projectId)
+      : window._currentProject;
     if (!proj || !proj.sentences || proj.sentences.length === 0) return;
     const outDir = _projectOutputDir(proj);
     if (!outDir) {
-      _updateAutoSaveIndicator('');  // 미저장 표시 유지
+      if (isActive) _updateAutoSaveIndicator('');  // 미저장 표시 유지
       return;
     }
     try {
-      _updateAutoSaveIndicator('saving');
+      if (isActive) _updateAutoSaveIndicator('saving');
       const ProjectStore = require('../core/project-store');
       ProjectStore.saveProject(proj, outDir);
-      _updateAutoSaveIndicator('saved');
+      if (isActive) _updateAutoSaveIndicator('saved');
     } catch (e) {
       console.warn('[자동저장]', e.message);
-      _updateAutoSaveIndicator('error', e.message);
+      if (isActive) _updateAutoSaveIndicator('error', e.message);
     }
   }, 500);
 }
@@ -7741,13 +7746,16 @@ function _appendSilenceToWav(wavBuf, silenceSec) {
   return newBuf;
 }
 
+// (PR4) 큐 진입점 — 호출자가 await convertSentence(sid, opts) 패턴 그대로 사용 가능.
+// 큐가 없으면(폴백) 직접 실행. 정상 흐름은 push → run 안에서 _convertSentenceImpl 실행.
 async function convertSentence(sid, _opts = {}) {
   const proj = window._currentProject;
   if (!proj) return false;
+  const projectId = proj.id;
   const sentence = proj.sentences.find(s => s.id === sid);
   if (!sentence) return false;
 
-  // 프리셋 미선택 — 직접 호출(silent X) 일 때만 alert 로 명시적 안내
+  // 프리셋 미선택 — 큐 push 전 동기 검증
   if (!_activePresetId) {
     if (!_opts.silent && !_opts._retried) {
       alert('🎙 프리셋을 먼저 선택하세요.\n(우측 보조 패널 → 프리셋 탭에서 사용할 음성을 클릭)');
@@ -7756,18 +7764,12 @@ async function convertSentence(sid, _opts = {}) {
     }
     return false;
   }
-
-  // 단일 호출 (그룹/일괄 외부) 일 때만 자체적으로 토글 — 중첩 호출 시 외부 토글 보존
-  const _selfManaged = !window._ttsConvertActive;
-  if (_selfManaged) _setTtsConvertActive(true);
-
+  // 프리셋/채널을 push 시점에 캡처 — 탭 전환되어도 task 는 자기 프리셋 사용
   const { preset, channel } = _resolvePresetForSentence(sentence);
   if (!preset) {
     addLog('TTS 프리셋 미선택 — 우측 보조 패널 → 프리셋 탭에서 선택', 'err');
-    if (_selfManaged) _setTtsConvertActive(false);
     return false;
   }
-
   const { getInstance } = require('../tts/tts-manager');
   const mgr = getInstance();
   if (!mgr.isAvailable(preset.engine)) {
@@ -7775,16 +7777,57 @@ async function convertSentence(sid, _opts = {}) {
     return false;
   }
 
+  // 단일 호출일 때만 자체 토글 (convertAllSentences 가 외부에서 미리 set 한 경우 보존)
+  const _selfManaged = !window._ttsConvertActive;
+  if (_selfManaged) _setTtsConvertActive(true);
+
+  // 큐가 없으면 직접 실행 (테스트 환경 / 폴백)
+  const q = window._queues && window._queues.tts;
+  if (!q) {
+    const ok = await _convertSentenceImpl(projectId, sid, preset, channel, _opts);
+    if (_selfManaged) _setTtsConvertActive(false);
+    return ok;
+  }
+
+  return new Promise((resolve) => {
+    q.push({
+      projectId,
+      label: `TTS s${sentence.num}`,
+      run: () => _convertSentenceImpl(projectId, sid, preset, channel, _opts),
+      onSuccess: (r) => {
+        if (_selfManaged) _setTtsConvertActive(false);
+        resolve(r === true);
+      },
+      onError: (e) => {
+        if (_selfManaged) _setTtsConvertActive(false);
+        if (e && e.message !== 'cancelled') {
+          addLog(`[s${sentence.num}] 큐 task 실패: ${e.message}`, 'err');
+        }
+        resolve(false);
+      },
+    });
+  });
+}
+
+// (PR4) 큐 task 본문 — projectId / sid 로 매 호출 시 재조회 (탭 전환·재분할 안전).
+// 재시도 로직은 task 내부에 흡수 — 큐 중첩 push 회피.
+async function _convertSentenceImpl(projectId, sid, preset, channel, _opts = {}) {
+  const proj = window._projects.find(p => p.id === projectId);
+  if (!proj) return false;
+  const sentence = proj.sentences.find(s => s.id === sid);
+  if (!sentence) return false;
+
   sentence.ttsStatus = 'pending';
   _updateSentenceStatus(sid, 'pending');
 
   try {
+    const { getInstance } = require('../tts/tts-manager');
+    const mgr = getInstance();
     const opts = _buildSynthesizeOpts(preset, channel);
     if (preset.voice === 'clone' && preset.engine === 'omnivoice' && (!opts.refAudioPath || !opts.refText)) {
       addLog(`[!] [${sentence.num}] Voice Clone 모드인데 참조음성/참조텍스트 누락 — 프리셋 ⚙ 다시 설정 후 저장 필요`, 'err');
       sentence.ttsStatus = 'fail';
       _updateSentenceStatus(sid, 'fail');
-      if (_selfManaged) _setTtsConvertActive(false);
       return false;
     }
     if (!_opts.silent) {
@@ -7792,7 +7835,6 @@ async function convertSentence(sid, _opts = {}) {
         ? ` ref=${opts.refAudioPath.split(/[\\/]/).pop()}`
         : ' ref=(없음)';
       const seedTag = opts.seed != null ? ` seed=${opts.seed}` : '';
-      // 실제 합성 텍스트 첫 40자도 함께 — 인라인 편집 후 합성 결과를 사용자가 검증 가능
       const textPreview = (sentence.text || '').slice(0, 40) + (sentence.text.length > 40 ? '…' : '');
       addLog(`[${sentence.num}] ${preset.name} (${preset.engine}/${opts.voice})${refTag}${seedTag} · "${textPreview}"`, 'info');
     }
@@ -7804,15 +7846,12 @@ async function convertSentence(sid, _opts = {}) {
     const path = require('path');
     const os = require('os');
     const ext = result.format === 'wav' ? 'wav' : 'mp3';
-    // proj.ttsOutputDir 미리 설정돼 있으면 사용 (자동제작 모드 캐시).
-    // 없으면 _getProjectOutputDir() 으로 프로젝트 폴더 잡고 그 하위 tts/ 자동 설정.
-    // 이미지 단독 생성과 동일한 패턴 — 프리셋 미선택 시에만 임시폴더 폴백.
     let ttsDir = proj.ttsOutputDir;
     if (!ttsDir) {
       const projectDir = _getProjectOutputDir();
       if (projectDir) {
         ttsDir = path.join(projectDir, 'tts');
-        proj.ttsOutputDir = ttsDir;   // 캐시 — 다음 단독 변환에 재사용
+        proj.ttsOutputDir = ttsDir;
       } else {
         ttsDir = path.join(os.tmpdir(), 'primingflow_tts');
       }
@@ -7822,7 +7861,6 @@ async function convertSentence(sid, _opts = {}) {
       ? `${String(sentence.num).padStart(3, '0')}_${sid}`
       : `${sid}_${Date.now()}`;
     const outPath = path.join(ttsDir, `${fileBase}.${ext}`);
-    // WAV 무음 패딩 — silenceSec > 0 이고 WAV 포맷일 때만 적용
     let finalBuf = result.mp3Buffer;
     if (opts.silenceSec > 0 && ext === 'wav') {
       try {
@@ -7838,33 +7876,29 @@ async function convertSentence(sid, _opts = {}) {
     sentence.ttsStatus = 'done';
     sentence.ttsPresetId = preset.id;
 
-    // 파일 존재 검증 — write 가 실패했다면 idle 로 되돌리고 false
     if (!fs.existsSync(outPath)) {
       addLog(`[!] [${sentence.num}] mp3 저장 후 파일 미존재: ${outPath}`, 'err');
       sentence.ttsAudioPath = null;
       sentence.ttsStatus = 'idle';
       _updateSentenceStatus(sid, 'idle');
-      if (_selfManaged) _setTtsConvertActive(false);
       return false;
     }
 
     _updateSentenceStatus(sid, 'done', `${result.durationSec.toFixed(1)}s`);
     _updateProgress();
     try { _accumulateRtf(sentence.ttsDurationSec, _ttsWallMs); } catch (_) {}
-    if (_selfManaged) _setTtsConvertActive(false);
-    if (typeof _autoSaveProject === 'function') _autoSaveProject();
+    // (PR4) 명시적 projectId — 비활성 탭이라도 자기 프로젝트 .pflow 에 저장
+    if (typeof _autoSaveProject === 'function') _autoSaveProject(projectId);
     return true;
   } catch (e) {
-    // 1회 자동 재시도 — 일시적 실패 (네트워크·voiceLocale race) 흡수
     if (!_opts._retried) {
-      addLog(`[${sentence.num}] 첫 시도 실패 (${e.message.substring(0, 80)}) — 1초 후 재시도`, 'info');
+      addLog(`[${sentence.num}] 첫 시도 실패 (${(e.message || '').substring(0, 80)}) — 1초 후 재시도`, 'info');
       await new Promise(r => setTimeout(r, 1000));
-      return convertSentence(sid, { ..._opts, _retried: true });
+      return _convertSentenceImpl(projectId, sid, preset, channel, { ..._opts, _retried: true });
     }
     sentence.ttsStatus = 'fail';
     _updateSentenceStatus(sid, 'fail');
     addLog(`[${sentence.num}] 변환 실패 (재시도 후): ${e.message}`, 'err');
-    if (_selfManaged) _setTtsConvertActive(false);
     return false;
   }
 }
