@@ -61,6 +61,86 @@
 
   .main { display:flex; flex:1; overflow:hidden; }
 
+  /* 프로젝트 탭 바 — 여러 대본 동시 작업 (PR2) */
+  .project-tabs-bar {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 12px 0;
+    flex-shrink: 0;
+  }
+  .project-tabs {
+    display: flex;
+    gap: 4px;
+    align-items: flex-end;
+    overflow-x: auto;
+    overflow-y: hidden;
+    min-height: 34px;
+  }
+  .project-tabs::-webkit-scrollbar { height: 6px; }
+  .project-tab-add {
+    flex: 0 0 auto;
+    background: var(--bg-soft);
+    border: 1px solid var(--border-soft);
+    color: var(--text-soft);
+    border-radius: 8px;
+    padding: 4px 12px;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    height: 30px;
+    min-width: 34px;
+  }
+  .project-tab-add:hover { background: var(--accent); color: white; border-color: var(--accent); }
+  .project-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    padding: 6px 8px 7px 10px;
+    color: var(--text-soft);
+    font-size: 12px;
+    cursor: pointer;
+    max-width: 240px;
+    position: relative;
+    margin-bottom: -1px;
+  }
+  .project-tab:hover { background: var(--bg-input); color: var(--text-base); }
+  .project-tab.active {
+    background: var(--bg-base);
+    color: var(--text-strong);
+    font-weight: 600;
+    border-color: var(--accent);
+    z-index: 1;
+  }
+  .project-tab .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
+  .project-tab .status-dots { display: inline-flex; gap: 3px; margin-left: 2px; }
+  .project-tab .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .project-tab .dot.tts   { background: #3b82f6; }
+  .project-tab .dot.image { background: #a855f7; }
+  .project-tab .dot.video { background: #f97316; }
+  .project-tab .close-btn {
+    flex: none;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 1px 4px;
+    border-radius: 3px;
+    margin-left: 2px;
+  }
+  .project-tab .close-btn:hover { background: var(--danger); color: white; }
+  .project-tab.flash { animation: tabFlash 0.5s ease-in-out 3; }
+  @keyframes tabFlash {
+    0%,100% { background: var(--accent); color: white; }
+    50%     { background: var(--bg-soft); color: var(--text-soft); }
+  }
+
   /* 메인 통합 작업 영역 — 3열 grid: 작업목록 | 보조패널 | 작업흐름 */
   .workspace {
     display: grid;
@@ -1016,6 +1096,14 @@
     <div style="text-align:center; margin-top:20px; padding-top:16px; border-top:1px solid var(--border); color:var(--text-muted); font-size:12px;">
       Priming Flow <span id="helpModalVersion"></span> · Google Flow + Vrew 자동화
     </div>
+  </div>
+</div>
+
+<!-- 프로젝트 탭 바 (PR2 multi-project) — 여러 대본 동시 열기 -->
+<div class="project-tabs-bar">
+  <div id="projectTabs" class="project-tabs">
+    <button class="project-tab-add" onclick="newProjectTab()" title="새 대본 탭 열기">+</button>
+    <!-- JS 가 동적으로 탭 div 생성 -->
   </div>
 </div>
 
@@ -2445,6 +2533,199 @@ Object.defineProperty(window, '_currentProject', {
   },
 });
 
+// ─── 탭 UI / 멀티 프로젝트 (PR2) ──────────────────────
+let _newProjectCounter = 0;
+
+function _createEmptyProject(overrides = {}) {
+  _newProjectCounter += 1;
+  return {
+    id: _genProjectId(),
+    scriptText: '',
+    scriptFileName: null,
+    scriptFilePath: null,
+    tabCreatedOrder: _newProjectCounter,
+    thresholds: { shortLen: 10, longLen: 20, introSentenceSize: 2, mainSentenceSize: 3 },
+    sentences: [],
+    groups: [],
+    outputDir: null,
+    imageOutputDir: null,
+    ttsOutputDir: null,
+    activeTasks: {
+      tts:   { running: false, done: 0, total: 0 },
+      image: { running: false, done: 0, total: 0 },
+      video: { running: false, done: 0, total: 0 },
+    },
+    ...overrides,
+  };
+}
+
+function _projectTabLabel(p) {
+  if (p.scriptFileName) return p.scriptFileName;
+  return `새 대본 ${p.tabCreatedOrder || '?'}`;
+}
+
+function _projectTabLabelShort(p) {
+  const lbl = _projectTabLabel(p);
+  if (lbl.length <= 18) return lbl;
+  return lbl.slice(0, 16) + '…';
+}
+
+function renderProjectTabs() {
+  const wrap = document.getElementById('projectTabs');
+  if (!wrap) return;
+  const addBtn = wrap.querySelector('.project-tab-add');
+  wrap.innerHTML = '';
+  if (addBtn) wrap.appendChild(addBtn);
+  for (const p of window._projects) {
+    const isActive = p.id === window._activeProjectId;
+    const div = document.createElement('div');
+    div.className = 'project-tab' + (isActive ? ' active' : '');
+    div.dataset.projectId = p.id;
+    div.title = _projectTabLabel(p);
+    div.addEventListener('click', (e) => {
+      if (e.target && e.target.classList.contains('close-btn')) return;
+      switchProject(p.id);
+    });
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'label';
+    labelSpan.textContent = '📝 ' + _projectTabLabelShort(p);
+    div.appendChild(labelSpan);
+    const t = p.activeTasks || {};
+    const dotsWrap = document.createElement('span');
+    dotsWrap.className = 'status-dots';
+    if (t.tts && t.tts.running)     { const d=document.createElement('span'); d.className='dot tts';   d.title='TTS 진행 중';   dotsWrap.appendChild(d); }
+    if (t.image && t.image.running) { const d=document.createElement('span'); d.className='dot image'; d.title='이미지 진행 중'; dotsWrap.appendChild(d); }
+    if (t.video && t.video.running) { const d=document.createElement('span'); d.className='dot video'; d.title='비디오 진행 중'; dotsWrap.appendChild(d); }
+    if (dotsWrap.childElementCount > 0) div.appendChild(dotsWrap);
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'close-btn';
+    closeBtn.textContent = '✕';
+    closeBtn.title = '이 탭 닫기';
+    closeBtn.addEventListener('click', (e) => { e.stopPropagation(); closeProjectTab(p.id); });
+    div.appendChild(closeBtn);
+    wrap.appendChild(div);
+  }
+}
+
+// 자동저장 pending 이면 활성(=OLD) 프로젝트 기준으로 즉시 실행 — 탭 전환 전 호출
+function _flushAutoSaveForActive() {
+  if (typeof _autoSaveTimer === 'undefined' || !_autoSaveTimer) return;
+  clearTimeout(_autoSaveTimer);
+  _autoSaveTimer = null;
+  try {
+    const oldProj = window._currentProject;
+    if (!oldProj || !oldProj.sentences || oldProj.sentences.length === 0) return;
+    const outDir = (typeof _projectOutputDir === 'function') ? _projectOutputDir(oldProj) : null;
+    if (!outDir) return;
+    const ProjectStore = require('../core/project-store');
+    ProjectStore.saveProject(oldProj, outDir);
+    if (typeof _updateAutoSaveIndicator === 'function') _updateAutoSaveIndicator('saved');
+  } catch (e) {
+    console.warn('[자동저장 flush]', e.message);
+  }
+}
+
+function newProjectTab() {
+  _flushAutoSaveForActive();
+  const p = _createEmptyProject();
+  // setter 의 단일탭 in-place 교체 우회 — _projects 에 직접 push
+  window._projects.push(p);
+  window._activeProjectId = p.id;
+  _applyProjectToUI(p);
+  renderProjectTabs();
+  addLog(`새 탭 — ${_projectTabLabel(p)}`, 'info');
+}
+
+function switchProject(id) {
+  if (window._activeProjectId === id) return;
+  const p = window._projects.find(x => x.id === id);
+  if (!p) return;
+  _flushAutoSaveForActive();
+  window._activeProjectId = id;
+  _applyProjectToUI(p);
+  renderProjectTabs();
+}
+
+function closeProjectTab(id) {
+  const p = window._projects.find(x => x.id === id);
+  if (!p) return;
+  const wasActive = window._activeProjectId === id;
+  if (wasActive) _flushAutoSaveForActive();
+  window._projects = window._projects.filter(x => x.id !== id);
+  if (wasActive) {
+    if (window._projects.length > 0) {
+      const next = window._projects[0];
+      window._activeProjectId = next.id;
+      _applyProjectToUI(next);
+    } else {
+      const np = _createEmptyProject();
+      window._projects.push(np);
+      window._activeProjectId = np.id;
+      _applyProjectToUI(np);
+    }
+  }
+  renderProjectTabs();
+}
+
+// 주어진 프로젝트의 데이터를 화면에 반영 — switchProject / newProjectTab / closeProjectTab 공용
+function _applyProjectToUI(p) {
+  if (!p) return;
+  // 전역 캐시 동기화 — 기존 코드 호환
+  window._scriptText = p.scriptText || '';
+  window._scriptFileName = p.scriptFileName || null;
+  window._scriptFilePath = p.scriptFilePath || '';
+  // 분할 옵션 input 복원
+  if (p.thresholds) {
+    const set = (id, v) => { const el = document.getElementById(id); if (el != null && v != null) el.value = v; };
+    set('shortLen',           p.thresholds.shortLen);
+    set('longLen',            p.thresholds.longLen);
+    set('introSentenceSize',  p.thresholds.introSentenceSize);
+    set('mainSentenceSize',   p.thresholds.mainSentenceSize);
+  }
+  const fnEl = document.getElementById('taskListFileName');
+  if (fnEl) {
+    if (p.scriptFileName) {
+      fnEl.textContent = p.scriptFileName;
+      fnEl.title = p.scriptFileName;
+      fnEl.style.display = '';
+    } else {
+      fnEl.textContent = '';
+      fnEl.style.display = 'none';
+    }
+  }
+  const hasContent = (p.sentences && p.sentences.length > 0) || (p.groups && p.groups.length > 0);
+  const groupsBox = document.getElementById('taskListGroups');
+  const empty = document.getElementById('taskEmpty');
+  const editBtn = document.getElementById('editScriptBtn');
+  const dictBtn = document.getElementById('scriptDictBtn');
+  const progressEl = document.getElementById('taskListProgress');
+  if (hasContent) {
+    if (empty) empty.style.display = 'none';
+    if (groupsBox) groupsBox.style.display = '';
+    if (editBtn) editBtn.style.display = '';
+    if (dictBtn) dictBtn.style.display = '';
+    if (typeof renderTaskList === 'function') renderTaskList(p);
+  } else {
+    if (groupsBox) { groupsBox.style.display = 'none'; groupsBox.innerHTML = ''; }
+    if (empty) empty.style.display = 'flex';
+    if (editBtn) editBtn.style.display = 'none';
+    if (dictBtn) dictBtn.style.display = 'none';
+    if (progressEl) progressEl.textContent = '0 / 0';
+  }
+  try { if (typeof _updateScriptDictBadge === 'function') _updateScriptDictBadge(); } catch {}
+  try { if (typeof _updateAutoSaveIndicator === 'function') _updateAutoSaveIndicator('saved'); } catch {}
+}
+
+// 부팅 시 1개 프로젝트 보장 + 탭 첫 렌더
+function _initProjectTabs() {
+  if (window._projects.length === 0) {
+    const p = _createEmptyProject();
+    window._projects.push(p);
+    window._activeProjectId = p.id;
+  }
+  renderProjectTabs();
+}
+
 // 대본 텍스트 전역 — 항상 최신 대본을 보유 (textarea 없이)
 window._scriptText = '';
 
@@ -2463,6 +2744,14 @@ async function openFile() {
       window._scriptFileName = (file.name || '').replace(/\.(txt|md|markdown)$/i, '').trim();
       // 짝꿍 사전 경로 보관
       window._scriptFilePath = file.path || '';
+      // (PR2) 활성 프로젝트 메타에도 반영 — 탭 라벨에 보이도록
+      {
+        const _cur = window._currentProject;
+        if (_cur) {
+          _cur.scriptFileName = window._scriptFileName;
+          _cur.scriptFilePath = window._scriptFilePath;
+        }
+      }
       // 작업 목록 헤더에 파일명 표시
       const fnEl = document.getElementById('taskListFileName');
       if (fnEl) {
@@ -2613,8 +2902,17 @@ async function loadProjectFile() {
     try {
       const ProjectStore = require('../core/project-store');
       const { project, stats } = ProjectStore.loadProject(filePath);
+      // (PR2) 레거시 .pflow 호환 — scriptFileName 미저장 시 파일명에서 폴백
+      if (!project.scriptFileName) {
+        try {
+          const path = require('path');
+          project.scriptFileName = path.basename(filePath, '.pflow');
+        } catch {}
+      }
       window._currentProject = project;
       window._scriptText = project.scriptText || '';
+      window._scriptFileName = project.scriptFileName || null;
+      window._scriptFilePath = project.scriptFilePath || '';
 
       // UI 복원
       const scriptArea = document.getElementById('scriptInputArea');
@@ -2634,6 +2932,17 @@ async function loadProjectFile() {
       // 그룹 카드 / sentence 카드 다시 그림
       if (typeof renderTaskList === 'function') renderTaskList(project);
       if (typeof _updateScriptDictBadge === 'function') _updateScriptDictBadge();
+
+      // (PR2) 작업 목록 헤더 파일명 + 탭 라벨 갱신
+      {
+        const fnEl = document.getElementById('taskListFileName');
+        if (fnEl && project.scriptFileName) {
+          fnEl.textContent = project.scriptFileName;
+          fnEl.title = project.scriptFileName;
+          fnEl.style.display = '';
+        }
+      }
+      if (typeof renderProjectTabs === 'function') renderProjectTabs();
 
       // 로그 요약
       const path = require('path');
@@ -3283,8 +3592,28 @@ function loadSample() {
 // 모두 지우고 처음 상태로
 function clearScript() {
   window._scriptText = '';
-  window._currentProject = null;
+  window._scriptFileName = null;
   window._scriptFilePath = '';
+  // (PR2) 활성 탭은 유지하고 데이터만 빈 상태로 reset — 탭 자체를 닫으려면 ✕ 사용
+  const cur = window._currentProject;
+  if (cur) {
+    cur.scriptText = '';
+    cur.scriptFileName = null;
+    cur.scriptFilePath = null;
+    cur.sentences = [];
+    cur.groups = [];
+    cur.thresholds = { shortLen: 10, longLen: 20, introSentenceSize: 2, mainSentenceSize: 3 };
+    cur.outputDir = null;
+    cur.imageOutputDir = null;
+    cur.ttsOutputDir = null;
+    cur.activeTasks = {
+      tts:   { running: false, done: 0, total: 0 },
+      image: { running: false, done: 0, total: 0 },
+      video: { running: false, done: 0, total: 0 },
+    };
+  } else if (typeof _initProjectTabs === 'function') {
+    _initProjectTabs();
+  }
   const groupsBox = document.getElementById('taskListGroups');
   const empty = document.getElementById('taskEmpty');
   const editBtn = document.getElementById('editScriptBtn');
@@ -3300,6 +3629,8 @@ function clearScript() {
   if (fnEl) { fnEl.style.display = 'none'; fnEl.textContent = ''; }
   const progressEl = document.getElementById('taskListProgress');
   if (progressEl) progressEl.textContent = '0 / 0';
+  // (PR2) 탭 라벨 갱신
+  if (typeof renderProjectTabs === 'function') renderProjectTabs();
   addLog('대본 및 작업 목록 초기화', 'info');
 }
 
@@ -3600,6 +3931,16 @@ function confirmScriptInputModal() {
     return;
   }
   window._scriptText = text;
+  // (PR2) 직접 입력 — 활성 프로젝트의 파일 메타 비움 (탭 라벨은 "새 대본 N" 로 폴백)
+  {
+    const _cur = window._currentProject;
+    if (_cur) {
+      _cur.scriptFileName = null;
+      _cur.scriptFilePath = null;
+    }
+  }
+  window._scriptFileName = null;
+  window._scriptFilePath = '';
   closeScriptInputModal();
   splitScript();
 }
@@ -3966,7 +4307,9 @@ function _splitScriptImpl() {
   }
 
   // 전역 저장 (TTS/이미지/저장 단계에서 사용)
+  // (PR2) 활성 탭의 메타데이터(id / scriptFileName / outputDir / activeTasks …)는 스프레드로 보존
   window._currentProject = {
+    ...(window._currentProject || {}),
     scriptText: text,
     thresholds: {
       shortLen, longLen,
@@ -3979,6 +4322,8 @@ function _splitScriptImpl() {
 
   // 4단계: 작업 목록 UI 렌더
   renderTaskList(window._currentProject);
+  // (PR2) 탭 라벨 갱신 — scriptFileName 변경 가능성 반영
+  if (typeof renderProjectTabs === 'function') renderProjectTabs();
   // 발음 사전 배지 갱신
   if (typeof _updateScriptDictBadge === 'function') _updateScriptDictBadge();
   // 자동 저장 — 분할 결과 보존
@@ -5375,6 +5720,8 @@ function _fmtUptime(sec) {
 
 // 페이지 로드 시 + provider 가 늦게 ready 되는 경우 대비 주기적 갱신
 window.addEventListener('DOMContentLoaded', () => {
+  // (PR2) 프로젝트 탭 초기화 — 부팅 시 1개 빈 프로젝트 보장 + 탭 렌더
+  try { _initProjectTabs(); } catch (e) { console.warn('[init project tabs]', e); }
   renderPresets();
   renderChannelSelect();
   renderGroupStages();
