@@ -2742,6 +2742,41 @@ function _initProjectTabs() {
   renderProjectTabs();
 }
 
+// ─── 작업 큐 (PR3) ──────────────────────────────────
+// 외부 자원(OmniVoice GPU / Flow Playwright / Grok 브라우저) 이 단일이라 자원별 큐로 직렬화.
+// 멀티 탭이라도 큐 max=1 이므로 같은 자원 작업이 동시 시작되지 않는다.
+// 아직 기존 변환 함수(convertSentence / _runGroupImageGeneration / convertGroupVideo) 는
+// 큐 사용 안 함 — PR4/5 에서 wrap 예정. 인스턴스만 미리 만들어 두고 onChange 콜백으로
+// 탭 상태 점 + 글로벌 status bar 를 갱신할 발판 마련.
+(function _initTaskQueues() {
+  try {
+    const { TaskQueue } = require('../core/task-queue');
+    function _onQueueChange(snap) {
+      // 1) byProject 카운트를 각 프로젝트.activeTasks 에 반영
+      const all = window._queues;
+      for (const p of window._projects) {
+        const tts   = all && all.tts   && all.tts.snapshot().byProject[p.id]   || { queued: 0, running: 0 };
+        const img   = all && all.image && all.image.snapshot().byProject[p.id] || { queued: 0, running: 0 };
+        const vid   = all && all.video && all.video.snapshot().byProject[p.id] || { queued: 0, running: 0 };
+        p.activeTasks = p.activeTasks || { tts: {}, image: {}, video: {} };
+        p.activeTasks.tts   = { running: tts.running > 0,   queued: tts.queued,   done: p.activeTasks.tts.done   || 0, total: p.activeTasks.tts.total   || 0 };
+        p.activeTasks.image = { running: img.running > 0,   queued: img.queued,   done: p.activeTasks.image.done || 0, total: p.activeTasks.image.total || 0 };
+        p.activeTasks.video = { running: vid.running > 0,   queued: vid.queued,   done: p.activeTasks.video.done || 0, total: p.activeTasks.video.total || 0 };
+      }
+      // 2) 탭 색 점 갱신 — PR6 글로벌 status bar 는 별도 추가 예정
+      try { if (typeof renderProjectTabs === 'function') renderProjectTabs(); } catch {}
+    }
+    window._queues = {
+      tts:   new TaskQueue('tts',   1, _onQueueChange),
+      image: new TaskQueue('image', 1, _onQueueChange),
+      video: new TaskQueue('video', 1, _onQueueChange),
+    };
+  } catch (e) {
+    console.error('[TaskQueue] 초기화 실패:', e);
+    window._queues = null;
+  }
+})();
+
 // 대본 텍스트 전역 — 항상 최신 대본을 보유 (textarea 없이)
 window._scriptText = '';
 
