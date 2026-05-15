@@ -8379,15 +8379,46 @@ function _getGrokEngine() {
  */
 async function convertGroupVideo(groupId, opts = {}) {
   addLog(`[Grok] convertGroupVideo 호출 (groupId=${groupId})`, 'info');
+  // (PR5) 큐 진입점 — 사전 검증 후 큐에 push. 본문은 task 안에서 실행.
+  const _projForValidation = window._currentProject;
+  if (!_projForValidation) { addLog('[Grok] 프로젝트 없음 — 대본 먼저 로드', 'err'); return false; }
+  const projectId = _projForValidation.id;
+  const _gForValidation = _projForValidation.groups.find(x => x.id === groupId);
+  if (!_gForValidation) { addLog(`[Grok] 그룹 못 찾음: ${groupId}`, 'err'); return false; }
+  const _fsForValidation = require('fs');
+  if (!_gForValidation.imagePath || !_fsForValidation.existsSync(_gForValidation.imagePath)) {
+    addLog(`[Grok] 그룹 ${_gForValidation.num} — 먼저 이미지를 만들거나 첨부하세요 (imagePath=${_gForValidation.imagePath || '비어있음'})`, 'err');
+    return false;
+  }
+
+  const _q = window._queues && window._queues.video;
+  const _taskBody = () => _convertGroupVideoBody(projectId, groupId, opts);
+  if (!_q) return _taskBody();
+  return new Promise((resolve) => {
+    _q.push({
+      projectId,
+      label: `비디오 그룹 ${_gForValidation.num}`,
+      run: _taskBody,
+      onSuccess: r => resolve(r === true),
+      onError: e => {
+        if (e && e.message !== 'cancelled') addLog(`[Grok] task 실패: ${e.message}`, 'err');
+        resolve(false);
+      },
+    });
+  });
+}
+
+// (PR5) 비디오 task 본문 — projectId / groupId 로 매 실행 시 재조회
+async function _convertGroupVideoBody(projectId, groupId, opts = {}) {
   try {
-    const proj = window._currentProject;
-    if (!proj) { addLog('[Grok] 프로젝트 없음 — 대본 먼저 로드', 'err'); return false; }
+    const proj = window._projects.find(p => p.id === projectId);
+    if (!proj) { addLog('[Grok] 프로젝트 없음 (task) — 탭이 닫혔을 수 있음', 'err'); return false; }
     const g = proj.groups.find(x => x.id === groupId);
-    if (!g) { addLog(`[Grok] 그룹 못 찾음: ${groupId}`, 'err'); return false; }
+    if (!g) { addLog(`[Grok] 그룹 못 찾음 (task): ${groupId}`, 'err'); return false; }
 
     const fs = require('fs');
     if (!g.imagePath || !fs.existsSync(g.imagePath)) {
-      addLog(`[Grok] 그룹 ${g.num} — 먼저 이미지를 만들거나 첨부하세요 (imagePath=${g.imagePath || '비어있음'})`, 'err');
+      addLog(`[Grok] 그룹 ${g.num} — task 실행 시점에 이미지 없음`, 'err');
       return false;
     }
 
@@ -8407,7 +8438,7 @@ async function convertGroupVideo(groupId, opts = {}) {
     g.videoStatus = 'generating';
     g.videoSourceImage = g.imagePath;
     if (motion) g.videoMotionPrompt = motion;
-    renderTaskList(window._currentProject);
+    if (window._activeProjectId === projectId) renderTaskList(proj);
     if (!opts.silent) addLog(`[Grok] 그룹 ${g.num} 비디오 변환 시작 — ref=${path.basename(g.imagePath)} · motion="${motion || '(기본값)'}"`, 'info');
 
     // 그록 전용 플래그 — TTS/자동제작과 독립적
@@ -8421,7 +8452,7 @@ async function convertGroupVideo(groupId, opts = {}) {
       addLog(`[Grok] 엔진 로드 실패: ${e.message}`, 'err');
       g.videoStatus = 'fail';
       if (_selfManaged) window._grokConvertActive = false;
-      renderTaskList(window._currentProject);
+      if (window._activeProjectId === projectId) renderTaskList(proj);
       return false;
     }
 
@@ -8437,14 +8468,14 @@ async function convertGroupVideo(groupId, opts = {}) {
       g.videoStatus = 'done';
       addLog(`[Grok] ✅ 그룹 ${g.num} 비디오 완성: ${path.basename(result.videoPath)}`, 'ok');
       if (_selfManaged) window._grokConvertActive = false;
-      renderTaskList(window._currentProject);
-      if (typeof _autoSaveProject === 'function') _autoSaveProject();
+      if (window._activeProjectId === projectId) renderTaskList(proj);
+      if (typeof _autoSaveProject === 'function') _autoSaveProject(projectId);
       return true;
     } else {
       g.videoStatus = 'fail';
       addLog(`[Grok] ❌ 그룹 ${g.num} 비디오 실패: ${result.error}`, 'err');
       if (_selfManaged) window._grokConvertActive = false;
-      renderTaskList(window._currentProject);
+      if (window._activeProjectId === projectId) renderTaskList(proj);
       return false;
     }
   } catch (e) {
@@ -9240,8 +9271,10 @@ async function regenerateGroups(groupIds) {
 }
 
 async function _runGroupImageGeneration(groupIds, label) {
-  const proj = window._currentProject;
-  if (!proj) return;
+  // ── (PR5) 동기 사전 검증 — 알림은 사용자 액션 직후에 보여야 자연스러움 ──
+  const _projForValidation = window._currentProject;
+  if (!_projForValidation) return;
+  const projectId = _projForValidation.id;
 
   const ChannelStore = require('../core/channel-store');
   const channel = _activeChannelId ? ChannelStore.getById(_activeChannelId) : null;
@@ -9251,12 +9284,36 @@ async function _runGroupImageGeneration(groupIds, label) {
     return;
   }
 
+  // (PR5) 큐가 있으면 push 후 즉시 return — 본문은 task 안에서 실행.
+  // 큐가 없으면 폴백으로 직접 실행.
+  const _q = window._queues && window._queues.image;
+  const _taskBody = () => _runGroupImageGenerationBody(projectId, groupIds, label, channel);
+  if (!_q) return _taskBody();
+  return new Promise((resolve) => {
+    _q.push({
+      projectId,
+      label: `이미지 ${label} (${groupIds.length})`,
+      run: _taskBody,
+      onSuccess: r => resolve(r),
+      onError: e => {
+        if (e && e.message !== 'cancelled') addLog(`[이미지] task 실패: ${e.message}`, 'err');
+        resolve(false);
+      },
+    });
+  });
+}
+
+// (PR5) 이미지 생성 task 본문 — projectId 로 매 실행 시 proj 재조회 (탭 전환·재분할 안전)
+async function _runGroupImageGenerationBody(projectId, groupIds, label, channel) {
+  const proj = window._projects.find(p => p.id === projectId);
+  if (!proj) return false;
+
   // 선택된 그룹들의 합본 paragraph 만 모음. flow-engine 입장에서는 paragraphs[0..N-1] 가 되지만
   // 실제 그룹 번호는 다를 수 있어 (ex: 그룹 2, 5 만 재생성). 매핑 보존을 위해 _pendingGroupOrder 에 기록.
   const targetGroups = groupIds
     .map(id => proj.groups.find(g => g.id === id))
     .filter(Boolean);
-  if (targetGroups.length === 0) return;
+  if (targetGroups.length === 0) return false;
 
   const paragraphs = targetGroups.map(g => _buildGroupParagraph(g, proj));
   const emptyIdx = paragraphs.findIndex(p => !p || p.length === 0);
@@ -9319,6 +9376,8 @@ async function _runGroupImageGeneration(groupIds, label) {
   window._pendingGroupOrder = targetGroups.map(g => g.id);
   // image-done 이벤트가 paragraph idx (1..N) 보내는데, 우리는 실제 group.num 을 알아야 파일명에서 찾음
   window._pendingGroupNums = targetGroups.map(g => g.num);
+  // (PR5) image-done / done IPC 핸들러가 _autoSaveProject(이 projectId) 할 수 있도록 마킹
+  window._pendingProjectId = projectId;
 
   // 출력 폴더 — vrew 와 동일한 "프리셋이름_MMDD" 로 통일 (이미지/TTS/.vrew 모두 같은 폴더)
   let finalDir;
@@ -9655,9 +9714,19 @@ function _setGroupImageStatus(groupId, status, extraText) {
 }
 
 // 그룹 카드 썸네일 표시
+// (PR5) 멀티 탭 — 활성 탭이 아닐 수도 있으므로 모든 프로젝트에서 그룹 검색
+function _findProjectByGroupId(groupId) {
+  if (!groupId || !Array.isArray(window._projects)) return null;
+  for (const p of window._projects) {
+    if (p.groups && p.groups.find(x => x.id === groupId)) return p;
+  }
+  return null;
+}
+
 function _setGroupImageThumbnail(groupId, imgPath) {
-  const proj = window._currentProject;
-  const g = proj && proj.groups.find(x => x.id === groupId);
+  // (PR5) 활성 탭이 아닌 다른 탭의 이미지 task 일 수도 있어 모든 프로젝트 탐색
+  const owner = _findProjectByGroupId(groupId);
+  const g = owner && owner.groups.find(x => x.id === groupId);
   if (g) g.imagePath = imgPath;
   const box = document.querySelector(`.group-image[data-group-id="${groupId}"]`);
   if (!box) return;
@@ -9710,6 +9779,10 @@ ipcRenderer.on('image-done', (_, payload) => {
   if (!groupId) return;
   const outDir = window._lastGenOutputDir;
   if (!outDir) return;
+  // (PR5) 이 task 가 어느 프로젝트 소속인지 — 활성 탭이 바뀌었을 수 있어 명시적으로 lookup
+  const ownerProjectId = (window._pendingProjectId
+    || (_findProjectByGroupId(groupId) && _findProjectByGroupId(groupId).id)
+    || null);
   try {
     const fs = require('fs');
     const path = require('path');
@@ -9719,7 +9792,7 @@ ipcRenderer.on('image-done', (_, payload) => {
     if (renamedPath) {
       _setGroupImageThumbnail(groupId, renamedPath);
       _setGroupImageStatus(groupId, 'done');
-      if (typeof _autoSaveProject === 'function') _autoSaveProject();
+      if (typeof _autoSaveProject === 'function') _autoSaveProject(ownerProjectId);
     } else {
       // flow-engine 이 "이미 존재, 스킵" 한 경우 — 이미 그룹 NN_ 형태 파일이 있을 수 있음
       try {
@@ -9731,7 +9804,7 @@ ipcRenderer.on('image-done', (_, payload) => {
           if (existing) {
             _setGroupImageThumbnail(groupId, path.join(imgDir, existing));
             _setGroupImageStatus(groupId, 'done');
-            if (typeof _autoSaveProject === 'function') _autoSaveProject();
+            if (typeof _autoSaveProject === 'function') _autoSaveProject(ownerProjectId);
             return;
           }
         }
@@ -9749,6 +9822,10 @@ ipcRenderer.on('done', () => {
     const nums = window._pendingGroupNums || [];
     const outDir = window._lastGenOutputDir;
     if (!order.length || !outDir) return;
+    // (PR5) 이 task 가 어느 프로젝트 소속인지 — image task wrapper 가 set 한 값 우선
+    const ownerProjectId = (window._pendingProjectId
+      || (order[0] && _findProjectByGroupId(order[0]) && _findProjectByGroupId(order[0]).id)
+      || null);
     try {
       const fs = require('fs');
       const path = require('path');
@@ -9778,7 +9855,7 @@ ipcRenderer.on('done', () => {
           }
         }
       });
-      if (typeof _autoSaveProject === 'function') _autoSaveProject();
+      if (typeof _autoSaveProject === 'function') _autoSaveProject(ownerProjectId);
     } catch (e) {
       console.error('[group-image] 폴백 스캔 실패:', e);
     }
