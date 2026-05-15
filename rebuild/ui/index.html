@@ -1911,17 +1911,9 @@
       <textarea id="vdForm_text" rows="2"
         style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.4;">우리 갉아 먹히는 마음을 정약용의 가르침으로 회복해요.</textarea>
 
-      <!-- 고급 파라미터 (스텝 / t_shift / 온도 / 시드) — Clone 강도/언어/속도는 위 행에서 그대로 사용 -->
+      <!-- 고급 파라미터 (t_shift / 온도) — 스텝은 32 고정, 시드 제거 (보관소 저장이 결과물) -->
+      <!-- Clone 강도 / 언어 / 속도 는 위 프리셋 폼 행에서 그대로 사용 -->
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; margin-top:12px;">
-        <!-- 디퓨전 스텝 -->
-        <div style="display:flex; gap:8px; align-items:center;">
-          <label style="font-size:12px; color:var(--text-soft); flex:0 0 56px;" title="디퓨전 스텝 수 — 16=빠름, 32=품질">스텝</label>
-          <div class="chip-group" id="vdForm_numStepChips" style="flex:1;">
-            <div class="chip" data-val="16" style="flex:1; text-align:center;">16 (빠름)</div>
-            <div class="chip active" data-val="32" style="flex:1; text-align:center;">32 (품질)</div>
-          </div>
-        </div>
-
         <!-- t_shift -->
         <div style="display:flex; gap:8px; align-items:center;">
           <label style="font-size:12px; color:var(--text-soft); flex:0 0 56px;" title="시간 이동 — 디퓨전 노이즈 스케줄 조정 (고급)">t_shift</label>
@@ -1936,15 +1928,6 @@
           <input type="range" id="vdForm_temperature" min="0.0" max="2.0" step="0.1" value="0.0" style="flex:1; accent-color:var(--accent);"
             oninput="document.getElementById('vdForm_temperatureLabel').textContent = parseFloat(this.value).toFixed(1)">
           <span id="vdForm_temperatureLabel" style="font-size:13px; color:var(--text-strong); width:40px; text-align:right;">0.0</span>
-        </div>
-
-        <!-- 시드 (그리드 안 컴팩트) -->
-        <div style="display:flex; gap:6px; align-items:center;">
-          <label style="font-size:12px; color:var(--text-soft); flex:0 0 56px;" title="비우면 매번 새 목소리. 채우면 결정적">시드</label>
-          <input type="number" id="vdForm_seed" placeholder="비우면 랜덤"
-            style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 8px; border-radius:6px; font-size:13px;">
-          <button class="btn-sm" onclick="vdRandomSeed()" title="랜덤 시드 채우기" style="padding:5px 8px;">🎲</button>
-          <button class="btn-sm" onclick="document.getElementById('vdForm_seed').value=''" title="시드 비우기" style="padding:5px 8px;">∅</button>
         </div>
       </div>
 
@@ -5730,24 +5713,10 @@ function vdAddInstructToken(token) {
   ta.focus();
 }
 
-function _vdBindNumStepChips() {
-  const grp = document.getElementById('vdForm_numStepChips');
-  if (!grp || grp.dataset.bound === '1') return;
-  grp.dataset.bound = '1';
-  grp.querySelectorAll('.chip').forEach(c => {
-    c.onclick = () => {
-      grp.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
-      c.classList.add('active');
-    };
-  });
-}
-
 function _vdReadForm() {
-  const grp = document.getElementById('vdForm_numStepChips');
-  const numStepEl = grp ? grp.querySelector('.chip.active') : null;
-  const numStep = numStepEl ? parseInt(numStepEl.dataset.val, 10) : 32;
-  const seedRaw = (document.getElementById('vdForm_seed').value || '').trim();
-  // 언어/속도/일치도(guidance)는 프리셋 폼의 기존 슬라이더를 그대로 사용
+  // 스텝(numStep)은 32 고정 — 일반 사용자에게 노출 가치 없음.
+  // 시드 제거 — Voice Design 결과를 보관소에 저장하면 그 음성 자체가 결과물이라 시드 무의미.
+  // 언어/속도/Clone 강도(guidance)는 프리셋 폼의 기존 슬라이더를 그대로 사용.
   const langEl = document.getElementById('presetForm_voxcpmLang');
   const speedEl = document.getElementById('presetForm_speed');
   const guidanceEl = document.getElementById('presetForm_cfgValue');
@@ -5756,19 +5725,17 @@ function _vdReadForm() {
     text:     (document.getElementById('vdForm_text').value || '').trim(),
     language: langEl ? langEl.value : 'ko',
     speed:    speedEl ? parseFloat(speedEl.value) : 1.0,
-    numStep,
+    numStep:  32,
     guidance: guidanceEl ? parseFloat(guidanceEl.value) : 2.0,
     tShift:   parseFloat(document.getElementById('vdForm_tShift').value),
     temperature: parseFloat(document.getElementById('vdForm_temperature').value),
-    seed: seedRaw === '' ? null : parseInt(seedRaw, 10),
   };
 }
 
 // designSection 이 처음 보이거나 모드가 Voice Design 으로 막 바뀐 시점에 호출.
-// 칩 렌더링, 기본 저장명 시드, 직전 합성 결과 초기화.
+// 칩 렌더링, 기본 저장명, 직전 합성 결과 초기화.
 function _vdInitDesignSection() {
   _vdRenderChips();
-  _vdBindNumStepChips();
 
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
@@ -5785,11 +5752,6 @@ function _vdInitDesignSection() {
     hint.textContent = '먼저 🔊 합성하기 로 음성을 생성하세요.';
     hint.style.color = 'var(--text-muted)';
   }
-}
-
-function vdRandomSeed() {
-  const v = Math.floor(Math.random() * 0x7fffffff);
-  document.getElementById('vdForm_seed').value = String(v);
 }
 
 async function vdSynthesize() {
@@ -5821,7 +5783,6 @@ async function vdSynthesize() {
       tShift: f.tShift,
       classTemperature: f.temperature,
     };
-    if (f.seed != null && !Number.isNaN(f.seed)) opts.seed = f.seed;
 
     if (typeof _stopAllPreviews === 'function') _stopAllPreviews();
 
@@ -5839,7 +5800,7 @@ async function vdSynthesize() {
     const hint = document.getElementById('vdForm_saveHint');
     hint.textContent = `✓ 합성 완료 (${result.durationSec.toFixed(1)}초). 맘에 들면 파일명을 확인하고 💾 저장 을 누르세요.`;
     hint.style.color = 'var(--accent)';
-    if (typeof addLog === 'function') addLog(`[Voice Design] 합성 완료 (${result.durationSec.toFixed(1)}초, seed=${f.seed ?? '-'})`, 'ok');
+    if (typeof addLog === 'function') addLog(`[Voice Design] 합성 완료 (${result.durationSec.toFixed(1)}초)`, 'ok');
   } catch (e) {
     if (typeof addLog === 'function') addLog(`[Voice Design] 합성 실패: ${e.message}`, 'err');
     alert(_vdFriendlyError(e.message));
