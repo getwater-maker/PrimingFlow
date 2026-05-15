@@ -419,7 +419,7 @@ class GrokEngine {
       // 10. 비디오 생성 완료 대기 (폴링)
       // 완료 신호: <video> 등장 + downloadButton 클릭 가능
       const POLL_INTERVAL = 5000;
-      const TIMEOUT_MS = 5 * 60 * 1000;  // 최대 5분
+      const TIMEOUT_MS = 10 * 60 * 1000;  // 최대 10분 (5분으로 부족한 케이스 빈번)
       const startedAt = Date.now();
       let videoUrl = null;
       while (Date.now() - startedAt < TIMEOUT_MS) {

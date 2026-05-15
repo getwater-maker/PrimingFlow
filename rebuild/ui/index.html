@@ -8846,18 +8846,19 @@ async function _runGroupImageGeneration(groupIds, label) {
     addLog(`이미지 ${label} — ${targetGroups.length}개 그룹 → 새 폴더: ${finalDir}`, 'info');
   }
 
-  // ─── 재생성 cleanup — 그룹의 기존 imagePath 직접 검사해서 삭제 ───
-  // 견고함: prefix 기준 매칭 대신 g.imagePath 자체를 본다 — 외부 첨부 파일명도 인식.
-  // 안전: 출력 폴더 내부 파일만 디스크 삭제 (사용자가 외부에서 첨부한 원본 파일은 보호).
-  // 비디오: 이미지 재생성 시 기존 비디오도 의미 없어지므로 함께 제거 (디스크 mp4 도 출력 폴더면 삭제).
+  // ─── 재생성 cleanup — g.imagePath + 그룹 번호 prefix 모든 파일 일괄 삭제 ───
+  // 이전 버그: cleanup 이 g.imagePath 만 삭제 → flow-engine 의 _shouldSkip(num+'_')
+  // 검사가 폴더에 남은 '01_xxx.jpg' 발견 후 "이미 존재, 스킵" → image-done 만 보내고
+  // 새 이미지 생성 안 함 → imagePath 안 채워짐. 강화: 그룹 num 매칭되는 모든 prefix
+  // 파일을 출력 폴더에서 일괄 삭제해서 flow-engine 의 스킵 회피.
   try {
     const fs = require('fs');
     const path = require('path');
     const projectDir = proj.outputDir || _getProjectOutputDir() || '';
     const projectDirNorm = projectDir ? path.normalize(projectDir) : '';
-    let removedImg = 0, removedVideo = 0;
+    let removedImg = 0, removedVideo = 0, removedExtra = 0;
     for (const g of targetGroups) {
-      // 기존 이미지 처리
+      // 1) 기존 imagePath 가리키는 파일 삭제 (외부 폴더면 path 만 분리)
       if (g.imagePath && typeof g.imagePath === 'string') {
         const normalized = path.normalize(g.imagePath);
         const inside = projectDirNorm && normalized.startsWith(projectDirNorm);
@@ -8866,9 +8867,23 @@ async function _runGroupImageGeneration(groupIds, label) {
             if (fs.existsSync(g.imagePath)) { fs.unlinkSync(g.imagePath); removedImg++; }
           } catch {}
         }
-        g.imagePath = null;   // 외부 첨부든 내부든 항상 그룹에서 분리
+        g.imagePath = null;
       }
-      // 연결된 비디오도 같이 제거 (이미지 바뀌면 비디오 의미 없음)
+      // 2) finalDir 안의 그룹 번호 prefix 매칭 파일 모두 일괄 삭제 (flow-engine 스킵 회피)
+      try {
+        if (fs.existsSync(finalDir)) {
+          const padded = String(g.num).padStart(2, '0');
+          const reNum  = new RegExp(`^0*${g.num}_`);          // '1_' '01_' '001_'
+          const reGrp  = new RegExp(`^그룹\\s*${padded}_`);   // '그룹 01_'
+          for (const f of fs.readdirSync(finalDir)) {
+            if (!/\.(jpe?g|png|webp|mp4|webm|mkv|mov)$/i.test(f)) continue;
+            if (reNum.test(f) || reGrp.test(f)) {
+              try { fs.unlinkSync(path.join(finalDir, f)); removedExtra++; } catch {}
+            }
+          }
+        }
+      } catch {}
+      // 3) 연결된 비디오 제거 (이미지 바뀌면 무효)
       if (g.videoPath && typeof g.videoPath === 'string') {
         const normalized = path.normalize(g.videoPath);
         const inside = projectDirNorm && normalized.startsWith(projectDirNorm);
@@ -8882,8 +8897,8 @@ async function _runGroupImageGeneration(groupIds, label) {
         g.videoSourceImage = null;
       }
     }
-    if (removedImg > 0 || removedVideo > 0) {
-      addLog(`[cleanup] 기존 이미지 ${removedImg}개 + 비디오 ${removedVideo}개 디스크에서 삭제`, 'info');
+    if (removedImg + removedVideo + removedExtra > 0) {
+      addLog(`[cleanup] imagePath ${removedImg} + prefix 매칭 ${removedExtra} + 비디오 ${removedVideo} 삭제`, 'info');
     }
   } catch (e) {
     addLog(`[cleanup] 예외: ${e.message} — 계속 진행`, 'info');
@@ -9202,6 +9217,8 @@ ipcRenderer.on('image-done', (_, payload) => {
   const outDir = window._lastGenOutputDir;
   if (!outDir) return;
   try {
+    const fs = require('fs');
+    const path = require('path');
     const imgDir = _resolveImgDir(outDir);
     const sourcePadded = String(payload.num || (idx + 1)).padStart(2, '0');
     const renamedPath = _renameToGroupPrefix(imgDir, sourcePadded, groupNum);
@@ -9210,6 +9227,21 @@ ipcRenderer.on('image-done', (_, payload) => {
       _setGroupImageStatus(groupId, 'done');
       if (typeof _autoSaveProject === 'function') _autoSaveProject();
     } else {
+      // flow-engine 이 "이미 존재, 스킵" 한 경우 — 이미 그룹 NN_ 형태 파일이 있을 수 있음
+      try {
+        if (fs.existsSync(imgDir)) {
+          const groupPrefix = `그룹 ${String(groupNum).padStart(2, '0')}_`;
+          const existing = fs.readdirSync(imgDir).find(f =>
+            f.startsWith(groupPrefix) && /\.(png|jpe?g|webp)$/i.test(f)
+          );
+          if (existing) {
+            _setGroupImageThumbnail(groupId, path.join(imgDir, existing));
+            _setGroupImageStatus(groupId, 'done');
+            if (typeof _autoSaveProject === 'function') _autoSaveProject();
+            return;
+          }
+        }
+      } catch {}
       console.warn('[image-done] 파일 매칭 실패:', { imgDir, sourcePadded, groupNum, groupId });
     }
   } catch (e) {
