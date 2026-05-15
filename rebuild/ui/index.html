@@ -2538,6 +2538,9 @@ let _newProjectCounter = 0;
 
 function _createEmptyProject(overrides = {}) {
   _newProjectCounter += 1;
+  // (PR2.5) 새 탭은 현재 활성 프리셋을 시드로 — 사용자가 자주 쓰는 프리셋 그대로 inherit
+  let seedPresetId = null;
+  try { seedPresetId = (typeof _activePresetId !== 'undefined') ? _activePresetId : null; } catch {}
   return {
     id: _genProjectId(),
     scriptText: '',
@@ -2550,6 +2553,7 @@ function _createEmptyProject(overrides = {}) {
     outputDir: null,
     imageOutputDir: null,
     ttsOutputDir: null,
+    activePresetId: seedPresetId,
     activeTasks: {
       tts:   { running: false, done: 0, total: 0 },
       image: { running: false, done: 0, total: 0 },
@@ -2714,6 +2718,18 @@ function _applyProjectToUI(p) {
   }
   try { if (typeof _updateScriptDictBadge === 'function') _updateScriptDictBadge(); } catch {}
   try { if (typeof _updateAutoSaveIndicator === 'function') _updateAutoSaveIndicator('saved'); } catch {}
+  // (PR2.5) 활성 프리셋 복원 — 탭마다 다른 프리셋 유지
+  try {
+    if (typeof _activePresetId !== 'undefined') {
+      _activePresetId = p.activePresetId || null;
+      if (_activePresetId && typeof _applyActivePresetToMainScreen === 'function') {
+        const PresetStore = require('../tts/preset-store');
+        const preset = PresetStore.getById(_activePresetId);
+        if (preset) _applyActivePresetToMainScreen(preset);
+      }
+      if (typeof renderPresets === 'function') renderPresets();
+    }
+  } catch (e) { console.warn('[apply preset]', e.message); }
 }
 
 // 부팅 시 1개 프로젝트 보장 + 탭 첫 렌더
@@ -4869,6 +4885,9 @@ function renderPresets() {
             if (_isUsable(p, mgr)) {
               addLog(`[TTS] ${p.engine} 재연결 — "${p.name}" 활성화`, 'ok');
               _activePresetId = p.id;
+              // (PR2.5) 활성 탭에도 저장
+              { const _cur = window._currentProject; if (_cur) _cur.activePresetId = p.id; }
+              try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch {}
               _applyActivePresetToMainScreen(p);
               renderPresets();
               return;
@@ -4879,6 +4898,9 @@ function renderPresets() {
         return;
       }
       _activePresetId = p.id;
+      // (PR2.5) 활성 탭에도 저장 — 탭 전환 시 복원 + .pflow 자동저장
+      { const _cur = window._currentProject; if (_cur) _cur.activePresetId = p.id; }
+      try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch {}
       _applyActivePresetToMainScreen(p);
       renderPresets();
       addLog(`기본 프리셋 선택: ${p.name}`, 'ok');
