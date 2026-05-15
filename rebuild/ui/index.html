@@ -2707,6 +2707,38 @@ function switchProject(id) {
 function closeProjectTab(id) {
   const p = window._projects.find(x => x.id === id);
   if (!p) return;
+
+  // (PR7) 진행 중 / 대기 중 task 카운트 — confirm 으로 사용자에게 알림
+  let runningCount = 0;
+  let queuedCount = 0;
+  if (window._queues) {
+    for (const key of ['tts', 'image', 'video']) {
+      const q = window._queues[key];
+      if (!q) continue;
+      const by = q.snapshot().byProject[id] || { running: 0, queued: 0 };
+      runningCount += by.running || 0;
+      queuedCount  += by.queued  || 0;
+    }
+  }
+  if (runningCount + queuedCount > 0) {
+    const label = _projectTabLabelShort(p);
+    const lines = [
+      `"${label}" 탭에 ${runningCount + queuedCount}개 작업이 있습니다.`,
+      ``,
+      `[확인] 대기 ${queuedCount}개 취소 + 실행 중 ${runningCount}개는 완료까지 두고 탭 닫기`,
+      `[취소] 닫기 취소`,
+    ];
+    if (!confirm(lines.join('\n'))) return;
+    // 대기 task 모두 취소 (실행 중은 자연 종료)
+    if (window._queues) {
+      for (const key of ['tts', 'image', 'video']) {
+        const q = window._queues[key];
+        if (q) q.cancelProject(id);
+      }
+    }
+    addLog(`탭 닫기 — "${label}" 대기 ${queuedCount}개 취소 (실행 중 ${runningCount}개는 백그라운드 완료)`, 'info');
+  }
+
   const wasActive = window._activeProjectId === id;
   if (wasActive) _flushAutoSaveForActive();
   window._projects = window._projects.filter(x => x.id !== id);
