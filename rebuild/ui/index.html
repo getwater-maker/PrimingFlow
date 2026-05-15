@@ -1827,9 +1827,9 @@
         <input type="range" id="presetForm_speed" min="0.7" max="1.5" step="0.05" value="1.0" style="flex:1; accent-color:var(--accent);">
         <span id="presetForm_speedValue" style="font-size:13px; color:var(--text-strong); width:40px; text-align:right;">1.0x</span>
       </div>
-      <div id="presetForm_silenceRow" style="display:flex; gap:8px; align-items:center; width:100%; min-width:0;">
+      <div id="presetForm_silenceRow" style="display:flex; gap:8px; align-items:center; min-width:0;">
         <label style="font-size:12px; color:var(--text-soft); flex:0 0 56px;">문장 무음</label>
-        <input type="range" id="presetForm_silenceSec" min="0" max="2" step="0.1" value="0.8" style="flex:1 1 0; min-width:0; width:100%; accent-color:var(--accent);"
+        <input type="range" id="presetForm_silenceSec" min="0" max="2" step="0.1" value="0.8" style="flex:1 1 0; min-width:0; accent-color:var(--accent);"
           oninput="document.getElementById('presetForm_silenceSecLabel').textContent = parseFloat(this.value).toFixed(1) + 's'">
         <span id="presetForm_silenceSecLabel" style="font-size:13px; color:var(--text-strong); width:36px; text-align:right; flex:none;">0.8s</span>
       </div>
@@ -1868,17 +1868,21 @@
     </div>
 
     <!-- Voice Clone 전용 영역 (OmniVoice clone 일 때 표시) -->
+    <!-- 참조음성 + 미리듣기 같은 줄 통합 (사용자 요청) — 모달 880px 폭에 충분 -->
     <div id="presetForm_cloneSection" style="display:none; padding-top:12px; border-top:1px solid var(--border-soft); margin-top:12px;">
-      <div style="display:flex; gap:6px; align-items:center;">
+      <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
         <span style="font-size:13px; font-weight:600; color:var(--text-strong); flex:none;">참조음성</span>
         <select id="presetForm_refAudioSelect" onchange="onPresetRefAudioSelect(this)"
-          style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px;">
+          style="flex:2 1 160px; min-width:120px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px;">
           <option value="">— 보관소가 비어있습니다 —</option>
         </select>
-        <button class="btn-sm" onclick="playRefAudioPreview()" title="선택한 참조 음성 들어보기" style="padding:6px 8px;">▶ 듣기</button>
-        <button class="btn-sm" onclick="refreshRefAudioVault()" title="목록 새로고침" style="padding:6px 8px;">🔄</button>
-        <button class="btn-sm" onclick="openRefAudioVault()" title="보관소 폴더를 윈도우 탐색기로 열기" style="padding:6px 8px;">📂 폴더 열기</button>
+        <button class="btn-sm" onclick="playRefAudioPreview()" title="선택한 참조 음성 들어보기" style="padding:6px 8px; flex:none;">▶</button>
+        <button class="btn-sm" onclick="refreshRefAudioVault()" title="목록 새로고침" style="padding:6px 8px; flex:none;">🔄</button>
+        <button class="btn-sm" onclick="openRefAudioVault()" title="보관소 폴더를 윈도우 탐색기로 열기" style="padding:6px 8px; flex:none;">📂</button>
+        <input type="text" id="presetForm_previewTextClone" value="우리 마음을 정약용의 가르침으로 회복해요." placeholder="미리듣기 텍스트" style="flex:3 1 180px; min-width:120px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px;">
+        <button class="btn-sm" onclick="previewPreset()" id="presetForm_previewBtnClone" style="flex:none; padding:6px 10px;">🔊 미리듣기</button>
       </div>
+      <audio id="presetForm_audioClone" controls style="width:100%; display:none; height:30px; margin-top:6px;"></audio>
       <!-- 파일명/dataset 보존용 hidden (_readPresetForm 이 dataset.fullPath 를 읽음) -->
       <div id="presetForm_refAudioName" data-full-path="" style="display:none;"></div>
       <div id="presetForm_refTextBox" style="display:none;"></div>
@@ -1942,12 +1946,11 @@
       </div>
     </div>
 
-    <!-- 미리듣기 (Voice Design / Clone 양쪽에서 공통 사용) -->
+    <!-- 미리듣기 (Supertonic 등 — OmniVoice Voice Clone 모드는 cloneSection 안 통합 행 사용) -->
     <div id="presetForm_previewSection" style="display:none; padding-top:10px; border-top:1px dashed var(--border-soft); margin-top:10px;">
       <div style="display:flex; gap:6px; align-items:center;">
-        <span style="font-size:12px; color:var(--text-soft); flex:none;">🔊 미리듣기 (테스트)</span>
-        <input type="text" id="presetForm_previewText" value="우리 마음을 정약용의 가르침으로 회복해요." style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px;">
-        <button class="btn-sm" onclick="previewPreset()" id="presetForm_previewBtn">🔊 듣기</button>
+        <input type="text" id="presetForm_previewText" value="우리 마음을 정약용의 가르침으로 회복해요." placeholder="미리듣기 텍스트" style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px;">
+        <button class="btn-sm" onclick="previewPreset()" id="presetForm_previewBtn">🔊 미리듣기</button>
       </div>
       <audio id="presetForm_audio" controls style="width:100%; display:none; height:30px; margin-top:6px;"></audio>
     </div>
@@ -2020,33 +2023,33 @@
         <div style="margin-bottom:10px;">
           <div style="font-weight:600; margin-bottom:6px;">📝 본문 자막</div>
           <div style="display:flex; align-items:center; gap:5px; font-size:12px; flex-wrap:wrap;">
-            <span style="color:var(--text-soft); flex:none;">크기</span>
-            <select id="captionSize" title="랜덤: 빌드 시점에 100/125 중 한 번 정해 모든 자막에 동일 적용 (영상 안에서 변하지 않음)" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
-              <option value="100" selected>100</option>
+            <!-- 첫 옵션이 라벨 (value="" → collectCaptionStyleOpts 의 fallback 적용). 라벨만 보고 선택 안 하면 기본값. -->
+            <select id="captionSize" title="자막 크기 (px)" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
+              <option value="" selected>크기</option>
+              <option value="100">100</option>
               <option value="125">125</option>
               <option value="random">랜덤</option>
             </select>
-            <span style="color:var(--border); margin:0 2px;">|</span>
-            <span style="color:var(--text-soft); flex:none;">정렬</span>
-            <select id="captionAlign" title="랜덤: 빌드 시점에 좌/가운데 중 한 번 정해 모든 자막에 동일 적용 (영상 안에서 왔다갔다 하지 않음)" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
-              <option value="start" selected>좌</option>
+            <select id="captionAlign" title="자막 정렬" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
+              <option value="" selected>정렬</option>
+              <option value="start">좌</option>
               <option value="center">가운데</option>
               <option value="random">랜덤</option>
             </select>
-            <span style="color:var(--border); margin:0 2px;">|</span>
-            <span style="color:var(--text-soft); flex:none;" title="화면 하단에서 위로 올리는 비율 (%, 음수 = 위로). 랜덤: 빌드 시점에 -12.5%/-15% 중 한 번 정해 모든 자막에 동일 적용">위치</span>
-            <select id="captionYOffset" title="랜덤: 빌드 시점에 -12.5/-15/-17.5% 중 한 번 정해 모든 자막에 동일 적용 (영상 안에서 변하지 않음)" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
-              <option value="-12.5" selected>-12.5</option>
-              <option value="-15">-15</option>
-              <option value="-17.5">-17.5</option>
+            <select id="captionYOffset" title="화면 하단에서 위로 올리는 비율 (%, 음수 = 위로)" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
+              <option value="" selected>위치</option>
+              <option value="-12.5">-12.5%</option>
+              <option value="-15">-15%</option>
+              <option value="-17.5">-17.5%</option>
               <option value="random">랜덤</option>
             </select>
-            <span style="color:var(--text-muted);">%</span>
-            <span style="color:var(--border); margin:0 2px;">|</span>
-            <span style="color:var(--text-soft); flex:none;">너비</span>
-            <input type="number" id="captionWidth" value="96" min="40" max="100" step="2" style="width:50px; flex:none; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
-            <span style="color:var(--text-muted);">%</span>
-            <span style="color:var(--border); margin:0 2px;">|</span>
+            <select id="captionWidth" title="자막 박스 너비 (% of 화면)" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
+              <option value="" selected>너비</option>
+              <option value="80">80%</option>
+              <option value="90">90%</option>
+              <option value="96">96%</option>
+              <option value="100">100%</option>
+            </select>
             <!-- 글자색 / 외곽선색 (A 미리보기) -->
             <span title="글자색" style="position:relative; display:inline-block; width:30px; height:28px; flex:none;">
               <input type="color" id="captionFontColor" value="#FFFFFF" style="position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; padding:0; border:0;"
@@ -2072,39 +2075,45 @@
             <span style="font-weight:600;">AI 고지 문구 자막</span>
           </label>
           <input type="text" id="aiNoticeText" value="본 영상의 음성과 이미지는 AI 도구를 활용하여 제작되었습니다." style="width:100%; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); border-radius:6px; padding:6px 8px; font-size:12px; margin-top:6px; font-family:inherit; line-height:1.4; box-sizing:border-box;">
-          <!-- 시작/노출 + 색상 3개 한 줄 (AI 고지 옵션 컴팩트 통합) -->
+          <!-- 행 1: 시작/노출 — "[시작후 ▼] 5 초 부터 10 초간 노출" -->
           <div style="display:flex; align-items:center; gap:5px; margin-top:8px; font-size:12px; flex-wrap:wrap;">
-            <span style="color:var(--text-soft); flex:none;">시작</span>
             <select id="aiNoticeStartMode" onchange="_onAiNoticeStartModeChange()" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
               <option value="seconds" selected>시작후</option>
               <option value="clip">클립</option>
             </select>
             <input type="number" id="aiNoticeStartSeconds" value="5" min="0" step="0.5" style="width:44px; flex:none; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
             <input type="number" id="aiNoticeStartClip" value="1" min="1" style="width:44px; flex:none; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px; display:none;">
-            <span style="color:var(--text-muted);" id="aiNoticeStartUnit">초</span>
-            <span style="color:var(--border); margin:0 2px;">|</span>
-            <span style="color:var(--text-soft); flex:none;">노출</span>
+            <span style="color:var(--text-muted);" id="aiNoticeStartUnit">초 부터</span>
             <input type="number" id="aiNoticeDurationSeconds" value="10" min="0" step="0.5" title="0 = 끝까지" style="width:44px; flex:none; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
-            <span style="color:var(--text-muted);" title="0 = 끝까지">초</span>
-            <span style="color:var(--border); margin:0 2px;">|</span>
-            <!-- 색상 3개 — A 미리보기 스타일 (글자/배경/외곽 시각적 구분) -->
+            <span style="color:var(--text-muted);" title="0 = 끝까지">초간 노출</span>
+          </div>
+          <!-- 행 2: 색상 3개 + B/I — '없음' 토글은 색상 박스 우상단의 작은 ✗ 로 통합 -->
+          <div style="display:flex; align-items:center; gap:6px; margin-top:6px; font-size:12px; flex-wrap:wrap;">
             <span title="글자색" style="position:relative; display:inline-block; width:30px; height:28px; flex:none;">
               <input type="color" id="aiNoticeFontColor" value="#FFFFFF" style="position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; padding:0; border:0;"
                 oninput="document.getElementById('aiNoticeFontPreview').style.color=this.value">
               <span id="aiNoticeFontPreview" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:bold; color:#FFFFFF; background:#888; border:1px solid var(--border); border-radius:4px; pointer-events:none; line-height:1;">A</span>
             </span>
-            <span title="배경색" style="position:relative; display:inline-block; width:30px; height:28px; flex:none;">
+            <span title="배경색 (✗ 클릭 = 투명)" style="position:relative; display:inline-block; width:30px; height:28px; flex:none;">
               <input type="color" id="aiNoticeBgColor" value="#FFFFFF" style="position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; padding:0; border:0;"
                 oninput="document.getElementById('aiNoticeBgPreview').style.background=this.value">
               <span id="aiNoticeBgPreview" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:bold; color:#222; background:#FFFFFF; border:1px solid var(--border); border-radius:4px; pointer-events:none; line-height:1;">A</span>
+              <label title="배경 없음 (투명)" style="position:absolute; right:-5px; top:-5px; width:14px; height:14px; background:#fff; color:#888; border:1px solid var(--border); border-radius:50%; cursor:pointer; z-index:2; display:flex; align-items:center; justify-content:center; font-size:9px; line-height:1; user-select:none;">
+                <input type="checkbox" id="aiNoticeBgNone" style="position:absolute; opacity:0; cursor:pointer; width:100%; height:100%; margin:0;"
+                  onchange="const lb=this.parentElement; lb.style.background=this.checked?'var(--danger)':'#fff'; lb.style.color=this.checked?'#fff':'#888';">
+                <span style="pointer-events:none;">×</span>
+              </label>
             </span>
-            <label style="cursor:pointer; user-select:none; font-size:11px; color:var(--text-muted);"><input type="checkbox" id="aiNoticeBgNone" style="vertical-align:middle; margin:0 2px 0 0; cursor:pointer;">없음</label>
-            <span title="외곽선색" style="position:relative; display:inline-block; width:30px; height:28px; flex:none;">
+            <span title="외곽선색 (✗ 클릭 = 없음)" style="position:relative; display:inline-block; width:30px; height:28px; flex:none;">
               <input type="color" id="aiNoticeOutlineColor" value="#000000" style="position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; padding:0; border:0;"
                 oninput="document.getElementById('aiNoticeOutlinePreview').style.webkitTextStroke='1.5px '+this.value">
               <span id="aiNoticeOutlinePreview" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:bold; color:#FFFFFF; background:#fff; border:1px solid var(--border); border-radius:4px; pointer-events:none; line-height:1; -webkit-text-stroke:1.5px #000000;">A</span>
+              <label title="외곽선 없음" style="position:absolute; right:-5px; top:-5px; width:14px; height:14px; background:#fff; color:#888; border:1px solid var(--border); border-radius:50%; cursor:pointer; z-index:2; display:flex; align-items:center; justify-content:center; font-size:9px; line-height:1; user-select:none;">
+                <input type="checkbox" id="aiNoticeOutlineNone" style="position:absolute; opacity:0; cursor:pointer; width:100%; height:100%; margin:0;"
+                  onchange="const lb=this.parentElement; lb.style.background=this.checked?'var(--danger)':'#fff'; lb.style.color=this.checked?'#fff':'#888';">
+                <span style="pointer-events:none;">×</span>
+              </label>
             </span>
-            <label style="cursor:pointer; user-select:none; font-size:11px; color:var(--text-muted);"><input type="checkbox" id="aiNoticeOutlineNone" style="vertical-align:middle; margin:0 2px 0 0; cursor:pointer;">없음</label>
             <button type="button" id="aiNoticeBold" data-active="false" onclick="_toggleBIButton('aiNoticeBold')" title="굵게"
               style="width:28px; height:28px; font-size:13px; font-weight:bold; padding:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); cursor:pointer; border-radius:4px; flex:none;">B</button>
             <button type="button" id="aiNoticeItalic" data-active="false" onclick="_toggleBIButton('aiNoticeItalic')" title="이탤릭"
@@ -2120,11 +2129,11 @@
 
     </div>
 
-    <!-- 액션 — 저장 75% : 삭제 25% 한 줄 -->
+    <!-- 액션 — 저장 / 삭제 50:50 (동일 크기) -->
     <!-- width:auto — .btn-primary 의 CSS width:100% 가 flex 자식 폭을 100% 로 강제해 wrap 되는 것 방지 -->
     <div id="presetForm_actionRow" style="display:flex; gap:6px; margin-top:14px;">
-      <button class="btn btn-primary" onclick="savePreset()" style="flex:3; width:auto; min-width:0;">💾 저장</button>
-      <button class="btn-sm" onclick="deletePreset()" id="presetForm_deleteBtn" style="flex:1; min-width:0; background:var(--bg-soft); color:var(--danger); border:1px solid var(--border); display:none;">🗑 삭제</button>
+      <button class="btn btn-primary" onclick="savePreset()" style="flex:1; width:auto; min-width:0;">💾 저장</button>
+      <button class="btn-sm" onclick="deletePreset()" id="presetForm_deleteBtn" style="flex:1; min-width:0; background:var(--bg-soft); color:var(--danger); border:1px solid var(--border); display:none; padding:10px 16px; font-size:14px; font-weight:600;">🗑 삭제</button>
     </div>
   </div>
 </div>
@@ -4745,11 +4754,11 @@ function _onAiNoticeStartModeChange() {
   if (mode === 'clip') {
     if (clipInput)    clipInput.style.display = '';
     if (secondsInput) secondsInput.style.display = 'none';
-    if (unit)         unit.textContent = '번';
+    if (unit)         unit.textContent = '번 클립부터';
   } else {
     if (clipInput)    clipInput.style.display = 'none';
     if (secondsInput) secondsInput.style.display = '';
-    if (unit)         unit.textContent = '초';
+    if (unit)         unit.textContent = '초 부터';
   }
 }
 
@@ -4851,8 +4860,19 @@ function applyAiNoticeToForm(opt) {
   if (o.fontColor)    set('aiNoticeFontColor',    o.fontColor);
   if (o.bgColor)      set('aiNoticeBgColor',      o.bgColor);
   if (o.outlineColor) set('aiNoticeOutlineColor', o.outlineColor);
-  if (Object.prototype.hasOwnProperty.call(o, 'bgNone'))      setChk('aiNoticeBgNone',      o.bgNone);
-  if (Object.prototype.hasOwnProperty.call(o, 'outlineNone')) setChk('aiNoticeOutlineNone', o.outlineNone);
+  // '없음' 체크박스 복원 — 시각(label 배경/색)도 함께 갱신
+  const _setNoneChk = (id, val) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.checked = !!val;
+    const lb = el.parentElement;
+    if (lb) {
+      lb.style.background = val ? 'var(--danger)' : '#fff';
+      lb.style.color = val ? '#fff' : '#888';
+    }
+  };
+  if (Object.prototype.hasOwnProperty.call(o, 'bgNone'))      _setNoneChk('aiNoticeBgNone',      o.bgNone);
+  if (Object.prototype.hasOwnProperty.call(o, 'outlineNone')) _setNoneChk('aiNoticeOutlineNone', o.outlineNone);
   _setBIButton('aiNoticeBold',   !!o.bold);
   _setBIButton('aiNoticeItalic', !!o.italic);
 
@@ -5302,6 +5322,8 @@ function _setPresetEngine(engine) {
     setDisp('presetForm_actionRow',      isDesign); // 하단 💾 저장 + 🗑 삭제
     // 미리듣기는 designSection 의 "🔊 합성하기" 가 대체하므로 중복 숨김
     if (isDesign) document.getElementById('presetForm_previewSection').style.display = 'none';
+    // omnivoice + Voice Clone 일 때는 cloneSection 의 통합 행이 미리듣기 대체 → 별도 previewSection 숨김
+    if (isClone) document.getElementById('presetForm_previewSection').style.display = 'none';
 
     // 빈 그리드 칸 제거 — 우측이 사라진 행을 1컬럼으로 축소
     const setGridCols = (id, cols) => { const el = document.getElementById(id); if (el) el.style.gridTemplateColumns = cols; };
@@ -5712,10 +5734,10 @@ function openPresetModal(presetId) {
 
 function closePresetModal() {
   document.getElementById('presetModal').style.display = 'none';
-  const audio = document.getElementById('presetForm_audio');
-  if (audio) { audio.pause(); audio.src = ''; }
-  const vdAudio = document.getElementById('vdForm_audio');
-  if (vdAudio) { vdAudio.pause(); vdAudio.removeAttribute('src'); vdAudio.style.display = 'none'; }
+  for (const id of ['presetForm_audio', 'presetForm_audioClone', 'vdForm_audio']) {
+    const a = document.getElementById(id);
+    if (a) { a.pause(); a.removeAttribute('src'); a.style.display = 'none'; }
+  }
   _vdLastResultBuffer = null;
   _vdLastSynthText = '';
   _editingPresetId = null;
@@ -6328,8 +6350,8 @@ async function quickPreviewSelectedVoice() {
   const btn = document.getElementById('presetForm_voiceQuickPreview');
   if (!btn) return;
   const QUICK_SAMPLE = '안녕하세요, 이 목소리는 어떠세요?';
-  const inputEl = document.getElementById('presetForm_previewText');
-  const text = ((inputEl && inputEl.value && inputEl.value.trim()) || QUICK_SAMPLE);
+  const els = _activePreviewElems();
+  const text = ((els.input?.value || '').trim() || QUICK_SAMPLE);
 
   btn.disabled = true;
   const origLabel = btn.textContent;
@@ -6354,7 +6376,7 @@ async function quickPreviewSelectedVoice() {
     const ext = result.format === 'wav' ? 'wav' : 'mp3';
     const blob = new Blob([result.mp3Buffer], { type: ext === 'wav' ? 'audio/wav' : 'audio/mpeg' });
     const url = URL.createObjectURL(blob);
-    const audio = document.getElementById('presetForm_audio');
+    const audio = els.audio;
     audio.src = url;
     audio.style.display = '';
     audio.play().catch(() => {});
@@ -6369,15 +6391,35 @@ async function quickPreviewSelectedVoice() {
   }
 }
 
+// Voice Clone 일 때 cloneSection 의 통합 input/audio/btn 사용,
+// Supertonic 등 일 때 previewSection 의 input/audio/btn 사용. 자동 선택 헬퍼.
+function _activePreviewElems() {
+  const cloneInput = document.getElementById('presetForm_previewTextClone');
+  if (cloneInput && cloneInput.offsetParent !== null) {
+    return {
+      input: cloneInput,
+      btn:   document.getElementById('presetForm_previewBtnClone'),
+      audio: document.getElementById('presetForm_audioClone'),
+    };
+  }
+  return {
+    input: document.getElementById('presetForm_previewText'),
+    btn:   document.getElementById('presetForm_previewBtn'),
+    audio: document.getElementById('presetForm_audio'),
+  };
+}
+
 async function previewPreset() {
-  const text = document.getElementById('presetForm_previewText').value.trim();
+  const els = _activePreviewElems();
+  const text = (els.input?.value || '').trim();
   if (!text) {
     alert('테스트 텍스트를 입력하세요');
     return;
   }
 
   const preset = _readPresetForm();
-  const btn = document.getElementById('presetForm_previewBtn');
+  const btn = els.btn;
+  const origText = btn.textContent;
   btn.disabled = true;
   btn.textContent = '생성 중...';
 
@@ -6422,7 +6464,7 @@ async function previewPreset() {
     }
     const blob = new Blob([previewBuf], { type: mime });
     const url = URL.createObjectURL(blob);
-    const audio = document.getElementById('presetForm_audio');
+    const audio = els.audio;
     audio.src = url;
     audio.style.display = '';
     audio.play().catch(() => {});
@@ -6434,7 +6476,7 @@ async function previewPreset() {
     alert('미리듣기 실패: ' + e.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = '🔊 듣기';
+    btn.textContent = origText || '🔊 미리듣기';
   }
 }
 
