@@ -50,21 +50,25 @@ function buildTitleMatcher(groupTitle) {
 /**
  * 파일명에서 "그룹 N" / "group N" / "scene N" / 맨 앞 숫자 같은 패턴으로 그룹 번호 추출.
  * 매칭 후보:
- *   "그룹 01_..."   → 1
- *   "group 12 ..."  → 12
- *   "12_..."        → 12
- *   "scene_03..."   → 3
+ *   "그룹 01_..."          → 1
+ *   "group 12 ..."         → 12
+ *   "12_..."               → 12
+ *   "scene_03..."          → 3
+ *   "001_g_mp5nd2uc_516"   → 1   (맨 앞 zero-padded + underscore 구분)
  * 매칭 실패 시 null.
+ *
+ * \b 대신 (?!\d) 를 쓰는 이유: '001_' 처럼 숫자 다음 underscore 가 오면 \b 가 작동
+ * 안 함 (둘 다 word char). (?!\d) 로 '숫자 시퀀스 끝' 만 보장.
  */
 function extractGroupNumFromFilename(name) {
   if (!name) return null;
   // 확장자 제거
   const base = String(name).replace(/\.[a-z0-9]{1,5}$/i, '');
   // 1) 그룹/group/scene/장면 + 숫자
-  let m = base.match(/(?:그룹|group|scene|장면|chapter|chap|ep|episode|씬)\s*[_\-]?\s*0*(\d{1,4})/i);
+  let m = base.match(/(?:그룹|group|scene|장면|chapter|chap|ep|episode|씬)\s*[_\-]?\s*0*(\d{1,4})(?!\d)/i);
   if (m) return parseInt(m[1], 10);
-  // 2) 맨 앞 숫자 (예: "01_제목", "12 - 제목")
-  m = base.match(/^\s*0*(\d{1,4})\b/);
+  // 2) 맨 앞 숫자 (예: "01_제목", "12 - 제목", "001_g_...")
+  m = base.match(/^\s*0*(\d{1,4})(?!\d)/);
   if (m) return parseInt(m[1], 10);
   return null;
 }
