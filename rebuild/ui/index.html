@@ -1821,27 +1821,34 @@
     </div>
 
     <!-- 3+4행 통합: 속도 + 문장 무음 + Clone 강도 + 언어 (한 줄, OmniVoice 시 4컬럼) -->
+    <!-- 각 셀: 위 줄 = 라벨 + 값 (space-between), 아래 줄 = 슬라이더/셀렉트 (가로 100%) -->
     <div id="presetForm_row3Grid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px;">
-      <div id="presetForm_speedWrapper" style="display:flex; gap:8px; align-items:center;">
-        <label style="font-size:12px; color:var(--text-soft); flex:0 0 38px;">속도</label>
-        <input type="range" id="presetForm_speed" min="0.7" max="1.5" step="0.05" value="1.0" style="flex:1; accent-color:var(--accent);">
-        <span id="presetForm_speedValue" style="font-size:13px; color:var(--text-strong); width:40px; text-align:right;">1.0x</span>
+      <div id="presetForm_speedWrapper" style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; font-size:12px;">
+          <span style="color:var(--text-soft);">속도</span>
+          <span id="presetForm_speedValue" style="color:var(--text-strong); font-size:13px;">1.0x</span>
+        </div>
+        <input type="range" id="presetForm_speed" min="0.7" max="1.5" step="0.05" value="1.0" style="width:100%; accent-color:var(--accent);">
       </div>
-      <div id="presetForm_silenceRow" style="display:flex; gap:8px; align-items:center; min-width:0;">
-        <label style="font-size:12px; color:var(--text-soft); flex:0 0 56px;">문장 무음</label>
-        <input type="range" id="presetForm_silenceSec" min="0" max="2" step="0.1" value="0.8" style="flex:1 1 0; min-width:0; accent-color:var(--accent);"
+      <div id="presetForm_silenceRow" style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; font-size:12px;">
+          <span style="color:var(--text-soft);">문장 무음</span>
+          <span id="presetForm_silenceSecLabel" style="color:var(--text-strong); font-size:13px;">0.8s</span>
+        </div>
+        <input type="range" id="presetForm_silenceSec" min="0" max="2" step="0.1" value="0.8" style="width:100%; accent-color:var(--accent);"
           oninput="document.getElementById('presetForm_silenceSecLabel').textContent = parseFloat(this.value).toFixed(1) + 's'">
-        <span id="presetForm_silenceSecLabel" style="font-size:13px; color:var(--text-strong); width:36px; text-align:right; flex:none;">0.8s</span>
       </div>
-      <div id="presetForm_cfgWrapper" style="display:flex; gap:8px; align-items:center;">
-        <label style="font-size:12px; color:var(--text-soft); flex:0 0 64px;">Clone 강도</label>
-        <input type="range" id="presetForm_cfgValue" min="1" max="5" step="0.5" value="2.0" style="flex:1; accent-color:var(--accent);"
+      <div id="presetForm_cfgWrapper" style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; font-size:12px;">
+          <span style="color:var(--text-soft);">Clone 강도</span>
+          <span id="presetForm_cfgValueLabel" style="color:var(--text-strong); font-size:13px;">2.0</span>
+        </div>
+        <input type="range" id="presetForm_cfgValue" min="1" max="5" step="0.5" value="2.0" style="width:100%; accent-color:var(--accent);"
           oninput="document.getElementById('presetForm_cfgValueLabel').textContent = parseFloat(this.value).toFixed(1)">
-        <span id="presetForm_cfgValueLabel" style="font-size:13px; color:var(--text-strong); width:30px; text-align:right;">2.0</span>
       </div>
-      <div id="presetForm_langWrapper" style="display:flex; gap:8px; align-items:center;">
-        <label style="font-size:12px; color:var(--text-soft); flex:0 0 36px;">언어</label>
-        <select id="presetForm_voxcpmLang" style="flex:1; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 8px; border-radius:6px; font-size:13px;">
+      <div id="presetForm_langWrapper" style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+        <div style="font-size:12px; color:var(--text-soft);">언어</div>
+        <select id="presetForm_voxcpmLang" style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 8px; border-radius:6px; font-size:13px;">
           <option value="ko">한국어</option>
           <option value="en">English</option>
           <option value="ja">日本語</option>
