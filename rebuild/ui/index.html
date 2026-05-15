@@ -1783,7 +1783,7 @@
     </div>
 
     <!-- 1행: 엔진 + 이름 -->
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px;">
+    <div id="presetForm_row1Grid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px;">
       <div>
         <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">엔진</label>
         <div class="chip-group" id="presetForm_engineChips">
@@ -1792,7 +1792,7 @@
           <div class="chip"        data-val="supertonic" style="flex:1; text-align:center;" title="Supertonic-3 (CPU 로컬 — GPU 없이도 작동)">Supertonic</div>
         </div>
       </div>
-      <div>
+      <div id="presetForm_nameField">
         <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">이름</label>
         <div style="display:flex; gap:6px; align-items:center;">
           <input type="text" id="presetForm_name" autocomplete="off" placeholder="예: 차분한 여성" style="flex:1; min-width:0; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 10px; border-radius:6px; font-size:14px;">
@@ -1805,7 +1805,7 @@
     </div>
 
     <!-- 2행: 성우 + 스타일 -->
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px; align-items:end;">
+    <div id="presetForm_row2Grid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px; align-items:end;">
       <div>
         <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">성우 / Voice</label>
         <div style="display:flex; gap:6px; align-items:center;">
@@ -1821,7 +1821,7 @@
     </div>
 
     <!-- 3행: 속도 + 문장 무음 (한 줄) -->
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px;">
+    <div id="presetForm_row3Grid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px;">
       <div style="display:flex; gap:8px; align-items:center;">
         <label style="font-size:12px; color:var(--text-soft); flex:0 0 38px;">속도</label>
         <input type="range" id="presetForm_speed" min="0.7" max="1.5" step="0.05" value="1.0" style="flex:1; accent-color:var(--accent);">
@@ -1911,7 +1911,7 @@
       <textarea id="vdForm_text" rows="2"
         style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.4;">우리 갉아 먹히는 마음을 정약용의 가르침으로 회복해요.</textarea>
 
-      <!-- 고급 파라미터 (스텝 / t_shift / 온도) — Clone 강도/언어/속도는 위 행에서 그대로 사용 -->
+      <!-- 고급 파라미터 (스텝 / t_shift / 온도 / 시드) — Clone 강도/언어/속도는 위 행에서 그대로 사용 -->
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; margin-top:12px;">
         <!-- 디퓨전 스텝 -->
         <div style="display:flex; gap:8px; align-items:center;">
@@ -1937,15 +1937,15 @@
             oninput="document.getElementById('vdForm_temperatureLabel').textContent = parseFloat(this.value).toFixed(1)">
           <span id="vdForm_temperatureLabel" style="font-size:13px; color:var(--text-strong); width:40px; text-align:right;">0.0</span>
         </div>
-      </div>
 
-      <!-- 시드 -->
-      <div style="display:flex; gap:8px; align-items:center; padding:8px 12px; background:var(--bg-soft); border:1px solid var(--border-soft); border-radius:8px; margin-top:10px;">
-        <label style="font-size:12px; color:var(--text-soft); flex:0 0 56px;">시드</label>
-        <input type="number" id="vdForm_seed" placeholder="비워두면 매번 랜덤"
-          style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 8px; border-radius:6px; font-size:13px;">
-        <button class="btn-sm" onclick="vdRandomSeed()" title="랜덤 시드 채우기" style="padding:5px 10px;">🎲 랜덤</button>
-        <button class="btn-sm" onclick="document.getElementById('vdForm_seed').value=''" title="시드 비우기 (매번 새 목소리)" style="padding:5px 10px;">∅ 비움</button>
+        <!-- 시드 (그리드 안 컴팩트) -->
+        <div style="display:flex; gap:6px; align-items:center;">
+          <label style="font-size:12px; color:var(--text-soft); flex:0 0 56px;" title="비우면 매번 새 목소리. 채우면 결정적">시드</label>
+          <input type="number" id="vdForm_seed" placeholder="비우면 랜덤"
+            style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 8px; border-radius:6px; font-size:13px;">
+          <button class="btn-sm" onclick="vdRandomSeed()" title="랜덤 시드 채우기" style="padding:5px 8px;">🎲</button>
+          <button class="btn-sm" onclick="document.getElementById('vdForm_seed').value=''" title="시드 비우기" style="padding:5px 8px;">∅</button>
+        </div>
       </div>
 
       <!-- 합성 + 결과 -->
@@ -2132,7 +2132,7 @@
     </div>
 
     <!-- 액션 -->
-    <div style="display:flex; gap:6px; margin-top:14px;">
+    <div id="presetForm_actionRow" style="display:flex; gap:6px; margin-top:14px;">
       <button class="btn btn-primary" onclick="savePreset()" style="flex:1;">💾 저장</button>
       <button class="btn-sm" onclick="deletePreset()" id="presetForm_deleteBtn" style="background:var(--bg-soft); color:var(--danger); border:1px solid var(--border); display:none;">🗑 삭제</button>
     </div>
@@ -3721,6 +3721,34 @@ function _splitScriptImpl() {
     return;
   }
 
+  // 자산 이전 — 기존 project 의 sentence/group id 와 새 결과의 id 가 같으면
+  // (콘텐츠 해시 기반이라 같은 문장/같은 그룹 묶음이면 동일) TTS·이미지·동영상 자산을 그대로 이어받는다.
+  // 사용자가 오타 1글자 고치면 해당 문장만 새 id 로 자산이 사라지고, 나머지는 보존된다.
+  const _oldProj = window._currentProject;
+  if (_oldProj) {
+    const carriedSentence = ['ttsStatus', 'ttsAudioPath', 'ttsDurationSec', 'ttsPresetId', 'vrewClips'];
+    const carriedGroup = ['imageStatus', 'imagePath', 'promptKo', 'promptEn',
+                          'videoStatus', 'videoPath', 'videoSourceImage', 'videoMotionPrompt', 'kenburns'];
+    const oldSMap = new Map((_oldProj.sentences || []).map(s => [s.id, s]));
+    const oldGMap = new Map((_oldProj.groups   || []).map(g => [g.id, g]));
+    let carriedSCount = 0, carriedGCount = 0;
+    for (const ns of sentences) {
+      const os = oldSMap.get(ns.id);
+      if (!os) continue;
+      for (const k of carriedSentence) if (os[k] != null) ns[k] = os[k];
+      carriedSCount++;
+    }
+    for (const ng of groups) {
+      const og = oldGMap.get(ng.id);
+      if (!og) continue;
+      for (const k of carriedGroup) if (og[k] != null) ng[k] = og[k];
+      carriedGCount++;
+    }
+    if (carriedSCount > 0 || carriedGCount > 0) {
+      addLog(`재분할 — 자산 보존: 문장 ${carriedSCount}/${sentences.length}, 그룹 ${carriedGCount}/${groups.length}`, 'info');
+    }
+  }
+
   // 콘솔에 결과 자세히 출력 (4단계 UI 전까지의 검증 수단)
   console.log('━━━━━━━━━━━ 분할 결과 ━━━━━━━━━━━');
   console.log(`문장 ${sentences.length}개 → 그룹 ${groups.length}개`);
@@ -5250,13 +5278,21 @@ function _setPresetEngine(engine) {
     document.getElementById('presetForm_cloneSection').style.display  = isClone  ? '' : 'none';
     document.getElementById('presetForm_designSection').style.display = isDesign ? '' : 'none';
 
-    // Voice Design 은 "참조음성을 만드는 도구" — 채널 운영/자막/스타일/무음/별도 미리듣기는 무관 → 숨김
+    // Voice Design 은 "참조음성을 만드는 도구" — 다음 항목들은 무관 → 숨김
     const setDisp = (id, hide) => { const el = document.getElementById(id); if (el) el.style.display = hide ? 'none' : ''; };
-    setDisp('presetForm_styleRow',      isDesign);
-    setDisp('presetForm_silenceRow',    isDesign);
-    setDisp('presetForm_channelSection', isDesign);
+    setDisp('presetForm_styleRow',       isDesign); // 이미지 생성 스타일
+    setDisp('presetForm_silenceRow',     isDesign); // 문장 무음 (Voice Design 은 1문장 단위)
+    setDisp('presetForm_channelSection', isDesign); // 채널 운영 + 본문 자막 + AI 고지
+    setDisp('presetForm_nameField',      isDesign); // 이름 + ⭐ (프리셋 저장 무의미)
+    setDisp('presetForm_actionRow',      isDesign); // 하단 💾 저장 + 🗑 삭제
     // 미리듣기는 designSection 의 "🔊 합성하기" 가 대체하므로 중복 숨김
     if (isDesign) document.getElementById('presetForm_previewSection').style.display = 'none';
+
+    // 빈 그리드 칸 제거 — 우측이 사라진 행을 1컬럼으로 축소
+    const setGridCols = (id, cols) => { const el = document.getElementById(id); if (el) el.style.gridTemplateColumns = cols; };
+    setGridCols('presetForm_row1Grid', isDesign ? '1fr' : '1fr 1fr'); // 엔진 전체 너비
+    setGridCols('presetForm_row2Grid', isDesign ? '1fr' : '1fr 1fr'); // 성우 전체 너비
+    setGridCols('presetForm_row3Grid', isDesign ? '1fr' : '1fr 1fr'); // 속도 전체 너비
 
     if (isDesign && typeof _vdInitDesignSection === 'function') _vdInitDesignSection();
   };

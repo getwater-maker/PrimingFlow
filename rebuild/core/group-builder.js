@@ -20,7 +20,7 @@
  *   ...
  */
 
-const { Sentence, Group } = require('./project-model');
+const { Sentence, Group, makeSentenceIder, finalizeGroupIds } = require('./project-model');
 const { splitLongSentenceAlgo } = require('./long-sentence-splitter/algo-splitter');
 
 /**
@@ -63,8 +63,10 @@ function buildGroups(sentenceTexts, thresholds) {
   const stages = _normalizeStages(thresholds);
 
   // 1단계: Sentence 객체 생성 + 짧은/긴 문장 판정 + vrew 클립 자동 분할 (알고리즘)
+  // id 는 콘텐츠 해시 기반 — 같은 text 면 같은 id, 같은 text 가 N 번째면 _N suffix.
+  const sid = makeSentenceIder();
   const sentences = sentenceTexts.map((text, i) => {
-    const s = new Sentence({ num: i + 1, text });
+    const s = new Sentence({ id: sid(text), num: i + 1, text });
     s.isShort = s.charCount < shortLen;
     s.isLong = s.charCount > longLen;
 
@@ -112,6 +114,7 @@ function buildGroups(sentenceTexts, thresholds) {
     }
   }
 
+  finalizeGroupIds(groups, sentences);
   return { sentences, groups };
 }
 
@@ -127,8 +130,9 @@ function buildGroupsWithSections(items, thresholds) {
   const { shortLen, longLen } = thresholds;
   const vrewMaxChars = thresholds.vrewMaxChars || longLen;
 
+  const sid = makeSentenceIder();
   const sentences = items.map((item, i) => {
-    const s = new Sentence({ num: i + 1, text: item.text });
+    const s = new Sentence({ id: sid(item.text), num: i + 1, text: item.text });
     s.sectionTitle = item.sectionTitle || null;
     s.isShort = s.charCount < shortLen;
     s.isLong = s.charCount > longLen;
@@ -155,6 +159,7 @@ function buildGroupsWithSections(items, thresholds) {
     s.groupId = currentGroup.id;
   }
 
+  finalizeGroupIds(groups, sentences);
   return { sentences, groups };
 }
 
@@ -177,8 +182,9 @@ function buildGroupsWithIntro(items, thresholds) {
   const { shortLen, longLen, introSentenceSize, mainSentenceSize } = thresholds;
   const vrewMaxChars = thresholds.vrewMaxChars || longLen;
 
+  const sid = makeSentenceIder();
   const sentences = items.map((item, i) => {
-    const s = new Sentence({ num: i + 1, text: item.text });
+    const s = new Sentence({ id: sid(item.text), num: i + 1, text: item.text });
     s.isShort = s.charCount < shortLen;
     s.isLong = s.charCount > longLen;
     s.isIntro = !!item.isIntro;
@@ -224,6 +230,7 @@ function buildGroupsWithIntro(items, thresholds) {
       currentCount++;
     }
   }
+  finalizeGroupIds(groups, sentences);
   return { sentences, groups };
 }
 
@@ -249,8 +256,9 @@ function buildGroupsHybrid(items, thresholds) {
   const { shortLen, longLen, introSentenceSize, mainSentenceSize } = thresholds;
   const vrewMaxChars = thresholds.vrewMaxChars || longLen;
 
+  const sid = makeSentenceIder();
   const sentences = items.map((item, i) => {
-    const s = new Sentence({ num: i + 1, text: item.text });
+    const s = new Sentence({ id: sid(item.text), num: i + 1, text: item.text });
     s.isShort = s.charCount < shortLen;
     s.isLong = s.charCount > longLen;
     s.isIntro = !!item.isIntro;
@@ -312,6 +320,7 @@ function buildGroupsHybrid(items, thresholds) {
       }
     }
   }
+  finalizeGroupIds(groups, sentences);
   return { sentences, groups };
 }
 

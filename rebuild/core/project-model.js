@@ -9,10 +9,65 @@
  *   5. .vrew 저장 시 sentences + groups 를 사용
  */
 
+const crypto = require('crypto');
+
 let _seq = 0;
 function nextId(prefix) {
   _seq++;
   return `${prefix}_${Date.now().toString(36)}_${_seq}`;
+}
+
+/**
+ * 콘텐츠 해시 기반 안정 id.
+ * 같은 content 면 항상 같은 id → 대본 재분할 시 자산(TTS/이미지) 매칭/이전 가능.
+ *
+ * 같은 텍스트 sentence 가 여러 개 있을 수 있어 외부에서 등장 카운터 관리.
+ * → makeSentenceIder() / makeGroupIder() 헬퍼 사용 권장.
+ */
+function hashId(prefix, content) {
+  const h = crypto.createHash('sha256').update(String(content == null ? '' : content), 'utf8').digest('hex').slice(0, 10);
+  return `${prefix}_${h}`;
+}
+
+/**
+ * 같은 빌드 호출 안에서 동일 text 가 N 번째 나오면 `_N` suffix 부여.
+ * 첫 등장은 suffix 없음.
+ *
+ * 사용:
+ *   const sid = makeSentenceIder();
+ *   const id1 = sid('안녕'); // s_xxx
+ *   const id2 = sid('반가워'); // s_yyy
+ *   const id3 = sid('안녕'); // s_xxx_2
+ */
+function makeSentenceIder() {
+  const counter = new Map();
+  return (text) => {
+    const id = hashId('s', text);
+    const c = (counter.get(id) || 0) + 1;
+    counter.set(id, c);
+    return c === 1 ? id : `${id}_${c}`;
+  };
+}
+
+/**
+ * Group id 는 sentenceIds 의 join hash → 같은 sentence 묶음이면 같은 group id.
+ * 빌더가 sentenceIds 를 모두 채운 뒤 호출하여 group.id + 각 sentence.groupId 를 갱신.
+ */
+function finalizeGroupIds(groups, sentences) {
+  const sentMap = new Map(sentences.map(s => [s.id, s]));
+  const seenGroupIds = new Map(); // 동일 sentenceId 묶음 충돌 시 카운터
+  for (const g of groups) {
+    let newId = hashId('g', g.sentenceIds.join('|'));
+    const c = (seenGroupIds.get(newId) || 0) + 1;
+    seenGroupIds.set(newId, c);
+    if (c > 1) newId = `${newId}_${c}`;
+    if (newId === g.id) continue;
+    for (const sid of g.sentenceIds) {
+      const s = sentMap.get(sid);
+      if (s) s.groupId = newId;
+    }
+    g.id = newId;
+  }
 }
 
 /**
@@ -118,4 +173,4 @@ class Project {
   }
 }
 
-module.exports = { Sentence, Group, Project, countMeaningful };
+module.exports = { Sentence, Group, Project, countMeaningful, hashId, makeSentenceIder, finalizeGroupIds };
