@@ -7447,6 +7447,13 @@ function _showAutoProgress(title, steps) {
   closeBtn.style.opacity = '0.5';
   closeBtn.style.cursor = 'not-allowed';
   closeBtn.title = '작업 중에는 닫을 수 없습니다';
+  // 새 모달 시작 시 우상단 close 버튼은 ✕ 로 원복 (이전 작업의 '✓ 확인' 잔재 제거)
+  closeBtn.textContent = '✕';
+  closeBtn.style.background = '';
+  closeBtn.style.color = '';
+  closeBtn.style.fontWeight = '';
+  closeBtn.style.padding = '';
+  closeBtn.style.borderColor = '';
   body.innerHTML = '';
   for (const step of (steps || [])) {
     const row = document.createElement('div');
@@ -7508,7 +7515,14 @@ function _finishAutoProgress(summary) {
     closeBtn.disabled = false;
     closeBtn.style.opacity = '1';
     closeBtn.style.cursor = 'pointer';
-    closeBtn.title = '닫기';
+    closeBtn.title = '확인';
+    // 작업 완료 시 X 닫기 → '✓ 확인' primary 버튼으로 시각 강조 (사용자 요청)
+    closeBtn.textContent = '✓ 확인';
+    closeBtn.style.background = 'var(--accent)';
+    closeBtn.style.color = 'var(--accent-text)';
+    closeBtn.style.fontWeight = '600';
+    closeBtn.style.padding = '6px 14px';
+    closeBtn.style.borderColor = 'var(--accent)';
   }
   if (sumEl && summary) sumEl.textContent = summary;
   if (_autoProgressTimer) { clearInterval(_autoProgressTimer); _autoProgressTimer = null; }
