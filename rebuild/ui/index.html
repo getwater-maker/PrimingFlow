@@ -1168,7 +1168,7 @@
           </div>
 
           <!-- Row 2 -->
-          <button class="btn btn-sm-action" id="imageBatchAttachBtn" onclick="openImageBatchAttach()" title="외부 이미지 파일을 그룹 제목과 매칭해서 자동 첨부">📎 이미지 첨부</button>
+          <button class="btn btn-sm-action" id="imageBatchAttachBtn" onclick="openImageBatchAttach()" title="외부 이미지/동영상 파일을 그룹 제목 또는 그룹 번호(예: '그룹 01_...')와 매칭해서 자동 첨부">📎 이미지·영상 첨부</button>
           <button class="btn btn-sm-action" onclick="convertGroupRangeVideo()" title="위 입력 범위 그룹의 이미지를 Grok 으로 영상 변환">🎬 범위 영상</button>
 
           <!-- Row 3 -->
@@ -1186,7 +1186,7 @@
           style="display:none; width:100%; margin-top:6px; background:var(--warning, #c87000); color:#fff; font-weight:700;">
           🔁 실패 영상 재시도 (<span id="retryFailedCount">0</span>)
         </button>
-        <input type="file" id="imageBatchInput" multiple accept="image/*" style="display:none;">
+        <input type="file" id="imageBatchInput" multiple accept="image/jpeg,image/png,image/jpg,image/webp,video/mp4,video/webm,video/x-matroska,video/quicktime" style="display:none;">
       </div>
     </div>
 
@@ -7494,26 +7494,51 @@ function openImageBatchAttach() {
     const proj = window._currentProject;
     const result = matchImagesToGroups(proj.groups, fileInfos);
     if (result.matches.length === 0) {
-      addLog('이미지 일괄 첨부 — 매칭된 그룹 없음 (파일명에 섹션 제목 포함 필요)', 'warn');
+      addLog('일괄 첨부 — 매칭된 그룹 없음 (파일명에 그룹 번호 또는 섹션 제목 포함 필요)', 'warn');
       return;
     }
-    let count = 0;
+    // 확장자로 이미지/동영상 분기
+    const VIDEO_EXT = /\.(mp4|webm|mkv|mov|m4v|avi)$/i;
+    const IMAGE_EXT = /\.(jpe?g|png|webp|gif|bmp)$/i;
+    let imgCount = 0, videoCount = 0, skipUnknown = 0;
     for (const m of result.matches) {
       const g = proj.groups.find(x => x.id === m.groupId);
       if (!g) continue;
-      const hadVideo = !!g.videoPath;
-      g.imagePath   = m.file.path;
-      g.imageStatus = 'done';
-      g.videoPath   = null;
-      g.videoStatus = 'idle';
-      count++;
-      if (hadVideo) addLog(`그룹 ${g.num} — 기존 비디오 무효화 (새 이미지 적용)`, 'info');
+      const isVideo = VIDEO_EXT.test(m.file.name);
+      const isImage = IMAGE_EXT.test(m.file.name);
+      if (isVideo) {
+        // 동영상 첨부 — videoPath 채움 (이미지는 유지: 비디오 실패 시 fallback)
+        if (!g.imagePath) {
+          // 비디오만 있고 이미지가 없으면 비디오를 imagePath 처럼 표시 못 함 — Flow 빈 그룹으로 남음
+          addLog(`그룹 ${g.num} — 동영상 첨부 (이미지 없음 — 필요 시 'Flow 이미지' 별도 생성)`, 'info');
+        }
+        g.videoPath        = m.file.path;
+        g.videoStatus      = 'done';
+        g.videoSourceImage = g.imagePath || null;
+        videoCount++;
+      } else if (isImage) {
+        const hadVideo = !!g.videoPath;
+        g.imagePath   = m.file.path;
+        g.imageStatus = 'done';
+        g.videoPath   = null;
+        g.videoStatus = 'idle';
+        if (hadVideo) addLog(`그룹 ${g.num} — 기존 비디오 무효화 (새 이미지 적용)`, 'info');
+        imgCount++;
+      } else {
+        addLog(`그룹 ${g.num} — 지원 안 하는 확장자 (${m.file.name}) 스킵`, 'warn');
+        skipUnknown++;
+        continue;
+      }
       if (m.multipleHits) addLog(`그룹 ${g.num} — ${m.candidates.length}개 파일 매칭, 첫 번째 사용: ${m.file.name}`, 'warn');
     }
     if (result.unmatchedFiles.length > 0) {
-      addLog(`이미지 일괄 첨부 — 미사용 파일 ${result.unmatchedFiles.length}개`, 'info');
+      addLog(`일괄 첨부 — 미사용 파일 ${result.unmatchedFiles.length}개`, 'info');
     }
-    addLog(`이미지 일괄 첨부 완료 — ${count}개 그룹 갱신`, 'ok');
+    const parts = [];
+    if (imgCount   > 0) parts.push(`이미지 ${imgCount}`);
+    if (videoCount > 0) parts.push(`동영상 ${videoCount}`);
+    if (skipUnknown > 0) parts.push(`스킵 ${skipUnknown}`);
+    addLog(`일괄 첨부 완료 — ${parts.join(' / ')} 그룹 갱신`, 'ok');
     renderTaskList(proj);
   };
   input.click();
