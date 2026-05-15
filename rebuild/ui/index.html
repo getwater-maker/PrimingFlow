@@ -1085,6 +1085,13 @@
         <button class="btn-sm" onclick="openCurrentOutputFolder()" id="folderBtn" title="현재 활성 프리셋의 출력 폴더를 윈도우 탐색기로 열기" style="flex:1; padding:6px 10px;">📂 저장폴더 보기</button>
       </div>
 
+      <!-- 프로젝트 저장/불러오기 — 작업 상태(분할/sentence/그룹/자산) 를 출력 폴더 안 project.pflow 로 -->
+      <div style="display:flex; gap:6px; margin-bottom:8px; align-items:center;">
+        <button class="btn-sm" onclick="saveProjectFile()" id="projectSaveBtn" title="현재 작업 상태(분할/sentence/그룹/자산 경로)를 출력 폴더 안 project.pflow 로 저장" style="flex:1; padding:6px 10px;">💾 프로젝트 저장</button>
+        <button class="btn-sm" onclick="loadProjectFile()" title="저장한 project.pflow 를 열어 작업 이어가기" style="flex:1; padding:6px 10px;">📂 프로젝트 불러오기</button>
+        <span id="autoSaveIndicator" title="자동 저장 상태" style="flex:none; font-size:11px; color:var(--text-muted); white-space:nowrap; padding:0 6px;">— 미저장</span>
+      </div>
+
       <!-- 채널 영역은 좌측 프리셋으로 통합됨 (2026-05) — 드롭다운/버튼 폐기 -->
 
       <!-- Google 계정 프로필 — [셀렉트] [로그인] | [+추가] [삭제] 한 줄 -->
@@ -2460,6 +2467,156 @@ async function openFile() {
 }
 
 // 폴더 선택
+// ─── 프로젝트 저장/불러오기 (project.pflow) ────────────────────────
+// 출력 폴더 안 project.pflow 로 _currentProject 저장. 자산 경로는 상대화.
+// 사용자 액션(분할/TTS/이미지/비디오/sentence 편집) 후 자동 저장 (debounce 500ms).
+
+let _autoSaveTimer = null;
+let _autoSaveLastTime = 0;
+
+function _updateAutoSaveIndicator(state, msg) {
+  const el = document.getElementById('autoSaveIndicator');
+  if (!el) return;
+  if (state === 'saved') {
+    const now = new Date();
+    _autoSaveLastTime = Date.now();
+    el.textContent = `💾 저장됨 (${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')})`;
+    el.style.color = 'var(--success)';
+  } else if (state === 'saving') {
+    el.textContent = '💾 저장 중...';
+    el.style.color = 'var(--info)';
+  } else if (state === 'error') {
+    el.textContent = `⚠ 저장 실패 (${(msg || '').slice(0, 30)})`;
+    el.style.color = 'var(--danger)';
+  } else if (state === 'pending') {
+    el.textContent = '✏ 변경됨';
+    el.style.color = 'var(--warning)';
+  } else {
+    el.textContent = '— 미저장';
+    el.style.color = 'var(--text-muted)';
+  }
+}
+
+function _projectOutputDir(proj) {
+  if (!proj) return '';
+  return proj.outputDir || proj.imageOutputDir || _getProjectOutputDir() || '';
+}
+
+// 사용자가 명시적으로 클릭 — alert/log 로 결과 안내
+async function saveProjectFile() {
+  const proj = window._currentProject;
+  if (!proj || !proj.sentences || proj.sentences.length === 0) {
+    alert('먼저 대본을 분할하세요 (저장할 작업이 없음)');
+    return;
+  }
+  const outDir = _projectOutputDir(proj);
+  if (!outDir) {
+    alert('출력 폴더가 설정되지 않았습니다 — 활성 프리셋의 출력 폴더 먼저 선택하세요');
+    return;
+  }
+  try {
+    _updateAutoSaveIndicator('saving');
+    const ProjectStore = require('../core/project-store');
+    const r = ProjectStore.saveProject(proj, outDir);
+    addLog(`프로젝트 저장 — ${r.path} (sentence ${r.sentencesCount} / 그룹 ${r.groupsCount}, ${Math.round(r.size / 1024)}KB)`, 'ok');
+    _updateAutoSaveIndicator('saved');
+  } catch (e) {
+    addLog(`프로젝트 저장 실패: ${e.message}`, 'err');
+    _updateAutoSaveIndicator('error', e.message);
+    alert('프로젝트 저장 실패: ' + e.message);
+  }
+}
+
+// 자동 저장 (debounce) — 출력 폴더 없으면 조용히 skip, 실패해도 사용자 흐름 방해 X
+function _autoSaveProject() {
+  if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
+  _updateAutoSaveIndicator('pending');
+  _autoSaveTimer = setTimeout(() => {
+    _autoSaveTimer = null;
+    const proj = window._currentProject;
+    if (!proj || !proj.sentences || proj.sentences.length === 0) return;
+    const outDir = _projectOutputDir(proj);
+    if (!outDir) {
+      _updateAutoSaveIndicator('');  // 미저장 표시 유지
+      return;
+    }
+    try {
+      _updateAutoSaveIndicator('saving');
+      const ProjectStore = require('../core/project-store');
+      ProjectStore.saveProject(proj, outDir);
+      _updateAutoSaveIndicator('saved');
+    } catch (e) {
+      console.warn('[자동저장]', e.message);
+      _updateAutoSaveIndicator('error', e.message);
+    }
+  }, 500);
+}
+
+async function loadProjectFile() {
+  // ipcRenderer.invoke('select-file') 같은 헬퍼가 있으면 좋겠지만, 일단 webkitdirectory 우회 — 그냥 <input type=file>
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pflow,application/json';
+  input.onchange = async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    let filePath;
+    try {
+      const { webUtils } = require('electron');
+      filePath = webUtils.getPathForFile(f);
+    } catch {
+      filePath = f.path || '';
+    }
+    if (!filePath) {
+      addLog('[프로젝트 불러오기] 파일 경로 추출 실패', 'err');
+      return;
+    }
+    try {
+      const ProjectStore = require('../core/project-store');
+      const { project, stats } = ProjectStore.loadProject(filePath);
+      window._currentProject = project;
+      window._scriptText = project.scriptText || '';
+
+      // UI 복원
+      const scriptArea = document.getElementById('scriptInputArea');
+      if (scriptArea) scriptArea.value = project.scriptText || '';
+      const directInputBtn = document.getElementById('emptyState');
+      if (directInputBtn) directInputBtn.style.display = 'none';
+
+      // 분할 옵션 input 복원
+      if (project.thresholds) {
+        const set = (id, v) => { const el = document.getElementById(id); if (el != null && v != null) el.value = v; };
+        set('shortLen',           project.thresholds.shortLen);
+        set('longLen',            project.thresholds.longLen);
+        set('introSentenceSize',  project.thresholds.introSentenceSize);
+        set('mainSentenceSize',   project.thresholds.mainSentenceSize);
+      }
+
+      // 그룹 카드 / sentence 카드 다시 그림
+      if (typeof renderTaskList === 'function') renderTaskList(project);
+      if (typeof _updateScriptDictBadge === 'function') _updateScriptDictBadge();
+
+      // 로그 요약
+      const path = require('path');
+      const fileName = path.basename(filePath);
+      const summary = `프로젝트 로드 완료 (${fileName}) — sentence ${(project.sentences || []).length} / 그룹 ${(project.groups || []).length}`;
+      addLog(summary, 'ok');
+      if (stats.ttsMissing + stats.imageMissing + stats.videoMissing > 0) {
+        const parts = [];
+        if (stats.ttsMissing > 0)   parts.push(`TTS ${stats.ttsMissing}/${stats.total.tts}`);
+        if (stats.imageMissing > 0) parts.push(`이미지 ${stats.imageMissing}/${stats.total.image}`);
+        if (stats.videoMissing > 0) parts.push(`동영상 ${stats.videoMissing}/${stats.total.video}`);
+        addLog(`⚠ 자산 누락: ${parts.join(', ')} — 디스크에서 사라진 파일은 status 'idle' 로 초기화`, 'warn');
+      }
+      _updateAutoSaveIndicator('saved');
+    } catch (e) {
+      addLog(`프로젝트 불러오기 실패: ${e.message}`, 'err');
+      alert('프로젝트 불러오기 실패:\n' + e.message);
+    }
+  };
+  input.click();
+}
+
 async function openCurrentOutputFolder() {
   // 활성 프리셋의 outputFolder 우선, 없으면 메인 outputDir, 그것도 없으면 모든 프리셋 중 첫 번째 outputFolder
   let dir = '';
@@ -3785,6 +3942,8 @@ function _splitScriptImpl() {
   renderTaskList(window._currentProject);
   // 발음 사전 배지 갱신
   if (typeof _updateScriptDictBadge === 'function') _updateScriptDictBadge();
+  // 자동 저장 — 분할 결과 보존
+  if (typeof _autoSaveProject === 'function') _autoSaveProject();
 
   // 분할 옵션 안내문 끝에 그룹 수 미리보기 갱신 (입력 변경 시마다 자동 갱신됨)
   const previewEl = document.getElementById('splitGroupCountPreview');
@@ -7031,6 +7190,7 @@ function _commitSentenceEdit(sid, textEl) {
 
   // 원본 대본 텍스트도 동기화 (모달에서 수정 시 덮어쓰지 않게 — 대본은 별도)
   // _scriptText 는 그대로 유지 (재분할 시 사용자가 모달로 명시 변경한 것이 우선)
+  if (typeof _autoSaveProject === 'function') _autoSaveProject();
 }
 
 function _updateProgress() {
@@ -7249,6 +7409,7 @@ async function convertSentence(sid, _opts = {}) {
     _updateProgress();
     try { _accumulateRtf(sentence.ttsDurationSec, _ttsWallMs); } catch (_) {}
     if (_selfManaged) _setTtsConvertActive(false);
+    if (typeof _autoSaveProject === 'function') _autoSaveProject();
     return true;
   } catch (e) {
     // 1회 자동 재시도 — 일시적 실패 (네트워크·voiceLocale race) 흡수
@@ -7540,6 +7701,7 @@ function openImageBatchAttach() {
     if (skipUnknown > 0) parts.push(`스킵 ${skipUnknown}`);
     addLog(`일괄 첨부 완료 — ${parts.join(' / ')} 그룹 갱신`, 'ok');
     renderTaskList(proj);
+    if (typeof _autoSaveProject === 'function') _autoSaveProject();
   };
   input.click();
 }
@@ -7785,6 +7947,7 @@ async function convertGroupVideo(groupId, opts = {}) {
       addLog(`[Grok] ✅ 그룹 ${g.num} 비디오 완성: ${path.basename(result.videoPath)}`, 'ok');
       if (_selfManaged) window._grokConvertActive = false;
       renderTaskList(window._currentProject);
+      if (typeof _autoSaveProject === 'function') _autoSaveProject();
       return true;
     } else {
       g.videoStatus = 'fail';
@@ -9045,6 +9208,7 @@ ipcRenderer.on('image-done', (_, payload) => {
     if (renamedPath) {
       _setGroupImageThumbnail(groupId, renamedPath);
       _setGroupImageStatus(groupId, 'done');
+      if (typeof _autoSaveProject === 'function') _autoSaveProject();
     } else {
       console.warn('[image-done] 파일 매칭 실패:', { imgDir, sourcePadded, groupNum, groupId });
     }
@@ -9088,6 +9252,7 @@ ipcRenderer.on('done', () => {
           }
         }
       });
+      if (typeof _autoSaveProject === 'function') _autoSaveProject();
     } catch (e) {
       console.error('[group-image] 폴백 스캔 실패:', e);
     }
