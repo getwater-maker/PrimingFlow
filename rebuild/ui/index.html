@@ -141,6 +141,57 @@
     50%     { background: var(--bg-soft); color: var(--text-soft); }
   }
 
+  /* PR6: 글로벌 작업 status bar — 탭 바 아래 한 줄 */
+  .global-status-bar {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-soft);
+    padding: 4px 14px;
+    font-size: 11px;
+    color: var(--text-soft);
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    overflow-x: auto;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .global-status-bar:empty { display: none; }
+  .global-status-bar .gs-item { display: inline-flex; gap: 6px; align-items: center; }
+  .global-status-bar .gs-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .global-status-bar .gs-dot.tts   { background: #3b82f6; }
+  .global-status-bar .gs-dot.image { background: #a855f7; }
+  .global-status-bar .gs-dot.video { background: #f97316; }
+  .global-status-bar .gs-name { color: var(--text-base); font-weight: 600; }
+  .global-status-bar .gs-queue { color: var(--text-muted); }
+
+  /* PR6: 비활성 탭 완료 toast (우상단) */
+  .toast {
+    position: fixed;
+    top: 78px;
+    right: 16px;
+    z-index: 1000;
+    padding: 10px 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    color: var(--text-strong);
+    font-size: 13px;
+    box-shadow: var(--shadow-md);
+    animation: toastIn 0.3s ease-out;
+    max-width: 360px;
+  }
+  .toast.toast-success { border-color: var(--success); }
+  .toast.toast-error   { border-color: var(--danger);  }
+  .toast.out { animation: toastOut 0.3s ease-in forwards; }
+  @keyframes toastIn {
+    from { transform: translateX(120%); opacity: 0; }
+    to   { transform: translateX(0);   opacity: 1; }
+  }
+  @keyframes toastOut {
+    from { transform: translateX(0);   opacity: 1; }
+    to   { transform: translateX(120%); opacity: 0; }
+  }
+
   /* 메인 통합 작업 영역 — 3열 grid: 작업목록 | 보조패널 | 작업흐름 */
   .workspace {
     display: grid;
@@ -1106,6 +1157,9 @@
     <!-- JS 가 동적으로 탭 div 생성 -->
   </div>
 </div>
+
+<!-- 글로벌 작업 status bar (PR6) — 모든 탭의 큐 상태 요약 -->
+<div id="globalStatusBar" class="global-status-bar"></div>
 
 <div class="main">
 
@@ -2742,6 +2796,55 @@ function _initProjectTabs() {
   renderProjectTabs();
 }
 
+// ─── PR6: 글로벌 status bar + 비활성 탭 완료 알림 ──────────────
+function _renderGlobalStatusBar() {
+  const el = document.getElementById('globalStatusBar');
+  if (!el || !window._queues) return;
+  const items = [];
+  const KIND_MAP = { tts: 'TTS', image: '이미지', video: '비디오' };
+  for (const key of ['tts', 'image', 'video']) {
+    const q = window._queues[key];
+    if (!q) continue;
+    const snap = q.snapshot();
+    if (snap.running === 0 && snap.queued === 0) continue;
+    // 어느 프로젝트가 running 인지 (max=1 이라 최대 1개)
+    const runTask = snap.runningTasks && snap.runningTasks[0];
+    const runProj = runTask && window._projects.find(p => p.id === runTask.projectId);
+    const projLabel = runProj ? _projectTabLabelShort(runProj) : '—';
+    let text = `<span class="gs-dot ${key}"></span>[${KIND_MAP[key]}]`;
+    if (snap.running > 0) text += ` <span class="gs-name">${escapeHtml ? escapeHtml(projLabel) : projLabel}</span>`;
+    if (snap.queued > 0)  text += ` <span class="gs-queue">· 대기 ${snap.queued}</span>`;
+    items.push(`<span class="gs-item">${text}</span>`);
+  }
+  el.innerHTML = items.join('');
+}
+
+function _showToast(msg, kind) {
+  const t = document.createElement('div');
+  t.className = `toast toast-${kind || 'info'}`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.classList.add('out'), 3000);
+  setTimeout(() => { try { t.remove(); } catch {} }, 3500);
+}
+
+function _flashTab(projectId) {
+  const div = document.querySelector(`.project-tab[data-project-id="${projectId}"]`);
+  if (!div) return;
+  div.classList.add('flash');
+  setTimeout(() => { try { div.classList.remove('flash'); } catch {} }, 1600);
+}
+
+// batch 끝에서 호출 — 활성 탭이 아니면 toast + 깜박임
+function _notifyTabIfInactive(projectId, kind) {
+  if (!projectId || projectId === window._activeProjectId) return;
+  const proj = window._projects.find(p => p.id === projectId);
+  if (!proj) return;
+  const label = _projectTabLabelShort(proj);
+  _showToast(`✅ ${label} — ${kind} 완료`, 'success');
+  _flashTab(projectId);
+}
+
 // ─── 작업 큐 (PR3) ──────────────────────────────────
 // 외부 자원(OmniVoice GPU / Flow Playwright / Grok 브라우저) 이 단일이라 자원별 큐로 직렬화.
 // 멀티 탭이라도 큐 max=1 이므로 같은 자원 작업이 동시 시작되지 않는다.
@@ -2763,8 +2866,10 @@ function _initProjectTabs() {
         p.activeTasks.image = { running: img.running > 0,   queued: img.queued,   done: p.activeTasks.image.done || 0, total: p.activeTasks.image.total || 0 };
         p.activeTasks.video = { running: vid.running > 0,   queued: vid.queued,   done: p.activeTasks.video.done || 0, total: p.activeTasks.video.total || 0 };
       }
-      // 2) 탭 색 점 갱신 — PR6 글로벌 status bar 는 별도 추가 예정
+      // 2) 탭 색 점 갱신
       try { if (typeof renderProjectTabs === 'function') renderProjectTabs(); } catch {}
+      // 3) 글로벌 status bar 갱신 (PR6)
+      try { if (typeof _renderGlobalStatusBar === 'function') _renderGlobalStatusBar(); } catch {}
     }
     window._queues = {
       tts:   new TaskQueue('tts',   1, _onQueueChange),
@@ -8489,6 +8594,9 @@ async function _convertGroupVideoBody(projectId, groupId, opts = {}) {
 /** 그룹 ID 배열을 순차 비디오 변환하는 공통 헬퍼.
  *  영상 간 20~40초 랜덤 대기 — anti-detect 휴먼타이밍 + Grok rate-limit 부담 분산. */
 async function _convertGroupListToVideo(groupIds, label) {
+  // (PR6) batch 끝 toast 용 — 호출 시점 활성 프로젝트 기록
+  const _projForNotify = window._currentProject;
+  const _projectIdForNotify = _projForNotify && _projForNotify.id;
   addLog(`[Grok] ${label} — ${groupIds.length}개 그룹 비디오 변환 시작 (영상 간 20~40초 랜덤 대기)`, 'info');
   window._grokConvertActive = true;
   let success = 0, fail = 0, stopped = false;
@@ -8520,6 +8628,8 @@ async function _convertGroupListToVideo(groupIds, label) {
     addLog(`[Grok] 비디오 변환 중지 — 성공 ${success} / 실패 ${fail}`, 'err');
   } else {
     addLog(`[Grok] 비디오 변환 완료 — 성공 ${success} / 실패 ${fail}`, fail ? 'err' : 'ok');
+    // (PR6) 비활성 탭이면 toast + 깜박임
+    try { _notifyTabIfInactive(_projectIdForNotify, '비디오 변환'); } catch {}
   }
   // 마지막 영상 첨부 안정화 — UI 한 번 더 갱신 후 짧은 대기 (디스크 I/O + DOM 반영 보장)
   try {
@@ -8935,6 +9045,8 @@ async function convertAllSentences(opts = {}) {
     addLog(`일괄 변환 중지됨 (${finalDone} / ${total}, ${elapsed}초)`, 'err');
   } else {
     addLog(`일괄 변환 완료 (${finalDone} / ${total}, ${elapsed}초)${fail ? ` · 실패 ${fail}개` : ''}`, fail ? 'err' : 'ok');
+    // (PR6) 비활성 탭이면 toast + 깜박임
+    try { _notifyTabIfInactive(proj.id, '음성 변환'); } catch {}
   }
   return { success, fail, stopped, total: remaining.length };
 }
@@ -9526,7 +9638,11 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
 
   if (!result || !result.success) {
     addLog(`이미지 ${label} 오류: ${result && result.error}`, 'err');
+    return false;
   }
+  // (PR6) 비활성 탭이면 toast + 깜박임
+  try { _notifyTabIfInactive(projectId, '이미지 생성'); } catch {}
+  return true;
 }
 
 // ─── 8-D: .vrew 저장 (TTS ≠ 자막 분리) ──────────────────────────────
