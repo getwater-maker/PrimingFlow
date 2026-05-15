@@ -1776,7 +1776,7 @@
 
 <!-- 프리셋 편집 모달 -->
 <div id="presetModal" style="display:none; position:fixed; inset:0; background:rgba(58,52,46,0.5); z-index:999; align-items:center; justify-content:center;" onclick="if(event.target===this)closePresetModal()">
-  <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:14px; width:660px; max-width:96vw; max-height:92vh; overflow-y:auto; padding:24px; box-shadow:var(--shadow-lg);">
+  <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:14px; width:770px; max-width:96vw; max-height:92vh; overflow-y:auto; padding:24px; box-shadow:var(--shadow-lg);">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
       <h2 style="font-size:18px; color:var(--accent); margin:0;" id="presetModalTitle">🎙 프리셋 편집</h2>
       <button class="btn-sm" onclick="closePresetModal()" style="font-size:15px;">✕</button>
@@ -5752,62 +5752,84 @@ function closePresetModal() {
 }
 
 // ─── Voice Design 작업실 ────────────────────────────────
-const VD_CHIP_PRESETS = [
-  // 성별
-  { token: 'female',          ko: '여성' },
-  { token: 'male',            ko: '남성' },
-  // 연령 — 시니어 콘텐츠 타겟 강화
-  { token: 'child',           ko: '어린이' },
-  { token: 'young adult',     ko: '청년' },
-  { token: 'middle-aged',     ko: '중년' },
-  { token: 'elderly',         ko: '노년' },
-  { token: 'senior',          ko: '시니어' },
-  { token: 'grandfatherly',   ko: '할아버지같은' },
-  { token: 'grandmotherly',   ko: '할머니같은' },
-  { token: 'aged',            ko: '연륜있는' },
-  // 음높이
-  { token: 'low pitch',       ko: '저음' },
-  { token: 'medium pitch',    ko: '중음' },
-  { token: 'high pitch',      ko: '고음' },
-  { token: 'deep',            ko: '깊은' },
-  { token: 'baritone',        ko: '바리톤' },
-  // 톤·정서 — 시니어 친화
-  { token: 'warm tone',       ko: '따뜻한' },
-  { token: 'calm',            ko: '차분한' },
-  { token: 'gentle',          ko: '부드러운' },
-  { token: 'soft-spoken',     ko: '조용히 말하는' },
-  { token: 'soothing',        ko: '편안하게 하는' },
-  { token: 'comforting',      ko: '위로하는' },
-  { token: 'wise',            ko: '지혜로운' },
-  { token: 'thoughtful',      ko: '사려깊은' },
-  { token: 'nostalgic',       ko: '향수 어린' },
-  { token: 'reflective',      ko: '사색적인' },
-  { token: 'compassionate',   ko: '자애로운' },
-  { token: 'avuncular',       ko: '인자한' },
-  // 텍스처 — 시니어 음색 특성
-  { token: 'raspy',           ko: '허스키' },
-  { token: 'gravelly',        ko: '거친' },
-  { token: 'hoarse',          ko: '쉰' },
-  { token: 'breathy',         ko: '호흡감' },
-  { token: 'mellow',          ko: '원숙한' },
-  // 낭독/스토리텔링 — 시니어 콘텐츠에 적합
-  { token: 'narrator',        ko: '낭독자' },
-  { token: 'storyteller',     ko: '이야기꾼' },
-  { token: 'audiobook',       ko: '오디오북' },
-  { token: 'documentary',     ko: '다큐멘터리' },
-  { token: 'meditative',      ko: '명상적' },
-  { token: 'slow paced',      ko: '느린 호흡' },
-  { token: 'deliberate',      ko: '또박또박' },
-  { token: 'serious',         ko: '진중한' },
-  { token: 'formal',          ko: '격식 있는' },
-  // 기타 스타일
-  { token: 'energetic',       ko: '활기찬' },
-  { token: 'soft',            ko: '여린' },
-  { token: 'whisper',         ko: '속삭임' },
-  // 액센트
-  { token: 'american accent', ko: '미국식 영어' },
-  { token: 'british accent',  ko: '영국식 영어' },
+// 칩 그룹 정책 — 'single' 그룹은 같은 그룹의 다른 토큰 자동 제거(라디오), 'multi' 는 자유 조합.
+// 모순 발생 가능한 카테고리만 single. 톤/텍스처/낭독 등은 자연스럽게 함께 쓰임.
+const VD_CHIP_GROUPS = [
+  { key: 'gender',    label: '성별',     mode: 'single' },
+  { key: 'age',       label: '연령',     mode: 'single' },
+  { key: 'pitch',     label: '음높이',   mode: 'single' },
+  { key: 'pitchExtra',label: '음색',     mode: 'multi'  },
+  { key: 'tone',      label: '톤·정서',  mode: 'multi'  },
+  { key: 'texture',   label: '텍스처',   mode: 'multi'  },
+  { key: 'narration', label: '낭독 스타일', mode: 'multi' },
+  { key: 'style',     label: '기타 스타일', mode: 'multi' },
+  { key: 'accent',    label: '액센트',   mode: 'single' },
 ];
+
+const VD_CHIP_PRESETS = [
+  // 성별 (단일)
+  { token: 'female',          ko: '여성',     group: 'gender' },
+  { token: 'male',            ko: '남성',     group: 'gender' },
+  // 연령 (단일) — 시니어 콘텐츠 타겟 강화
+  { token: 'child',           ko: '어린이',   group: 'age' },
+  { token: 'young adult',     ko: '청년',     group: 'age' },
+  { token: 'middle-aged',     ko: '중년',     group: 'age' },
+  { token: 'elderly',         ko: '노년',     group: 'age' },
+  { token: 'senior',          ko: '시니어',   group: 'age' },
+  { token: 'grandfatherly',   ko: '할아버지같은', group: 'age' },
+  { token: 'grandmotherly',   ko: '할머니같은', group: 'age' },
+  { token: 'aged',            ko: '연륜있는', group: 'age' },
+  // 음높이 (단일)
+  { token: 'low pitch',       ko: '저음',     group: 'pitch' },
+  { token: 'medium pitch',    ko: '중음',     group: 'pitch' },
+  { token: 'high pitch',      ko: '고음',     group: 'pitch' },
+  // 음색 변형 (다중 — pitch 와 조합 가능)
+  { token: 'deep',            ko: '깊은',     group: 'pitchExtra' },
+  { token: 'baritone',        ko: '바리톤',   group: 'pitchExtra' },
+  // 톤·정서 (다중) — 시니어 친화
+  { token: 'warm tone',       ko: '따뜻한',   group: 'tone' },
+  { token: 'calm',            ko: '차분한',   group: 'tone' },
+  { token: 'gentle',          ko: '부드러운', group: 'tone' },
+  { token: 'soft-spoken',     ko: '조용히 말하는', group: 'tone' },
+  { token: 'soothing',        ko: '편안하게 하는', group: 'tone' },
+  { token: 'comforting',      ko: '위로하는', group: 'tone' },
+  { token: 'wise',            ko: '지혜로운', group: 'tone' },
+  { token: 'thoughtful',      ko: '사려깊은', group: 'tone' },
+  { token: 'nostalgic',       ko: '향수 어린', group: 'tone' },
+  { token: 'reflective',      ko: '사색적인', group: 'tone' },
+  { token: 'compassionate',   ko: '자애로운', group: 'tone' },
+  { token: 'avuncular',       ko: '인자한',   group: 'tone' },
+  // 텍스처 (다중) — 시니어 음색 특성
+  { token: 'raspy',           ko: '허스키',   group: 'texture' },
+  { token: 'gravelly',        ko: '거친',     group: 'texture' },
+  { token: 'hoarse',          ko: '쉰',       group: 'texture' },
+  { token: 'breathy',         ko: '호흡감',   group: 'texture' },
+  { token: 'mellow',          ko: '원숙한',   group: 'texture' },
+  // 낭독·스토리텔링 (다중)
+  { token: 'narrator',        ko: '낭독자',   group: 'narration' },
+  { token: 'storyteller',     ko: '이야기꾼', group: 'narration' },
+  { token: 'audiobook',       ko: '오디오북', group: 'narration' },
+  { token: 'documentary',     ko: '다큐멘터리', group: 'narration' },
+  { token: 'meditative',      ko: '명상적',   group: 'narration' },
+  { token: 'slow paced',      ko: '느린 호흡', group: 'narration' },
+  { token: 'deliberate',      ko: '또박또박', group: 'narration' },
+  { token: 'serious',         ko: '진중한',   group: 'narration' },
+  { token: 'formal',          ko: '격식 있는', group: 'narration' },
+  // 기타 스타일 (다중)
+  { token: 'energetic',       ko: '활기찬',   group: 'style' },
+  { token: 'soft',            ko: '여린',     group: 'style' },
+  { token: 'whisper',         ko: '속삭임',   group: 'style' },
+  // 액센트 (단일)
+  { token: 'american accent', ko: '미국식 영어', group: 'accent' },
+  { token: 'british accent',  ko: '영국식 영어', group: 'accent' },
+];
+
+// token (lowercase) → group key 빠른 조회
+const VD_CHIP_TOKEN_GROUP = (() => {
+  const m = new Map();
+  for (const it of VD_CHIP_PRESETS) m.set(it.token.toLowerCase(), it.group);
+  return m;
+})();
 
 let _vdLastResultBuffer = null;
 let _vdLastSynthText = '';
@@ -5816,25 +5838,83 @@ function _vdRenderChips() {
   const wrap = document.getElementById('vdForm_chips');
   if (!wrap) return;
   wrap.innerHTML = '';
-  for (const it of VD_CHIP_PRESETS) {
-    const chip = document.createElement('div');
-    chip.className = 'chip';
-    chip.style.cursor = 'pointer';
-    chip.style.padding = '4px 10px';
-    chip.style.fontSize = '12px';
-    chip.title = it.ko;
-    chip.textContent = it.token;
-    chip.onclick = () => vdAddInstructToken(it.token);
-    wrap.appendChild(chip);
+  wrap.style.display = 'flex';
+  wrap.style.flexDirection = 'column';
+  wrap.style.gap = '6px';
+
+  // 그룹별로 한 줄 — [라벨] [칩 칩 칩 ...]
+  for (const grp of VD_CHIP_GROUPS) {
+    const items = VD_CHIP_PRESETS.filter(it => it.group === grp.key);
+    if (items.length === 0) continue;
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.flexWrap = 'wrap';
+    row.style.alignItems = 'center';
+    row.style.gap = '4px';
+
+    const lb = document.createElement('span');
+    lb.textContent = grp.label + (grp.mode === 'single' ? ' (택1)' : '');
+    lb.style.fontSize = '11px';
+    lb.style.color = 'var(--text-muted)';
+    lb.style.flex = '0 0 88px';
+    lb.style.fontWeight = '600';
+    lb.title = grp.mode === 'single'
+      ? '같은 그룹에서 하나만 선택 — 다른 칩 클릭 시 자동 교체'
+      : '여러 개 자유 조합 가능';
+    row.appendChild(lb);
+
+    for (const it of items) {
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.dataset.token = it.token;
+      chip.dataset.group = it.group;
+      chip.style.cursor = 'pointer';
+      chip.style.padding = '4px 10px';
+      chip.style.fontSize = '12px';
+      chip.title = it.ko;
+      chip.textContent = it.token;
+      chip.onclick = () => vdAddInstructToken(it.token);
+      row.appendChild(chip);
+    }
+    wrap.appendChild(row);
   }
+  _vdRefreshChipActive();
+}
+
+// 현재 instruct textarea 내용 기준으로 활성 칩 시각 갱신.
+function _vdRefreshChipActive() {
+  const ta = document.getElementById('presetForm_instruct');
+  const wrap = document.getElementById('vdForm_chips');
+  if (!ta || !wrap) return;
+  const tokens = ta.value.split(/,\s*/).map(s => s.trim().toLowerCase()).filter(Boolean);
+  wrap.querySelectorAll('.chip[data-token]').forEach(c => {
+    const t = (c.dataset.token || '').toLowerCase();
+    if (tokens.includes(t)) c.classList.add('active');
+    else c.classList.remove('active');
+  });
 }
 
 function vdAddInstructToken(token) {
   const ta = document.getElementById('presetForm_instruct');
   if (!ta) return;
-  const cur = ta.value.trim();
-  if (cur && cur.split(/,\s*/).map(s => s.toLowerCase()).includes(token.toLowerCase())) return; // 중복 방지
-  ta.value = cur ? cur.replace(/,\s*$/, '') + ', ' + token : token;
+  const lower = token.toLowerCase();
+  const group = VD_CHIP_TOKEN_GROUP.get(lower);
+  const groupCfg = VD_CHIP_GROUPS.find(g => g.key === group);
+
+  let tokens = ta.value.split(/,\s*/).map(s => s.trim()).filter(Boolean);
+  const idx = tokens.findIndex(t => t.toLowerCase() === lower);
+  if (idx >= 0) {
+    // 이미 있음 → 토글 OFF
+    tokens.splice(idx, 1);
+  } else {
+    // single 그룹이면 같은 그룹의 기존 토큰 제거 (라디오)
+    if (groupCfg && groupCfg.mode === 'single' && group) {
+      tokens = tokens.filter(t => VD_CHIP_TOKEN_GROUP.get(t.toLowerCase()) !== group);
+    }
+    tokens.push(token);
+  }
+  ta.value = tokens.join(', ');
+  _vdRefreshChipActive();
   ta.focus();
 }
 
