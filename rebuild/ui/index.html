@@ -1902,7 +1902,8 @@
         placeholder="예: female, low pitch, warm tone, british accent"
         style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.4;"></textarea>
       <div style="font-size:11px; color:var(--text-muted); margin-top:6px; line-height:1.4;">
-        💡 아래 칩을 클릭하면 자동으로 콤마가 들어가니 직접 타이핑하지 않아도 됩니다. <b>female 과 male, low/medium/high pitch 는 동시에 쓰지 마세요</b> (모순 → 합성 실패).
+        💡 아래 칩만 클릭하세요. OmniVoice 모델이 학습한 토큰만 노출 (톤·정서/낭독 같은 자유 표현은 미지원). 같은 그룹은 택1 자동 적용.<br>
+        🎯 <b>시니어 음색 조합 예</b>: <code>elderly, low pitch</code> 또는 <code>elderly, very low pitch, whisper</code>
       </div>
       <div id="vdForm_chips" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;"></div>
 
@@ -5752,76 +5753,47 @@ function closePresetModal() {
 }
 
 // ─── Voice Design 작업실 ────────────────────────────────
-// 칩 그룹 정책 — 'single' 그룹은 같은 그룹의 다른 토큰 자동 제거(라디오), 'multi' 는 자유 조합.
-// 모순 발생 가능한 카테고리만 single. 톤/텍스처/낭독 등은 자연스럽게 함께 쓰임.
+// OmniVoice 의 instruct 파라미터가 실제로 학습된 토큰만 (k2-fsa/OmniVoice docs/voice-design.md).
+// 톤·정서/텍스처/낭독 표현 (warm tone, gentle, narrator 등) 은 모델이 학습되지 않아 unsupported 에러.
+// 시니어 콘텐츠는 'elderly + low/very low pitch + whisper' 조합으로 표현.
+// 카테고리 내 single (택1), 카테고리 간 자유 조합.
 const VD_CHIP_GROUPS = [
-  { key: 'gender',    label: '성별',     mode: 'single' },
-  { key: 'age',       label: '연령',     mode: 'single' },
-  { key: 'pitch',     label: '음높이',   mode: 'single' },
-  { key: 'pitchExtra',label: '음색',     mode: 'multi'  },
-  { key: 'tone',      label: '톤·정서',  mode: 'multi'  },
-  { key: 'texture',   label: '텍스처',   mode: 'multi'  },
-  { key: 'narration', label: '낭독 스타일', mode: 'multi' },
-  { key: 'style',     label: '기타 스타일', mode: 'multi' },
-  { key: 'accent',    label: '액센트',   mode: 'single' },
+  { key: 'gender', label: '성별',    mode: 'single' },
+  { key: 'age',    label: '연령',    mode: 'single' },
+  { key: 'pitch',  label: '음높이',  mode: 'single' },
+  { key: 'style',  label: '스타일',  mode: 'single' },
+  { key: 'accent', label: '액센트',  mode: 'single' },
 ];
 
 const VD_CHIP_PRESETS = [
-  // 성별 (단일)
-  { token: 'female',          ko: '여성',     group: 'gender' },
-  { token: 'male',            ko: '남성',     group: 'gender' },
-  // 연령 (단일) — 시니어 콘텐츠 타겟 강화
-  { token: 'child',           ko: '어린이',   group: 'age' },
-  { token: 'young adult',     ko: '청년',     group: 'age' },
-  { token: 'middle-aged',     ko: '중년',     group: 'age' },
-  { token: 'elderly',         ko: '노년',     group: 'age' },
-  { token: 'senior',          ko: '시니어',   group: 'age' },
-  { token: 'grandfatherly',   ko: '할아버지같은', group: 'age' },
-  { token: 'grandmotherly',   ko: '할머니같은', group: 'age' },
-  { token: 'aged',            ko: '연륜있는', group: 'age' },
-  // 음높이 (단일)
-  { token: 'low pitch',       ko: '저음',     group: 'pitch' },
-  { token: 'medium pitch',    ko: '중음',     group: 'pitch' },
-  { token: 'high pitch',      ko: '고음',     group: 'pitch' },
-  // 음색 변형 (다중 — pitch 와 조합 가능)
-  { token: 'deep',            ko: '깊은',     group: 'pitchExtra' },
-  { token: 'baritone',        ko: '바리톤',   group: 'pitchExtra' },
-  // 톤·정서 (다중) — 시니어 친화
-  { token: 'warm tone',       ko: '따뜻한',   group: 'tone' },
-  { token: 'calm',            ko: '차분한',   group: 'tone' },
-  { token: 'gentle',          ko: '부드러운', group: 'tone' },
-  { token: 'soft-spoken',     ko: '조용히 말하는', group: 'tone' },
-  { token: 'soothing',        ko: '편안하게 하는', group: 'tone' },
-  { token: 'comforting',      ko: '위로하는', group: 'tone' },
-  { token: 'wise',            ko: '지혜로운', group: 'tone' },
-  { token: 'thoughtful',      ko: '사려깊은', group: 'tone' },
-  { token: 'nostalgic',       ko: '향수 어린', group: 'tone' },
-  { token: 'reflective',      ko: '사색적인', group: 'tone' },
-  { token: 'compassionate',   ko: '자애로운', group: 'tone' },
-  { token: 'avuncular',       ko: '인자한',   group: 'tone' },
-  // 텍스처 (다중) — 시니어 음색 특성
-  { token: 'raspy',           ko: '허스키',   group: 'texture' },
-  { token: 'gravelly',        ko: '거친',     group: 'texture' },
-  { token: 'hoarse',          ko: '쉰',       group: 'texture' },
-  { token: 'breathy',         ko: '호흡감',   group: 'texture' },
-  { token: 'mellow',          ko: '원숙한',   group: 'texture' },
-  // 낭독·스토리텔링 (다중)
-  { token: 'narrator',        ko: '낭독자',   group: 'narration' },
-  { token: 'storyteller',     ko: '이야기꾼', group: 'narration' },
-  { token: 'audiobook',       ko: '오디오북', group: 'narration' },
-  { token: 'documentary',     ko: '다큐멘터리', group: 'narration' },
-  { token: 'meditative',      ko: '명상적',   group: 'narration' },
-  { token: 'slow paced',      ko: '느린 호흡', group: 'narration' },
-  { token: 'deliberate',      ko: '또박또박', group: 'narration' },
-  { token: 'serious',         ko: '진중한',   group: 'narration' },
-  { token: 'formal',          ko: '격식 있는', group: 'narration' },
-  // 기타 스타일 (다중)
-  { token: 'energetic',       ko: '활기찬',   group: 'style' },
-  { token: 'soft',            ko: '여린',     group: 'style' },
-  { token: 'whisper',         ko: '속삭임',   group: 'style' },
-  // 액센트 (단일)
-  { token: 'american accent', ko: '미국식 영어', group: 'accent' },
-  { token: 'british accent',  ko: '영국식 영어', group: 'accent' },
+  // Gender
+  { token: 'female',            ko: '여성',         group: 'gender' },
+  { token: 'male',              ko: '남성',         group: 'gender' },
+  // Age
+  { token: 'child',             ko: '어린이',       group: 'age' },
+  { token: 'teenager',          ko: '청소년',       group: 'age' },
+  { token: 'young adult',       ko: '청년',         group: 'age' },
+  { token: 'middle-aged',       ko: '중년',         group: 'age' },
+  { token: 'elderly',           ko: '노년 (시니어)', group: 'age' },
+  // Pitch
+  { token: 'very low pitch',    ko: '아주 낮은 음',  group: 'pitch' },
+  { token: 'low pitch',         ko: '낮은 음',      group: 'pitch' },
+  { token: 'moderate pitch',    ko: '중간 음',      group: 'pitch' },
+  { token: 'high pitch',        ko: '높은 음',      group: 'pitch' },
+  { token: 'very high pitch',   ko: '아주 높은 음',  group: 'pitch' },
+  // Style — OmniVoice 가 학습한 유일한 스타일
+  { token: 'whisper',           ko: '속삭임',       group: 'style' },
+  // English Accent
+  { token: 'american accent',   ko: '미국식',       group: 'accent' },
+  { token: 'british accent',    ko: '영국식',       group: 'accent' },
+  { token: 'australian accent', ko: '호주식',       group: 'accent' },
+  { token: 'canadian accent',   ko: '캐나다식',     group: 'accent' },
+  { token: 'indian accent',     ko: '인도식',       group: 'accent' },
+  { token: 'chinese accent',    ko: '중국식',       group: 'accent' },
+  { token: 'korean accent',     ko: '한국식',       group: 'accent' },
+  { token: 'japanese accent',   ko: '일본식',       group: 'accent' },
+  { token: 'portuguese accent', ko: '포르투갈식',   group: 'accent' },
+  { token: 'russian accent',    ko: '러시아식',     group: 'accent' },
 ];
 
 // token (lowercase) → group key 빠른 조회
@@ -6101,25 +6073,31 @@ async function vdSynthesize() {
 // 'Unsupported instruct items' / 'did you mean ...' 패턴 감지.
 function _vdFriendlyError(msg) {
   const m = String(msg || '');
+  console.error('[Voice Design 백엔드 에러 풀]', m);
   if (!/Unsupported instruct items/i.test(m)) {
     return '합성 실패: ' + m;
   }
-  // 'did you mean ...' 추천 추출
-  const suggestions = [];
-  const re = /did you mean '([^']+)'/g;
-  let match;
-  while ((match = re.exec(m)) !== null) suggestions.push(match[1]);
-  const tip = suggestions.length
-    ? `\n\n추천 토큰: ${suggestions.join(', ')}`
-    : '';
+  // unsupported 토큰들 + 추천 추출
+  const unsupportedRe = /'([^']+)'\s*->\s*'[^']+'\s*\(unsupported(?:; did you mean '([^']+)')?\)/g;
+  const lines = [];
+  let mt;
+  while ((mt = unsupportedRe.exec(m)) !== null) {
+    const bad = mt[1];
+    const sugg = mt[2];
+    lines.push(`  • ${bad}${sugg ? `  →  ${sugg} ?` : ''}`);
+  }
+  // valid list 추출
+  const validMatch = m.match(/Valid English items?:\s*([^\n]+)/i);
+  const valid = validMatch ? validMatch[1].trim().slice(0, 400) : null;
+
   return (
-    '합성 실패 — 음색 설명(instruct) 형식 오류\n\n' +
-    '각 속성은 콤마(,)로 구분해야 합니다.\n' +
-    '예) female, low pitch, warm tone\n\n' +
-    '또한 다음은 동시에 쓰면 모순입니다:\n' +
-    '  • female 과 male / man / boy\n' +
-    '  • low pitch / medium pitch / high pitch (셋 중 하나만)\n\n' +
-    '👉 위 칩들을 클릭만 해도 안전하게 입력됩니다.' + tip
+    '합성 실패 — OmniVoice 가 인식 못 하는 표현 포함\n\n' +
+    (lines.length ? '지원하지 않는 토큰:\n' + lines.join('\n') + '\n\n' : '') +
+    'OmniVoice 가 학습한 토큰만 사용 가능합니다.\n' +
+    '👉 칩을 클릭만 하세요 — 위 칩 목록은 모두 valid 토큰입니다.\n' +
+    '   톤·정서/낭독/텍스처 같은 자유 표현은 미지원입니다.\n\n' +
+    '🎯 시니어 음색은 elderly + low pitch 또는 elderly + very low pitch + whisper 조합.' +
+    (valid ? '\n\n[백엔드 valid 항목]\n' + valid : '')
   );
 }
 
