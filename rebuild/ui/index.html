@@ -6089,9 +6089,10 @@ async function vdSynthesize() {
 
 // 백엔드의 instruct 파싱 에러를 한국어 가이드로 변환.
 // 'Unsupported instruct items' / 'did you mean ...' 패턴 감지.
+// 자유 입력 정책 — 막지 않고, 어떤 토큰이 거부됐는지만 알리고 가능한 추천 제시.
 function _vdFriendlyError(msg) {
   const m = String(msg || '');
-  console.error('[Voice Design 백엔드 에러 풀]', m);
+  console.error('[Voice Design 백엔드 풀 에러] (valid 전체 포함)', m);
   if (!/Unsupported instruct items/i.test(m)) {
     return '합성 실패: ' + m;
   }
@@ -6102,20 +6103,13 @@ function _vdFriendlyError(msg) {
   while ((mt = unsupportedRe.exec(m)) !== null) {
     const bad = mt[1];
     const sugg = mt[2];
-    lines.push(`  • ${bad}${sugg ? `  →  ${sugg} ?` : ''}`);
+    lines.push(`  • "${bad}"${sugg ? `  →  "${sugg}" 추천` : ''}`);
   }
-  // valid list 추출
-  const validMatch = m.match(/Valid English items?:\s*([^\n]+)/i);
-  const valid = validMatch ? validMatch[1].trim().slice(0, 400) : null;
-
   return (
-    '합성 실패 — OmniVoice 가 인식 못 하는 표현 포함\n\n' +
-    (lines.length ? '지원하지 않는 토큰:\n' + lines.join('\n') + '\n\n' : '') +
-    'OmniVoice 가 학습한 토큰만 사용 가능합니다.\n' +
-    '👉 칩을 클릭만 하세요 — 위 칩 목록은 모두 valid 토큰입니다.\n' +
-    '   톤·정서/낭독/텍스처 같은 자유 표현은 미지원입니다.\n\n' +
-    '🎯 시니어 음색은 elderly + low pitch 또는 elderly + very low pitch + whisper 조합.' +
-    (valid ? '\n\n[백엔드 valid 항목]\n' + valid : '')
+    '합성 실패 — 이 토큰들은 OmniVoice 가 학습하지 못함:\n\n' +
+    (lines.length ? lines.join('\n') + '\n\n' : '') +
+    '👉 다른 표현으로 바꿔서 다시 시도하거나, 추천 토큰을 사용해보세요.\n' +
+    '   (전체 valid 목록은 F12 콘솔의 "Voice Design 백엔드 풀 에러" 로그 확인)'
   );
 }
 
