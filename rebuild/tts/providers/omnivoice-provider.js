@@ -189,8 +189,8 @@ class OmniVoiceProvider {
     // 순서 = 기본값. clone 을 첫 번째로 둬서 새 프리셋 OmniVoice 선택 시 Voice Clone 이 기본.
     // Voice Design 은 "참조음성 만드는 도구" 로 의도된 보조 모드.
     return [
-      { id: 'clone',   name: 'Voice Clone (참조음성 사용)', gender: null },
-      { id: 'default', name: 'Voice Design (음색 설명으로 합성)', gender: null },
+      { id: 'clone',   name: 'Voice Clone',  gender: null },
+      { id: 'default', name: 'Voice Design', gender: null },
     ];
   }
 }
