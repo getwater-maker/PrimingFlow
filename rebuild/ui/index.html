@@ -1776,7 +1776,7 @@
 
 <!-- 프리셋 편집 모달 -->
 <div id="presetModal" style="display:none; position:fixed; inset:0; background:rgba(58,52,46,0.5); z-index:999; align-items:center; justify-content:center;" onclick="if(event.target===this)closePresetModal()">
-  <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:14px; width:720px; max-width:92vw; max-height:92vh; overflow-y:auto; padding:24px; box-shadow:var(--shadow-lg);">
+  <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:14px; width:880px; max-width:96vw; max-height:92vh; overflow-y:auto; padding:24px; box-shadow:var(--shadow-lg);">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
       <h2 style="font-size:18px; color:var(--accent); margin:0;" id="presetModalTitle">🎙 프리셋 편집</h2>
       <button class="btn-sm" onclick="closePresetModal()" style="font-size:15px;">✕</button>
@@ -1806,7 +1806,7 @@
 
     <!-- 2행: 성우 + 스타일 -->
     <div id="presetForm_row2Grid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px; align-items:end;">
-      <div>
+      <div id="presetForm_voiceWrapper">
         <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">성우 / Voice</label>
         <div style="display:flex; gap:6px; align-items:center;">
           <select id="presetForm_voice" style="flex:1; min-width:0; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 10px; border-radius:6px; font-size:14px;"></select>
@@ -1822,7 +1822,7 @@
 
     <!-- 3행: 속도 + 문장 무음 (한 줄) -->
     <div id="presetForm_row3Grid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px;">
-      <div style="display:flex; gap:8px; align-items:center;">
+      <div id="presetForm_speedWrapper" style="display:flex; gap:8px; align-items:center;">
         <label style="font-size:12px; color:var(--text-soft); flex:0 0 38px;">속도</label>
         <input type="range" id="presetForm_speed" min="0.7" max="1.5" step="0.05" value="1.0" style="flex:1; accent-color:var(--accent);">
         <span id="presetForm_speedValue" style="font-size:13px; color:var(--text-strong); width:40px; text-align:right;">1.0x</span>
@@ -1837,13 +1837,13 @@
 
     <!-- 4행: Clone 강도 + 언어 (OmniVoice 일 때만 표시) -->
     <div id="presetForm_omniParamsRow" style="display:none; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px;">
-      <div style="display:flex; gap:8px; align-items:center;">
+      <div id="presetForm_cfgWrapper" style="display:flex; gap:8px; align-items:center;">
         <label style="font-size:12px; color:var(--text-soft); flex:0 0 64px;">Clone 강도</label>
         <input type="range" id="presetForm_cfgValue" min="1" max="5" step="0.5" value="2.0" style="flex:1; accent-color:var(--accent);"
           oninput="document.getElementById('presetForm_cfgValueLabel').textContent = parseFloat(this.value).toFixed(1)">
         <span id="presetForm_cfgValueLabel" style="font-size:13px; color:var(--text-strong); width:30px; text-align:right;">2.0</span>
       </div>
-      <div style="display:flex; gap:8px; align-items:center;">
+      <div id="presetForm_langWrapper" style="display:flex; gap:8px; align-items:center;">
         <label style="font-size:12px; color:var(--text-soft); flex:0 0 36px;">언어</label>
         <select id="presetForm_voxcpmLang" style="flex:1; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 8px; border-radius:6px; font-size:13px;">
           <option value="ko">한국어</option>
@@ -1911,14 +1911,17 @@
       <textarea id="vdForm_text" rows="2"
         style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.4;">우리 마음을 정약용의 가르침으로 회복해요.</textarea>
 
-      <!-- 다양성 (class_temperature) — 0=결정적(같은 결과), 높을수록 매번 다른 음성 -->
-      <!-- t_shift 는 0.1 고정 (어드밴스드, 일반 사용자엔 노출 가치 낮음) -->
-      <!-- Clone 강도 / 언어 / 속도 는 위 프리셋 폼 행에서 그대로 사용, 스텝은 32 고정, 시드 제거 -->
-      <div style="display:flex; gap:8px; align-items:center; margin-top:12px;">
-        <label style="font-size:12px; color:var(--text-soft); flex:0 0 56px;" title="0=결정적(같은 결과), 높을수록 매번 다른 목소리. 마음에 드는 결과를 노릴 때 ↑ 후 여러 번 합성">다양성</label>
-        <input type="range" id="vdForm_temperature" min="0.0" max="2.0" step="0.1" value="0.0" style="flex:1; accent-color:var(--accent);"
-          oninput="document.getElementById('vdForm_temperatureLabel').textContent = parseFloat(this.value).toFixed(1)">
-        <span id="vdForm_temperatureLabel" style="font-size:13px; color:var(--text-strong); width:40px; text-align:right;">0.0</span>
+      <!-- Voice Design 모드일 때 속도/Clone/언어/성우/다양성 5개를 한 줄에 모음 -->
+      <!-- _vdMoveControlsToTopGrid 가 옛 wrapper 들을 이 grid 로 DOM 이동, Voice Clone 모드 진입 시 원위치 복원 -->
+      <!-- 다양성 wrapper 는 처음부터 이 안에 위치 (designSection 안에서만 의미가 있어서) -->
+      <!-- t_shift 는 0.1 고정, 스텝 32 고정, 시드 제거 (보관소 저장이 결과물) -->
+      <div id="vdForm_topGrid" style="display:grid; grid-template-columns:repeat(5, 1fr); gap:8px; margin-top:8px; margin-bottom:12px; align-items:end;">
+        <div id="vdForm_temperatureWrapper" style="display:flex; flex-direction:column; align-items:stretch; gap:4px;">
+          <label style="font-size:12px; color:var(--text-soft);" title="0=결정적(같은 결과), 높을수록 매번 다른 목소리. 마음에 드는 결과를 노릴 때 ↑ 후 여러 번 합성">다양성</label>
+          <input type="range" id="vdForm_temperature" min="0.0" max="2.0" step="0.1" value="0.0" style="width:100%; accent-color:var(--accent);"
+            oninput="document.getElementById('vdForm_temperatureLabel').textContent = parseFloat(this.value).toFixed(1)">
+          <span id="vdForm_temperatureLabel" style="font-size:12px; color:var(--text-strong); text-align:right;">0.0</span>
+        </div>
       </div>
 
       <!-- 합성 + 파일명 + 보관소 저장 — 한 줄 균등 배치 -->
@@ -2052,6 +2055,10 @@
                 oninput="document.getElementById('captionOutlinePreview').style.webkitTextStroke='1.5px '+this.value">
               <span id="captionOutlinePreview" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:bold; color:#FFFFFF; background:#fff; border:1px solid var(--border); border-radius:4px; pointer-events:none; line-height:1; -webkit-text-stroke:1.5px #000000;">A</span>
             </span>
+            <button type="button" id="captionBold" data-active="false" onclick="_toggleBIButton('captionBold')" title="굵게"
+              style="width:28px; height:28px; font-size:13px; font-weight:bold; padding:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); cursor:pointer; border-radius:4px; flex:none;">B</button>
+            <button type="button" id="captionItalic" data-active="false" onclick="_toggleBIButton('captionItalic')" title="이탤릭"
+              style="width:28px; height:28px; font-size:13px; font-style:italic; padding:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); cursor:pointer; border-radius:4px; flex:none;">I</button>
           </div>
         </div>
 
@@ -2095,6 +2102,10 @@
               <span id="aiNoticeOutlinePreview" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:bold; color:#FFFFFF; background:#fff; border:1px solid var(--border); border-radius:4px; pointer-events:none; line-height:1; -webkit-text-stroke:1.5px #000000;">A</span>
             </span>
             <label style="cursor:pointer; user-select:none; font-size:11px; color:var(--text-muted);"><input type="checkbox" id="aiNoticeOutlineNone" style="vertical-align:middle; margin:0 2px 0 0; cursor:pointer;">없음</label>
+            <button type="button" id="aiNoticeBold" data-active="false" onclick="_toggleBIButton('aiNoticeBold')" title="굵게"
+              style="width:28px; height:28px; font-size:13px; font-weight:bold; padding:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); cursor:pointer; border-radius:4px; flex:none;">B</button>
+            <button type="button" id="aiNoticeItalic" data-active="false" onclick="_toggleBIButton('aiNoticeItalic')" title="이탤릭"
+              style="width:28px; height:28px; font-size:13px; font-style:italic; padding:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); cursor:pointer; border-radius:4px; flex:none;">I</button>
           </div>
         </div>
 
@@ -4736,6 +4747,21 @@ function _onAiNoticeStartModeChange() {
 }
 
 // 본문 자막 옵션 수집 (vrew 빌드 시 buildVrew 에 전달 + 프리셋 저장)
+// 자막 B/I 토글 버튼 헬퍼 — 본문 자막 + AI 고지 공용.
+function _toggleBIButton(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  _setBIButton(id, el.dataset.active !== 'true');
+}
+function _setBIButton(id, active) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.dataset.active = active ? 'true' : 'false';
+  el.style.background = active ? 'var(--accent)' : 'var(--bg-input)';
+  el.style.color = active ? '#fff' : '';
+  el.style.borderColor = active ? 'var(--accent)' : 'var(--border)';
+}
+
 function collectCaptionStyleOpts() {
   const sizeRaw    = document.getElementById('captionSize')?.value || '100';
   // size: 'random' (빌드 시점에 100/125 중 결정) 또는 숫자 문자열
@@ -4747,6 +4773,8 @@ function collectCaptionStyleOpts() {
   const widthPct   = parseFloat(document.getElementById('captionWidth')?.value || '96');
   const fontColor    = document.getElementById('captionFontColor')?.value    || '#FFFFFF';
   const outlineColor = document.getElementById('captionOutlineColor')?.value || '#000000';
+  const bold   = document.getElementById('captionBold')?.dataset.active === 'true';
+  const italic = document.getElementById('captionItalic')?.dataset.active === 'true';
   return {
     size,
     fontColor,
@@ -4754,6 +4782,8 @@ function collectCaptionStyleOpts() {
     align,                       // 'start' | 'center' | 'random'
     yOffset,                     // -0.125 / -0.15 / 'random'
     width:   widthPct / 100,     // 96% → 0.96
+    bold,
+    italic,
   };
 }
 
@@ -4788,6 +4818,8 @@ function applyCaptionStyleToForm(opt) {
   if (o.width != null)        set('captionWidth', Math.round(o.width * 100));
   if (o.fontColor)            set('captionFontColor', o.fontColor);
   if (o.outlineColor)         set('captionOutlineColor', o.outlineColor);
+  _setBIButton('captionBold',   !!o.bold);
+  _setBIButton('captionItalic', !!o.italic);
   const fp = document.getElementById('captionFontPreview');
   const op = document.getElementById('captionOutlinePreview');
   if (fp && o.fontColor)    fp.style.color = o.fontColor;
@@ -4814,6 +4846,8 @@ function applyAiNoticeToForm(opt) {
   if (o.outlineColor) set('aiNoticeOutlineColor', o.outlineColor);
   if (Object.prototype.hasOwnProperty.call(o, 'bgNone'))      setChk('aiNoticeBgNone',      o.bgNone);
   if (Object.prototype.hasOwnProperty.call(o, 'outlineNone')) setChk('aiNoticeOutlineNone', o.outlineNone);
+  _setBIButton('aiNoticeBold',   !!o.bold);
+  _setBIButton('aiNoticeItalic', !!o.italic);
 
   // A 미리보기 박스에 색상 동기화 (DOM 에 있을 때만)
   const fp = document.getElementById('aiNoticeFontPreview');
@@ -4848,6 +4882,8 @@ function collectAiNoticeOpts() {
     outlineColor: document.getElementById('aiNoticeOutlineColor')?.value || '#000000',
     bgNone:       !!document.getElementById('aiNoticeBgNone')?.checked,
     outlineNone:  !!document.getElementById('aiNoticeOutlineNone')?.checked,
+    bold:         document.getElementById('aiNoticeBold')?.dataset.active   === 'true',
+    italic:       document.getElementById('aiNoticeItalic')?.dataset.active === 'true',
   };
 }
 
@@ -5266,7 +5302,12 @@ function _setPresetEngine(engine) {
     setGridCols('presetForm_row2Grid', isDesign ? '1fr' : '1fr 1fr'); // 성우 전체 너비
     setGridCols('presetForm_row3Grid', isDesign ? '1fr' : '1fr 1fr'); // 속도 전체 너비
 
-    if (isDesign && typeof _vdInitDesignSection === 'function') _vdInitDesignSection();
+    if (isDesign && typeof _vdInitDesignSection === 'function') {
+      _vdInitDesignSection();
+    } else if (typeof _vdRestoreControlsFromTopGrid === 'function') {
+      // Voice Design 외 모드 — 옮겼던 wrapper 들을 원위치로
+      _vdRestoreControlsFromTopGrid();
+    }
   };
   _updateOmniVoiceMode();
   select.onchange = _updateOmniVoiceMode;
@@ -5779,10 +5820,92 @@ function _vdReadForm() {
   };
 }
 
+// DOM 이동 방식 — Voice Design 모드 진입 시 5개 wrapper 를 vdForm_topGrid 로 모음.
+// 다른 모드 진입 시 옛 위치로 복원. _vdOrigParents 가 원위치 정보 보존.
+const _vdOrigParents = new Map();
+const _VD_MOVED_IDS = [
+  'presetForm_speedWrapper',
+  'presetForm_cfgWrapper',
+  'presetForm_langWrapper',
+  'presetForm_voiceWrapper',
+  // vdForm_temperatureWrapper 는 이미 topGrid 안 — 이동 불필요
+];
+
+function _vdMoveControlsToTopGrid() {
+  const grid = document.getElementById('vdForm_topGrid');
+  if (!grid) return;
+  // 다양성을 마지막으로 옮기기 위해 먼저 떼어내고 마지막에 다시 append
+  const tempWrapper = document.getElementById('vdForm_temperatureWrapper');
+  for (const id of _VD_MOVED_IDS) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    if (!_vdOrigParents.has(id)) {
+      _vdOrigParents.set(id, {
+        parent: el.parentNode,
+        next: el.nextSibling,
+        flexDirection: el.style.flexDirection || '',
+        alignItems: el.style.alignItems || '',
+        gap: el.style.gap || '',
+      });
+    }
+    grid.appendChild(el);
+    el.style.flexDirection = 'column';
+    el.style.alignItems = 'stretch';
+    el.style.gap = '4px';
+    // 자식 라벨/슬라이더/select 의 flex 강제 fixed-width 해제 (5컬럼 좁은 폭 대응)
+    el.querySelectorAll('label').forEach(lb => {
+      if (!lb.dataset.vdOrigFlex) lb.dataset.vdOrigFlex = lb.style.flex || '';
+      lb.style.flex = 'none';
+    });
+    el.querySelectorAll('input[type=range], select').forEach(inp => {
+      if (!inp.dataset.vdOrigFlex) inp.dataset.vdOrigFlex = inp.style.flex || '';
+      inp.style.flex = 'none';
+      if (!inp.dataset.vdOrigWidth) inp.dataset.vdOrigWidth = inp.style.width || '';
+      inp.style.width = '100%';
+    });
+  }
+  // 다양성을 마지막 셀로 위치 보장
+  if (tempWrapper) grid.appendChild(tempWrapper);
+}
+
+function _vdRestoreControlsFromTopGrid() {
+  for (const [id, info] of _vdOrigParents.entries()) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    if (info.next && info.next.parentNode === info.parent) {
+      info.parent.insertBefore(el, info.next);
+    } else {
+      info.parent.appendChild(el);
+    }
+    el.style.flexDirection = info.flexDirection;
+    el.style.alignItems = info.alignItems;
+    el.style.gap = info.gap;
+    // 자식 inline flex/width 복원
+    el.querySelectorAll('label').forEach(lb => {
+      if (lb.dataset.vdOrigFlex !== undefined) {
+        lb.style.flex = lb.dataset.vdOrigFlex;
+        delete lb.dataset.vdOrigFlex;
+      }
+    });
+    el.querySelectorAll('input[type=range], select').forEach(inp => {
+      if (inp.dataset.vdOrigFlex !== undefined) {
+        inp.style.flex = inp.dataset.vdOrigFlex;
+        delete inp.dataset.vdOrigFlex;
+      }
+      if (inp.dataset.vdOrigWidth !== undefined) {
+        inp.style.width = inp.dataset.vdOrigWidth;
+        delete inp.dataset.vdOrigWidth;
+      }
+    });
+  }
+  _vdOrigParents.clear();
+}
+
 // designSection 이 처음 보이거나 모드가 Voice Design 으로 막 바뀐 시점에 호출.
 // 칩 렌더링, 기본 저장명, 직전 합성 결과 초기화.
 function _vdInitDesignSection() {
   _vdRenderChips();
+  _vdMoveControlsToTopGrid();
 
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');

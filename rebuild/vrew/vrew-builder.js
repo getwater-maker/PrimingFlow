@@ -279,6 +279,8 @@ function addAiNoticeTrack(pj, opt, clipDurations, log) {
     'outline-color': outlineColor,
     'outline-on': outlineNone ? 'false' : 'true',
     'outline-width': '6',
+    ...(opt.bold   ? { bold: true }   : {}),
+    ...(opt.italic ? { italic: true } : {}),
   };
 
   pj.props.tracks[tid] = {
@@ -506,6 +508,8 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
     ...(resolvedSize          ? { size: String(resolvedSize) }                 : {}),
     ...(_userCap.fontColor    ? { color: _userCap.fontColor }                  : {}),
     ...(_userCap.outlineColor ? { 'outline-color': _userCap.outlineColor }     : {}),
+    ...(_userCap.bold         ? { bold: true }                                 : {}),
+    ...(_userCap.italic       ? { italic: true }                               : {}),
   };
   const captionStyle = {
     ...CAPTION_STYLE,
