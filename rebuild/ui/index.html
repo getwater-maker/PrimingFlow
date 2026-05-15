@@ -6084,6 +6084,16 @@ async function vdSynthesize() {
   } finally {
     btn.disabled = false;
     btn.textContent = '🔊 합성하기';
+    // 합성 후 사용자가 instruct 수정할 수 있도록 textarea 강제 enable + focus 복원
+    // (alert 닫힌 후 입력 안 되는 비정상 상황 방어. setTimeout 0 으로 alert blocking 종료 후 실행)
+    setTimeout(() => {
+      const ta = document.getElementById('presetForm_instruct');
+      if (!ta) return;
+      ta.disabled = false;
+      ta.readOnly = false;
+      ta.style.pointerEvents = '';
+      try { ta.focus(); } catch (_) {}
+    }, 0);
   }
 }
 
