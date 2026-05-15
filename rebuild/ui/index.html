@@ -2013,6 +2013,9 @@
       <!-- 영상 후처리 (vrew 빌드 시 적용 — 이미지/동영상 모드 무관 항상 적용) -->
       <div style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:8px;">
 
+       <!-- 본문 자막 + AI 고지 좌/우 그리드 — 모달 폭 880px 에서 한 줄로 표시 -->
+       <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start;">
+
         <!-- 본문 자막 — 크기/정렬/위치/너비/색상 (영상.vrew 검증 기준값) -->
         <div style="margin-bottom:10px;">
           <div style="font-weight:600; margin-bottom:6px;">📝 본문 자막</div>
@@ -2109,15 +2112,19 @@
           </div>
         </div>
 
+       </div>
+       <!-- /본문 자막 + AI 고지 좌/우 그리드 -->
+
         <!-- 채널 로고 오버레이는 위 "채널 로고 (워터마크 + 오버레이)" 영역으로 통합됨 -->
       </div>
 
     </div>
 
     <!-- 액션 — 저장 75% : 삭제 25% 한 줄 -->
+    <!-- width:auto — .btn-primary 의 CSS width:100% 가 flex 자식 폭을 100% 로 강제해 wrap 되는 것 방지 -->
     <div id="presetForm_actionRow" style="display:flex; gap:6px; margin-top:14px;">
-      <button class="btn btn-primary" onclick="savePreset()" style="flex:3;">💾 저장</button>
-      <button class="btn-sm" onclick="deletePreset()" id="presetForm_deleteBtn" style="flex:1; background:var(--bg-soft); color:var(--danger); border:1px solid var(--border); display:none;">🗑 삭제</button>
+      <button class="btn btn-primary" onclick="savePreset()" style="flex:3; width:auto; min-width:0;">💾 저장</button>
+      <button class="btn-sm" onclick="deletePreset()" id="presetForm_deleteBtn" style="flex:1; min-width:0; background:var(--bg-soft); color:var(--danger); border:1px solid var(--border); display:none;">🗑 삭제</button>
     </div>
   </div>
 </div>
