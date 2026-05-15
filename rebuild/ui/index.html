@@ -2406,6 +2406,45 @@ document.querySelectorAll('.chip-group').forEach(group => {
   });
 });
 
+// ─── 다중 프로젝트 모델 (PR1) ────────────────────────
+// 기존 단일 window._currentProject 흐름을 _projects[] + _activeProjectId + getter/setter 로 alias.
+// 수백 곳의 `window._currentProject.xxx` 참조는 getter 가 활성 프로젝트를 반환하므로 그대로 작동.
+// PR1 시점은 한 번에 한 프로젝트만 보유 — PR2 의 newProjectTab/switchProject 가 _projects 와
+// _activeProjectId 를 직접 조작하면서 멀티 탭이 켜진다.
+function _genProjectId() {
+  return 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+}
+window._projects = [];
+window._activeProjectId = null;
+Object.defineProperty(window, '_currentProject', {
+  configurable: true,
+  enumerable: true,
+  get() {
+    if (!window._activeProjectId) return null;
+    return window._projects.find(p => p.id === window._activeProjectId) || null;
+  },
+  set(v) {
+    if (v == null) {
+      // clearScript 호환 — 단일 탭 시점에서는 모든 프로젝트 비움
+      window._projects = [];
+      window._activeProjectId = null;
+      return;
+    }
+    if (!v.id) v.id = _genProjectId();
+    const idx = window._projects.findIndex(p => p.id === v.id);
+    if (idx >= 0) {
+      window._projects[idx] = v;
+    } else {
+      // 단일 탭 흐름 — 기존 활성 프로젝트는 교체 (PR2 의 newProjectTab 은 _projects.push 직접 호출로 우회)
+      if (window._activeProjectId) {
+        window._projects = window._projects.filter(p => p.id !== window._activeProjectId);
+      }
+      window._projects.push(v);
+    }
+    window._activeProjectId = v.id;
+  },
+});
+
 // 대본 텍스트 전역 — 항상 최신 대본을 보유 (textarea 없이)
 window._scriptText = '';
 
