@@ -47,35 +47,70 @@ function buildTitleMatcher(groupTitle) {
  *   unmatchedFiles: Array<{name:string, path:string}>
  * }}
  */
+/**
+ * 파일명에서 "그룹 N" / "group N" / "scene N" / 맨 앞 숫자 같은 패턴으로 그룹 번호 추출.
+ * 매칭 후보:
+ *   "그룹 01_..."   → 1
+ *   "group 12 ..."  → 12
+ *   "12_..."        → 12
+ *   "scene_03..."   → 3
+ * 매칭 실패 시 null.
+ */
+function extractGroupNumFromFilename(name) {
+  if (!name) return null;
+  // 확장자 제거
+  const base = String(name).replace(/\.[a-z0-9]{1,5}$/i, '');
+  // 1) 그룹/group/scene/장면 + 숫자
+  let m = base.match(/(?:그룹|group|scene|장면|chapter|chap|ep|episode|씬)\s*[_\-]?\s*0*(\d{1,4})/i);
+  if (m) return parseInt(m[1], 10);
+  // 2) 맨 앞 숫자 (예: "01_제목", "12 - 제목")
+  m = base.match(/^\s*0*(\d{1,4})\b/);
+  if (m) return parseInt(m[1], 10);
+  return null;
+}
+
 function matchImagesToGroups(groups, files) {
   const usedFiles = new Set();
   const matches = [];
   const skippedGroups = [];
 
+  // 파일명 → 추출된 그룹 번호 사전 계산 (각 파일 1회)
+  const fileNumIndex = files.map(f => ({ file: f, num: extractGroupNumFromFilename(f.name) }));
+
   for (const g of groups) {
-    if (!g.title) {
-      skippedGroups.push({ groupId: g.id, groupNum: g.num, groupTitle: null });
-      continue;
-    }
-    const re = buildTitleMatcher(g.title);
-    if (!re) {
-      skippedGroups.push({ groupId: g.id, groupNum: g.num, groupTitle: g.title });
-      continue;
+    let candidates = [];
+    let matchedBy = null;
+
+    // 1) group.title 매칭 (대괄호 섹션 등 title 있는 그룹)
+    if (g.title) {
+      const re = buildTitleMatcher(g.title);
+      if (re) {
+        candidates = files.filter(f => !usedFiles.has(f.name) && re.test(f.name));
+        if (candidates.length > 0) matchedBy = 'title';
+      }
     }
 
-    const candidates = files.filter(f => re.test(f.name));
+    // 2) group.num 매칭 fallback — 일반 본론/도입부 그룹 (title 없음) 또는 title 매칭 0건
+    if (candidates.length === 0 && Number.isFinite(g.num)) {
+      candidates = fileNumIndex
+        .filter(fi => fi.num === g.num && !usedFiles.has(fi.file.name))
+        .map(fi => fi.file);
+      if (candidates.length > 0) matchedBy = 'num';
+    }
+
     if (candidates.length === 0) {
-      skippedGroups.push({ groupId: g.id, groupNum: g.num, groupTitle: g.title });
+      skippedGroups.push({ groupId: g.id, groupNum: g.num, groupTitle: g.title || null });
     } else {
       const chosen = candidates[0];
       usedFiles.add(chosen.name);
       matches.push({
         groupId: g.id,
         groupNum: g.num,
-        groupTitle: g.title,
+        groupTitle: g.title || null,
         file: chosen,
         multipleHits: candidates.length > 1,
         candidates,
+        matchedBy, // 'title' | 'num'
       });
     }
   }
@@ -84,4 +119,4 @@ function matchImagesToGroups(groups, files) {
   return { matches, skippedGroups, unmatchedFiles };
 }
 
-module.exports = { buildTitleMatcher, matchImagesToGroups };
+module.exports = { buildTitleMatcher, extractGroupNumFromFilename, matchImagesToGroups };
