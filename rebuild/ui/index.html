@@ -8942,7 +8942,10 @@ async function _runGroupImageGeneration(groupIds, label) {
     model: document.getElementById('modelSelect').value,
     count: selectedCount,
     withSubtitle: false,  // .vrew 자막 트랙만 사용 (이미지에 합성 안 함)
-    outputDir: finalDir,
+    // finalDir 자체가 이미 '.../images' 인데 flow-engine 이 'imgDir = outputDir/images' 한 번 더
+    // 붙여서 '.../images/images' 이중 폴더가 됨 → cleanup / _shouldSkip / image-done 모두
+    // 다른 폴더 보게 됨. 부모(projectDir) 를 넘겨서 flow-engine 이 만든 imgDir 가 finalDir 와 일치.
+    outputDir: (require('path')).dirname(finalDir),
     profileId: (channel && channel.profileId) || getSelectedProfile(),
     characterImages: characterImagePaths,
     characterMap: characterMap,
