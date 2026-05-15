@@ -1910,9 +1910,9 @@
         placeholder="예: female, low pitch, warm tone, british accent"
         style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.4;"></textarea>
       <div style="font-size:11px; color:var(--text-muted); margin-top:6px; line-height:1.4;">
-        💡 <b>직접 입력이 메인 — 칩은 추천·편의용</b>. 자유롭게 영문 표현을 적어보세요. 칩은 OmniVoice 가 확실히 학습한 토큰들이라 안전하게 시작할 때 사용.<br>
-        🎯 <b>시니어 음색 조합 예</b>: <code>elderly, low pitch</code> 또는 <code>elderly, very low pitch, whisper</code><br>
-        ⚠ 모델이 학습 안 한 표현은 백엔드가 거부할 수 있어요 — 그때 alert 가 valid 후보를 알려줍니다.
+        💡 <b>짧은 토큰을 콤마로 구분</b>해서 입력하세요 — OmniVoice 는 자연어 문장이 아닌 <b>태그 분류</b> 모델입니다 (예: <code>male, elderly, low pitch</code>).<br>
+        🎯 <b>시니어 음색 예</b>: <code>elderly, low pitch</code> / <code>male, elderly, very low pitch, whisper</code><br>
+        ⚠ "warm, wise, grandfather telling story" 같은 <b>풍부한 자연어 묘사는 미지원</b>. 그런 정서가 필요하면 <b>Voice Clone</b> (참조음성) 사용 권장 — 시니어 화자 음성 10~30초만 있으면 톤·정서 그대로 복제됩니다.
       </div>
       <div id="vdForm_chips" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;"></div>
 
@@ -6115,11 +6115,18 @@ function _vdFriendlyError(msg) {
     const sugg = mt[2];
     lines.push(`  • "${bad}"${sugg ? `  →  "${sugg}" 추천` : ''}`);
   }
+  // 자연어 문장 감지 — unsupported 가 많거나(>=4) 일반 영어 단어/구두점 패턴이면 자연어로 추정
+  const looksLikeProse = lines.length >= 4 || /\b(voice|tone|story|like|that|with|the|and|is|of)\b/i.test(m);
+  const proseHint = looksLikeProse
+    ? '\n\n📝 자연어 문장 같습니다 — OmniVoice 는 "male, elderly, low pitch" 같은 짧은 토큰만 받습니다.\n' +
+      '   풍부한 정서(warm/wise/grandfather 등)는 Voice Clone (참조음성)으로 표현하세요.'
+    : '';
   return (
     '합성 실패 — 이 토큰들은 OmniVoice 가 학습하지 못함:\n\n' +
-    (lines.length ? lines.join('\n') + '\n\n' : '') +
-    '👉 다른 표현으로 바꿔서 다시 시도하거나, 추천 토큰을 사용해보세요.\n' +
-    '   (전체 valid 목록은 F12 콘솔의 "Voice Design 백엔드 풀 에러" 로그 확인)'
+    (lines.length ? lines.slice(0, 8).join('\n') + (lines.length > 8 ? `\n  ... 외 ${lines.length - 8}개 더` : '') + '\n\n' : '') +
+    '👉 짧은 토큰만 콤마로 구분 (예: male, elderly, low pitch)' +
+    proseHint +
+    '\n\n(전체 valid 목록은 F12 콘솔 "Voice Design 백엔드 풀 에러" 로그)'
   );
 }
 
