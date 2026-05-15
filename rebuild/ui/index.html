@@ -1826,9 +1826,10 @@
       <div id="presetForm_speedWrapper" style="display:flex; flex-direction:column; gap:4px; min-width:0;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; font-size:12px;">
           <span style="color:var(--text-soft);">속도</span>
-          <span id="presetForm_speedValue" style="color:var(--text-strong); font-size:13px;">1.0x</span>
+          <span id="presetForm_speedValue" style="color:var(--text-strong); font-size:13px;">1.00x</span>
         </div>
-        <input type="range" id="presetForm_speed" min="0.7" max="1.5" step="0.05" value="1.0" style="width:100%; accent-color:var(--accent);">
+        <input type="range" id="presetForm_speed" min="0.7" max="1.5" step="0.05" value="1.0" style="width:100%; accent-color:var(--accent);"
+          oninput="document.getElementById('presetForm_speedValue').textContent = parseFloat(this.value).toFixed(2) + 'x'">
       </div>
       <div id="presetForm_silenceRow" style="display:flex; flex-direction:column; gap:4px; min-width:0;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; font-size:12px;">
@@ -6003,6 +6004,13 @@ function _vdInitDesignSection() {
   _vdRenderChips();
   _vdMoveControlsToTopGrid();
 
+  // textarea 직접 타이핑 시에도 칩 active 시각 갱신 — 한 번만 바인딩.
+  const ta = document.getElementById('presetForm_instruct');
+  if (ta && !ta.dataset.vdInputBound) {
+    ta.dataset.vdInputBound = '1';
+    ta.addEventListener('input', () => _vdRefreshChipActive());
+  }
+
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   const stamp = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
@@ -6024,6 +6032,19 @@ async function vdSynthesize() {
   const f = _vdReadForm();
   if (!f.text) { alert('시범 텍스트를 입력하세요'); return; }
   if (!f.instruct) { alert('음색 설명(instruct)을 입력하세요 — 칩을 눌러도 됩니다'); return; }
+
+  // 사전 검증 — instruct 의 토큰 중 OmniVoice 가 학습 안 한 것이 있으면 즉시 안내
+  const tokens = f.instruct.split(/,\s*/).map(s => s.trim()).filter(Boolean);
+  const unsupported = tokens.filter(t => !VD_CHIP_TOKEN_GROUP.has(t.toLowerCase()));
+  if (unsupported.length) {
+    const ok = confirm(
+      'OmniVoice 가 학습하지 않은 토큰이 있습니다:\n' +
+      unsupported.map(t => '  • ' + t).join('\n') +
+      '\n\n그대로 합성하면 백엔드가 거부할 가능성이 큽니다.\n' +
+      '취소 후 칩만 사용하시려면 [취소], 그래도 시도하시려면 [확인].'
+    );
+    if (!ok) return;
+  }
 
   const btn = document.getElementById('vdForm_synthBtn');
   btn.disabled = true;
