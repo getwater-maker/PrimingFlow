@@ -439,15 +439,32 @@ class GrokEngine {
           }
         }
 
-        // 다운로드 버튼이 있으면 enabled 인 경우에만 클릭 → mp4 수신
-        // (DOM 에 등장해도 disabled 인 사이클이 있음 — 그럴 때 click 하면 30초씩 까먹어
-        //  5분 timeout 까지 도달. enabled 가 될 때까지 폴링으로 넘김.)
+        // 다운로드 버튼이 있으면 enabled + 비디오 ready 두 조건 모두 만족할 때만 클릭.
+        // (이전 버그: enabled 만으로 클릭 → 생성 중인 placeholder 다운로드 → 정적 10초 mp4)
+        // videoReady 정의: <video> 의 duration > 1초 + readyState >= 2 (HAVE_CURRENT_DATA).
+        // 둘 다 진짜 생성 완료된 비디오 element 가 mount 됐을 때만 true.
         const dlBtn = await this.page.$(GROK_SELECTORS.downloadButton);
         let dlEnabled = false;
         if (dlBtn) {
           try { dlEnabled = await dlBtn.isEnabled(); } catch { dlEnabled = false; }
         }
-        if (dlBtn && dlEnabled) {
+        let videoReady = false;
+        if (dlEnabled) {
+          try {
+            videoReady = await this.page.evaluate(() => {
+              const v = document.querySelector('main article video');
+              if (!v) return false;
+              const dur = isFinite(v.duration) ? v.duration : 0;
+              return v.readyState >= 2 && dur > 1;
+            });
+          } catch { videoReady = false; }
+          if (!videoReady) {
+            // 다운로드 버튼은 enabled 인데 비디오는 아직 안 됨 — 다음 폴링 사이클로
+            const elapsed = Math.round((Date.now() - startedAt) / 1000);
+            this.log(`[Grok] 버튼 enabled 이나 비디오 미준비 (대기 ${elapsed}s)`);
+          }
+        }
+        if (dlBtn && dlEnabled && videoReady) {
           this.log('[Grok] 다운로드 버튼 클릭 (대기 90초)');
           try {
             const [download] = await Promise.all([
