@@ -2054,7 +2054,7 @@
       </div>
       <!-- 한국어 사용자 안내 (OmniVoice 는 영/중 학습 — 한국어 본문 품질 제한) -->
       <div style="font-size:11px; color:var(--text-strong); background:var(--bg-soft); border:1px solid var(--border-soft); border-radius:6px; padding:6px 10px; margin-bottom:10px; line-height:1.5;">
-        💡 한국어 음성은 <code>korean accent</code> 칩 + <b>영문 시범 텍스트</b>가 가장 자연스럽습니다. 한글 본문은 발음이 불안정할 수 있어요.
+        💡 한국어 음성은 instruct 에 <code>korean accent</code> 토큰 + <b>영문 시범 텍스트</b>가 가장 자연스럽습니다. 한글 본문은 발음이 불안정할 수 있어요.
       </div>
 
       <!-- 음색 설명 (instruct) -->
@@ -2139,30 +2139,20 @@
         </div>
       </details>
 
-      <!-- 액션 영역 — 2행 균형 레이아웃 -->
-      <!-- 1행: [🔊 합성하기]  [🎲 가챠 N=4]   — 합성 계열 (생성 액션) -->
-      <!-- 2행: [파일명........] [💾 보관소 저장]  — 저장 계열 (보관 액션) -->
-      <div style="display:flex; flex-direction:column; gap:6px; margin-top:12px;">
-        <div style="display:flex; gap:6px; align-items:stretch;">
-          <button class="btn btn-primary" onclick="vdSynthesize()" id="vdForm_synthBtn"
-            style="flex:2; min-width:0; padding:9px 14px; font-size:13px;">🔊 합성하기</button>
-          <button class="btn btn-primary" onclick="vdRunGacha()" id="vdForm_gachaBtn"
-            title="같은 instruct 로 N개 후보 합성 — 갤러리에서 비교 후 1개 선택 저장"
-            style="flex:1; min-width:0; padding:9px 12px; font-size:13px; background:var(--accent-soft); color:var(--accent-hover); display:flex; align-items:center; justify-content:center; gap:6px;">
-            🎲 가챠
-            <span style="display:inline-flex; align-items:center; gap:3px; font-size:11px; color:var(--text-muted);">N
-              <input type="number" id="vdForm_gachaN" min="1" max="8" step="1" value="4"
-                onclick="event.stopPropagation()"
-                style="width:38px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:2px 4px; border-radius:4px; font-size:12px; text-align:center;">
-            </span>
-          </button>
-        </div>
-        <div style="display:flex; gap:6px; align-items:stretch;">
-          <input type="text" id="vdForm_saveName" placeholder="파일명 (확장자 제외)"
-            style="flex:2; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:9px 12px; border-radius:6px; font-size:13px;">
-          <button class="btn btn-primary" onclick="vdSaveToVault()" id="vdForm_saveBtn"
-            style="flex:1; min-width:0; padding:9px 14px; font-size:13px;">💾 보관소 저장</button>
-        </div>
+      <!-- 액션 영역 — 1줄 5컬럼: [합성] [가챠] [N] [파일명] [저장] -->
+      <div style="display:flex; gap:6px; align-items:stretch; margin-top:12px;">
+        <button class="btn btn-primary" onclick="vdSynthesize()" id="vdForm_synthBtn"
+          style="flex:1.4; min-width:0; padding:8px 10px; font-size:13px; white-space:nowrap;">🔊 합성</button>
+        <button class="btn btn-primary" onclick="vdRunGacha()" id="vdForm_gachaBtn"
+          title="같은 instruct 로 N개 후보 합성 — 갤러리에서 비교 후 1개 선택 저장"
+          style="flex:1; min-width:0; padding:8px 10px; font-size:13px; background:var(--accent-soft); color:var(--accent-hover); white-space:nowrap;">🎲 가챠</button>
+        <input type="number" id="vdForm_gachaN" min="1" max="8" step="1" value="4"
+          title="가챠 후보 개수 (1~8)"
+          style="width:50px; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:0 6px; border-radius:6px; font-size:13px; text-align:center;">
+        <input type="text" id="vdForm_saveName" placeholder="파일명"
+          style="flex:2; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:8px 10px; border-radius:6px; font-size:13px;">
+        <button class="btn btn-primary" onclick="vdSaveToVault()" id="vdForm_saveBtn"
+          style="flex:1.2; min-width:0; padding:8px 10px; font-size:13px; white-space:nowrap;">💾 저장</button>
       </div>
       <audio id="vdForm_audio" controls style="width:100%; display:none; height:32px; margin-top:8px;"></audio>
 
@@ -7046,7 +7036,8 @@ const VD_CHIP_GROUPS = [
   { key: 'age',    label: '연령',    mode: 'single' },
   { key: 'pitch',  label: '음높이',  mode: 'single' },
   { key: 'style',  label: '스타일',  mode: 'single' },
-  { key: 'accent', label: '액센트',  mode: 'single' },
+  // accent 그룹은 칩 UI 에서 숨김 (요청). VD_CHIP_PRESETS 안 accent 토큰은 그대로 두어
+  // textarea 자유 입력(예: 'korean accent')은 여전히 작동.
 ];
 
 const VD_CHIP_PRESETS = [
@@ -7117,7 +7108,7 @@ function _vdRenderChips() {
   wrap.innerHTML = '';
   wrap.style.display = 'flex';
   wrap.style.flexDirection = 'column';
-  wrap.style.gap = '6px';
+  wrap.style.gap = '2px';  // 행 사이 간격 축소
 
   // 그룹별로 한 줄 — [라벨] [칩 칩 칩 ...]
   for (const grp of VD_CHIP_GROUPS) {
@@ -7127,13 +7118,13 @@ function _vdRenderChips() {
     row.style.display = 'flex';
     row.style.flexWrap = 'wrap';
     row.style.alignItems = 'center';
-    row.style.gap = '4px';
+    row.style.gap = '3px';
 
     const lb = document.createElement('span');
     lb.textContent = grp.label + (grp.mode === 'single' ? ' (택1)' : '');
     lb.style.fontSize = '11px';
     lb.style.color = 'var(--text-muted)';
-    lb.style.flex = '0 0 88px';
+    lb.style.flex = '0 0 78px';
     lb.style.fontWeight = '600';
     lb.title = grp.mode === 'single'
       ? '같은 그룹에서 하나만 선택 — 다른 칩 클릭 시 자동 교체'
@@ -7146,8 +7137,9 @@ function _vdRenderChips() {
       chip.dataset.token = it.token;
       chip.dataset.group = it.group;
       chip.style.cursor = 'pointer';
-      chip.style.padding = '4px 10px';
+      chip.style.padding = '2px 9px';   // 칩 자체 높이 축소
       chip.style.fontSize = '12px';
+      chip.style.lineHeight = '1.4';
       chip.title = it.ko;
       chip.textContent = it.token;
       chip.onclick = () => vdAddInstructToken(it.token);
