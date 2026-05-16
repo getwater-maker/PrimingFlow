@@ -15,6 +15,16 @@ function _baseUrl() {
   return (p && p.baseUrl) ? p.baseUrl.replace(/\/+$/, '') : '';
 }
 
+/** secret-store 의 omnivoice.apiKey 가 있으면 X-API-Key 헤더 반환 — provider 와 동일 패턴 */
+function _authHeaders() {
+  try {
+    const SecretStore = require('./secret-store');
+    const s = SecretStore.get('omnivoice');
+    if (s && s.apiKey) return { 'X-API-Key': s.apiKey };
+  } catch (_) {}
+  return {};
+}
+
 /**
  * /asr/status — Whisper 로드 여부 + 백엔드 도달 가능성. 실패해도 transcribe 는 시도 가능.
  */
@@ -22,7 +32,7 @@ async function checkAsrStatus() {
   const base = _baseUrl();
   if (!base) return { loaded: false, reachable: false };
   try {
-    const res = await fetch(base + '/asr/status', { method: 'GET' });
+    const res = await fetch(base + '/asr/status', { method: 'GET', headers: { ..._authHeaders() } });
     if (!res.ok) return { loaded: false, reachable: true };
     const j = await res.json();
     return { loaded: !!j.loaded, reachable: true };
@@ -57,7 +67,7 @@ async function transcribe(audioPath, opts = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { method: 'POST', body: form, signal: controller.signal });
+    const res = await fetch(url, { method: 'POST', body: form, headers: { ..._authHeaders() }, signal: controller.signal });
     if (!res.ok) {
       let detail = '';
       try { detail = await res.text(); } catch (_) {}
