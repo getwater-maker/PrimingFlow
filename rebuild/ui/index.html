@@ -1992,7 +1992,7 @@
       </div>
       <div id="presetForm_cfgWrapper" style="display:flex; flex-direction:column; gap:4px; min-width:0;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; font-size:12px;">
-          <span style="color:var(--text-soft);">Clone 강도</span>
+          <span id="presetForm_cfgLabelText" style="color:var(--text-soft);" title="guidance_scale — Voice Clone 모드에서는 '참조음성 닮기', Voice Design 모드에서는 'instruct 토큰 영향력'">Clone 강도</span>
           <span id="presetForm_cfgValueLabel" style="color:var(--text-strong); font-size:13px;">2.0</span>
         </div>
         <input type="range" id="presetForm_cfgValue" min="1" max="5" step="0.5" value="2.0" style="width:100%; accent-color:var(--accent);"
@@ -2139,20 +2139,30 @@
         </div>
       </details>
 
-      <!-- 합성 + 가챠 + 파일명 + 보관소 저장 -->
-      <div style="display:flex; gap:6px; align-items:center; margin-top:10px;">
-        <button class="btn btn-primary" onclick="vdSynthesize()" id="vdForm_synthBtn" style="flex:1; min-width:0;">🔊 합성하기</button>
-        <button class="btn-sm" onclick="vdRunGacha()" id="vdForm_gachaBtn" style="flex:none; padding:7px 10px;" title="같은 instruct 로 N개 후보 합성 — 갤러리에서 비교 후 1개 선택 저장">🎲 가챠</button>
-        <label style="font-size:11px; color:var(--text-muted); display:flex; align-items:center; gap:4px;">
-          N
-          <input type="number" id="vdForm_gachaN" min="1" max="8" step="1" value="4"
-            style="width:42px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:3px 4px; border-radius:4px; font-size:12px; text-align:center;">
-        </label>
-      </div>
-      <div style="display:flex; gap:6px; align-items:center; margin-top:6px;">
-        <input type="text" id="vdForm_saveName" placeholder="파일명 (확장자 제외)"
-          style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px;">
-        <button class="btn btn-primary" onclick="vdSaveToVault()" id="vdForm_saveBtn" style="flex:none; padding:7px 14px;">💾 보관소 저장</button>
+      <!-- 액션 영역 — 2행 균형 레이아웃 -->
+      <!-- 1행: [🔊 합성하기]  [🎲 가챠 N=4]   — 합성 계열 (생성 액션) -->
+      <!-- 2행: [파일명........] [💾 보관소 저장]  — 저장 계열 (보관 액션) -->
+      <div style="display:flex; flex-direction:column; gap:6px; margin-top:12px;">
+        <div style="display:flex; gap:6px; align-items:stretch;">
+          <button class="btn btn-primary" onclick="vdSynthesize()" id="vdForm_synthBtn"
+            style="flex:2; min-width:0; padding:9px 14px; font-size:13px;">🔊 합성하기</button>
+          <button class="btn btn-primary" onclick="vdRunGacha()" id="vdForm_gachaBtn"
+            title="같은 instruct 로 N개 후보 합성 — 갤러리에서 비교 후 1개 선택 저장"
+            style="flex:1; min-width:0; padding:9px 12px; font-size:13px; background:var(--accent-soft); color:var(--accent-hover); display:flex; align-items:center; justify-content:center; gap:6px;">
+            🎲 가챠
+            <span style="display:inline-flex; align-items:center; gap:3px; font-size:11px; color:var(--text-muted);">N
+              <input type="number" id="vdForm_gachaN" min="1" max="8" step="1" value="4"
+                onclick="event.stopPropagation()"
+                style="width:38px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:2px 4px; border-radius:4px; font-size:12px; text-align:center;">
+            </span>
+          </button>
+        </div>
+        <div style="display:flex; gap:6px; align-items:stretch;">
+          <input type="text" id="vdForm_saveName" placeholder="파일명 (확장자 제외)"
+            style="flex:2; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:9px 12px; border-radius:6px; font-size:13px;">
+          <button class="btn btn-primary" onclick="vdSaveToVault()" id="vdForm_saveBtn"
+            style="flex:1; min-width:0; padding:9px 14px; font-size:13px;">💾 보관소 저장</button>
+        </div>
       </div>
       <audio id="vdForm_audio" controls style="width:100%; display:none; height:32px; margin-top:8px;"></audio>
 
@@ -7293,6 +7303,9 @@ function _vdMoveControlsToTopGrid() {
 }
 
 function _vdRestoreControlsFromTopGrid() {
+  // 라벨 원복 — Voice Clone 등 다른 모드로 돌아갈 때
+  const cfgLb = document.getElementById('presetForm_cfgLabelText');
+  if (cfgLb) cfgLb.textContent = 'Clone 강도';
   for (const [id, info] of _vdOrigParents.entries()) {
     const el = document.getElementById(id);
     if (!el) continue;
@@ -7356,6 +7369,9 @@ function _vdInitDesignSection() {
   }
   // 결정론적 모드 상태 라벨 초기 갱신
   try { vdRefreshDetStatus(); } catch (_) {}
+  // guidance_scale 라벨을 Voice Design 모드용으로 변경 — 같은 슬라이더가 모드에 따라 의미가 달라짐
+  const cfgLb = document.getElementById('presetForm_cfgLabelText');
+  if (cfgLb) cfgLb.textContent = '토큰 영향력';
 }
 
 async function vdSynthesize() {
