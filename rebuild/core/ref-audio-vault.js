@@ -89,9 +89,13 @@ function _uniqueBasename(basename) {
  * @param {string} filename - 사용자가 입력한 이름 (확장자 무시)
  * @param {Buffer|Uint8Array} wavBuffer - WAV 바이트
  * @param {string} refText - 합성에 사용된 텍스트 (참조음성 대본으로 그대로 사용)
- * @returns {{ basename: string, wavPath: string, txtPath: string }}
+ * @param {object} [designMeta] - 선택적 sidecar — instruct + hyperparameter 묶음.
+ *   주어지면 같은 basename 의 `.json` 파일로 함께 저장 → 이후 동일 hyperparameter 로 재합성 가능.
+ *   예: { engine:'omnivoice', mode:'design', instruct, guidance_scale, position_temperature,
+ *        class_temperature, denoise, duration, num_step, speed, seed, language, savedAt }
+ * @returns {{ basename: string, wavPath: string, txtPath: string, metaPath?: string }}
  */
-function saveItem(filename, wavBuffer, refText) {
+function saveItem(filename, wavBuffer, refText, designMeta) {
   ensureVault();
   const safe = _sanitizeBasename(filename);
   const basename = _uniqueBasename(safe);
@@ -99,7 +103,39 @@ function saveItem(filename, wavBuffer, refText) {
   const txtPath = path.join(VAULT_DIR, basename + '.txt');
   fs.writeFileSync(wavPath, Buffer.isBuffer(wavBuffer) ? wavBuffer : Buffer.from(wavBuffer));
   fs.writeFileSync(txtPath, String(refText || ''), 'utf8');
-  return { basename, wavPath, txtPath };
+
+  const result = { basename, wavPath, txtPath };
+  if (designMeta && typeof designMeta === 'object') {
+    const metaPath = path.join(VAULT_DIR, basename + '.json');
+    const meta = { savedAt: new Date().toISOString(), ...designMeta };
+    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), 'utf8');
+    result.metaPath = metaPath;
+  }
+  return result;
 }
 
-module.exports = { VAULT_DIR, ensureVault, getVaultDir, listItems, openInExplorer, saveItem };
+/**
+ * 보관소 아이템 1건의 sidecar(.json) 로드. 없으면 null.
+ * Voice Design 으로 저장한 음성의 instruct + hyperparameter 복원에 사용.
+ * @param {string} wavOrBasePath - .wav 절대경로 또는 basename
+ * @returns {object|null}
+ */
+function loadMeta(wavOrBasePath) {
+  if (!wavOrBasePath) return null;
+  let metaPath;
+  if (path.isAbsolute(wavOrBasePath)) {
+    metaPath = wavOrBasePath.replace(/\.(wav|mp3|m4a|flac)$/i, '.json');
+  } else {
+    metaPath = path.join(VAULT_DIR, _sanitizeBasename(wavOrBasePath) + '.json');
+  }
+  try {
+    if (fs.existsSync(metaPath)) {
+      return JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+    }
+  } catch (e) {
+    console.error('[ref-audio-vault] meta 읽기 실패:', e.message);
+  }
+  return null;
+}
+
+module.exports = { VAULT_DIR, ensureVault, getVaultDir, listItems, openInExplorer, saveItem, loadMeta };

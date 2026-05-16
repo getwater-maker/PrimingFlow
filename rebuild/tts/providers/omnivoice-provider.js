@@ -58,16 +58,19 @@ class OmniVoiceProvider {
   /**
    * @param {string} text
    * @param {object} opts
-   *   refAudioPath       {string}  로컬 참조음성 파일 경로 (Voice Clone)
-   *   refText            {string}  참조음성 대본
-   *   instruct           {string}  Voice Design 설명 (refAudio 없을 때)
-   *   cfgValue           {number}  guidance_scale (1~4, 기본 2)
-   *   inferenceTimesteps {number}  num_step (16/32, 기본 32)
-   *   speed              {number}  속도 배율 (네이티브 지원)
-   *   language           {string}  'ko' | 'en' | ...
-   *   tShift             {number}  t_shift (0.0~0.3, 기본 0.1)
-   *   classTemperature   {number}  class_temperature (0=결정적, 기본 0.0)
-   *   seed               {number}  시드 (지정 시 결정적 합성)
+   *   refAudioPath        {string}  로컬 참조음성 파일 경로 (Voice Clone)
+   *   refText             {string}  참조음성 대본
+   *   instruct            {string}  Voice Design 설명 (refAudio 없을 때)
+   *   cfgValue            {number}  guidance_scale (1~4, 기본 2)
+   *   inferenceTimesteps  {number}  num_step (8~64, 기본 32) — 품질↔속도
+   *   speed               {number}  속도 배율 (네이티브 지원)
+   *   language            {string}  'ko' | 'en' | ...
+   *   tShift              {number}  t_shift (0.0~0.3, 기본 0.1)
+   *   classTemperature    {number}  class_temperature (0=결정적, 기본 0.0)
+   *   positionTemperature {number}  position_temperature (0=결정적, 기본 5.0)
+   *   denoise             {boolean} 노이즈 제거 토큰 (기본 true)
+   *   duration            {number}  목표 길이(초). null/0/undefined = 자동
+   *   seed                {number}  시드 (지정 시 결정적 합성)
    */
   async synthesize(text, opts = {}) {
     if (!this.ready) throw new Error('OmniVoice 백엔드 미준비');
@@ -82,6 +85,11 @@ class OmniVoiceProvider {
     if (opts.language) payload.language = opts.language;
     if (opts.tShift != null) payload.t_shift = parseFloat(opts.tShift);
     if (opts.classTemperature != null) payload.class_temperature = parseFloat(opts.classTemperature);
+    if (opts.positionTemperature != null) payload.position_temperature = parseFloat(opts.positionTemperature);
+    if (opts.denoise != null) payload.denoise = !!opts.denoise;
+    if (opts.duration != null && opts.duration !== '' && Number(opts.duration) > 0) {
+      payload.duration = parseFloat(opts.duration);
+    }
     if (opts.seed != null && opts.seed !== '') payload.seed = parseInt(opts.seed, 10);
 
     // Voice Clone 모드 — 로컬 파일을 합성 직전 서버에 업로드 후 토큰화
