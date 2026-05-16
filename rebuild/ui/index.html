@@ -2435,21 +2435,24 @@
 <div id="videoToTextModal" style="display:none; position:fixed; inset:0; background:rgba(58,52,46,0.5); z-index:999; align-items:center; justify-content:center;" onclick="if(event.target===this)closeVideoToText()">
   <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:14px; width:min(90vw,820px); max-height:88vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:var(--shadow-lg);">
     <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 24px; border-bottom:1px solid var(--border-soft);">
-      <h2 style="font-size:20px; color:var(--accent); margin:0;">🎬 영상 → 음성 추출 + 텍스트 변환</h2>
+      <h2 style="font-size:20px; color:var(--accent); margin:0;">🎬 영상/음성 → 텍스트 변환</h2>
       <button class="btn-sm" onclick="closeVideoToText()" style="font-size:18px;">✕</button>
     </div>
     <div style="padding:20px 24px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:14px;">
       <div>
-        <label style="font-size:13px; color:var(--text-strong); display:block; margin-bottom:6px;">1️⃣ 동영상 파일</label>
+        <label style="font-size:13px; color:var(--text-strong); display:block; margin-bottom:6px;">1️⃣ 동영상 또는 음성 파일</label>
         <div style="display:flex; gap:8px; align-items:center;">
-          <input type="file" id="v2tFileInput" accept="video/*" style="flex:1; font-size:13px;" />
+          <input type="file" id="v2tFileInput" accept="video/*,audio/*,.mp4,.mov,.webm,.mkv,.avi,.m4a,.mp3,.wav,.flac,.ogg" style="flex:1; font-size:13px;" />
           <button class="btn-sm" id="v2tExtractBtn" onclick="v2t_extract()" disabled>▶ 음성 추출</button>
         </div>
         <div id="v2tFileLabel" style="font-size:12px; color:var(--text-muted); margin-top:4px;"></div>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:2px; line-height:1.4;">
+          💡 동영상이면 음성 추출 → STT, 음성 파일이면 추출 단계 자동 스킵 → 바로 STT.
+        </div>
       </div>
 
       <div id="v2tAudioWrap" style="display:none;">
-        <label style="font-size:13px; color:var(--text-strong); display:block; margin-bottom:6px;">2️⃣ 추출된 음성 (mp3)</label>
+        <label id="v2tAudioLabel" style="font-size:13px; color:var(--text-strong); display:block; margin-bottom:6px;">2️⃣ 음성</label>
         <audio id="v2tAudio" controls style="width:100%;"></audio>
       </div>
 
@@ -3783,7 +3786,7 @@ document.addEventListener('keydown', (e) => {
 // ────────────────────────────────────────────────────────────────────
 // 🎬 영상→텍스트 모달
 // ────────────────────────────────────────────────────────────────────
-const _v2tState = { videoPath: '', mp3Path: '' };
+const _v2tState = { videoPath: '', mp3Path: '', kind: '' };  // kind: 'video' | 'audio' | ''
 
 function openVideoToText() {
   document.getElementById('videoToTextModal').style.display = 'flex';
@@ -3793,25 +3796,69 @@ function closeVideoToText() {
   try { document.getElementById('v2tAudio').pause(); } catch (_) {}
 }
 
+// 파일 확장자 기반 종류 판별 — file.type 이 비어있는 경우 대비
+function _v2tDetectKind(file) {
+  const t = (file.type || '').toLowerCase();
+  if (t.startsWith('video/')) return 'video';
+  if (t.startsWith('audio/')) return 'audio';
+  const ext = (file.name || '').toLowerCase().split('.').pop();
+  if (['mp4','mov','webm','mkv','avi','flv','wmv','m4v'].includes(ext)) return 'video';
+  if (['mp3','m4a','wav','flac','ogg','aac','wma'].includes(ext)) return 'audio';
+  return 'video'; // 모호하면 영상으로 가정 — ffmpeg 가 음성 트랙 없으면 에러 보고
+}
+
 // 파일 input 핸들러
 (function bindV2t() {
   document.getElementById('v2tFileInput').addEventListener('change', (e) => {
     const f = e.target.files && e.target.files[0];
     if (!f) return;
     const { webUtils } = require('electron');
-    _v2tState.videoPath = webUtils.getPathForFile(f) || '';
+    const filePath = webUtils.getPathForFile(f) || '';
+    const kind = _v2tDetectKind(f);
+    _v2tState.kind = kind;
+    _v2tState.videoPath = filePath;
     _v2tState.mp3Path = '';
-    document.getElementById('v2tFileLabel').textContent = _v2tState.videoPath ? `파일: ${_v2tState.videoPath}` : `(경로 없음 — 파일을 직접 끌어다 놓으세요)`;
-    document.getElementById('v2tExtractBtn').disabled = !_v2tState.videoPath;
-    document.getElementById('v2tAudioWrap').style.display = 'none';
-    ['v2tSttBtn', 'v2tSaveMp3Btn', 'v2tSaveTxtBtn', 'v2tCopyBtn', 'v2tSendBtn'].forEach(id => document.getElementById(id).disabled = true);
+
+    // 공통 초기화
     document.getElementById('v2tTextarea').value = '';
     document.getElementById('v2tStatus').textContent = '';
+    ['v2tSttBtn', 'v2tSaveMp3Btn', 'v2tSaveTxtBtn', 'v2tCopyBtn', 'v2tSendBtn'].forEach(id => document.getElementById(id).disabled = true);
+
+    const extractBtn = document.getElementById('v2tExtractBtn');
+
+    if (kind === 'audio') {
+      // 음성 파일 — 추출 단계 스킵, 바로 STT 가능
+      _v2tState.mp3Path = filePath; // STT/save/send 모두 이 경로 사용
+      document.getElementById('v2tFileLabel').textContent = filePath ? `🎵 음성 파일: ${filePath}` : '(경로 없음)';
+      extractBtn.disabled = true;
+      extractBtn.textContent = '✓ 음성 파일 (추출 불필요)';
+      // 오디오 미리듣기 즉시 표시
+      const audio = document.getElementById('v2tAudio');
+      audio.src = 'file:///' + filePath.replace(/\\/g, '/');
+      document.getElementById('v2tAudioWrap').style.display = '';
+      document.getElementById('v2tAudioLabel').textContent = '2️⃣ 음성 (원본)';
+      // STT + 저장 즉시 활성
+      document.getElementById('v2tSttBtn').disabled = !filePath;
+      document.getElementById('v2tSaveMp3Btn').disabled = !filePath;
+      document.getElementById('v2tStatus').textContent = '✅ 음성 파일 준비됨 — 📝 STT 변환 을 누르세요.';
+    } else {
+      // 영상 — 음성 추출 필요
+      document.getElementById('v2tFileLabel').textContent = filePath ? `🎬 동영상: ${filePath}` : '(경로 없음 — 파일을 직접 끌어다 놓으세요)';
+      extractBtn.disabled = !filePath;
+      extractBtn.textContent = '▶ 음성 추출';
+      document.getElementById('v2tAudioWrap').style.display = 'none';
+      document.getElementById('v2tAudioLabel').textContent = '2️⃣ 추출된 음성 (mp3)';
+    }
   });
 })();
 
 async function v2t_extract() {
   if (!_v2tState.videoPath) return alert('동영상 파일을 먼저 선택하세요.');
+  if (_v2tState.kind === 'audio') {
+    // 안전망 — 버튼 disabled 라 도달 안 함
+    document.getElementById('v2tStatus').textContent = '음성 파일은 추출 단계가 필요 없습니다. 바로 STT 변환을 누르세요.';
+    return;
+  }
   const btn = document.getElementById('v2tExtractBtn');
   btn.disabled = true; btn.textContent = '⏳ 추출 중...';
   document.getElementById('v2tStatus').textContent = '🔄 ffmpeg 로 음성 추출 중...';
@@ -3830,7 +3877,8 @@ async function v2t_extract() {
     document.getElementById('v2tStatus').textContent = '❌ ' + e.message;
     alert('음성 추출 실패:\n' + e.message);
   } finally {
-    btn.disabled = false; btn.textContent = '▶ 음성 추출';
+    btn.disabled = (_v2tState.kind === 'audio');
+    btn.textContent = '▶ 음성 추출';
   }
 }
 
@@ -3858,18 +3906,23 @@ async function v2t_runStt() {
 async function v2t_saveMp3() {
   if (!_v2tState.mp3Path) return;
   const fs = require('fs');
-  const defaultName = 'extracted-' + Date.now() + '.mp3';
+  const path = require('path');
+  const isAudio = _v2tState.kind === 'audio';
+  const srcExt = isAudio ? (path.extname(_v2tState.mp3Path) || '.mp3').toLowerCase().replace(/^\./, '') : 'mp3';
+  const defaultName = (isAudio ? 'audio-' : 'extracted-') + Date.now() + '.' + srcExt;
   const savePath = await ipcRenderer.invoke('show-save-dialog', {
-    title: 'mp3 저장',
+    title: isAudio ? '음성 파일 저장' : 'mp3 저장',
     defaultPath: defaultName,
-    filters: [{ name: 'MP3', extensions: ['mp3'] }],
+    filters: [
+      { name: '오디오', extensions: [srcExt, 'mp3', 'm4a', 'wav', 'flac', 'ogg'] },
+    ],
   }).catch(() => null);
   if (!savePath || !savePath.filePath) return;
   try {
     fs.copyFileSync(_v2tState.mp3Path, savePath.filePath);
-    document.getElementById('v2tStatus').textContent = `✅ mp3 저장: ${savePath.filePath}`;
+    document.getElementById('v2tStatus').textContent = `✅ 저장: ${savePath.filePath}`;
   } catch (e) {
-    alert('mp3 저장 실패: ' + e.message);
+    alert('파일 저장 실패: ' + e.message);
   }
 }
 
@@ -3906,8 +3959,9 @@ function v2t_copyText() {
 function v2t_sendToRefAudio() {
   if (!_v2tState.mp3Path) return;
   const text = document.getElementById('v2tTextarea').value || '';
+  const fromVideo = _v2tState.kind !== 'audio';
   closeVideoToText();
-  openRecToRef({ sourcePath: _v2tState.mp3Path, presetText: text, fromVideo: true });
+  openRecToRef({ sourcePath: _v2tState.mp3Path, presetText: text, fromVideo });
 }
 
 // ────────────────────────────────────────────────────────────────────
