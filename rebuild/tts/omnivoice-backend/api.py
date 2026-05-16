@@ -589,7 +589,7 @@ async def asr_status():
 
 @app.post("/asr")
 async def transcribe(req: ASRRequest):
-    """음성 파일의 텍스트를 자동 추출한다."""
+    """음성 파일의 텍스트를 자동 추출한다 (로컬 경로 전달, 같은 머신 전용)."""
     global _asr_loaded
 
     if not _model_loaded or _model is None:
@@ -614,6 +614,43 @@ async def transcribe(req: ASRRequest):
     except Exception as e:
         logger.error("ASR 오류: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"ASR 오류: {e}")
+
+
+@app.post("/asr-upload")
+async def transcribe_upload(file: UploadFile = File(...)):
+    """음성 파일을 multipart 로 업로드받아 텍스트로 변환 (원격 PC에서도 사용 가능)."""
+    global _asr_loaded
+
+    if not _model_loaded or _model is None:
+        raise HTTPException(status_code=503, detail="TTS 모델이 아직 로드되지 않았습니다")
+
+    suffix = Path(file.filename or "input.wav").suffix or ".wav"
+    data = await file.read()
+    _REF_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+    tmp_name = f"asr_{hashlib.sha256(data).hexdigest()[:16]}{suffix}"
+    tmp_path = _REF_AUDIO_DIR / tmp_name
+    tmp_path.write_bytes(data)
+
+    try:
+        if not _asr_loaded:
+            logger.info("ASR 모델 로드 시작 (whisper-large-v3-turbo)...")
+            _model.load_asr_model("openai/whisper-large-v3-turbo")
+            _asr_loaded = True
+            logger.info("ASR 모델 로드 완료")
+
+        logger.info("ASR(upload) 시작: %s", tmp_path)
+        text = _model.transcribe(str(tmp_path))
+        logger.info("ASR(upload) 완료: %s → '%s'", tmp_path, text[:100])
+        return {"text": text}
+
+    except Exception as e:
+        logger.error("ASR(upload) 오류: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"ASR 오류: {e}")
+    finally:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
 
 
 # ── 서버 시작 ───────────────────────────────────────

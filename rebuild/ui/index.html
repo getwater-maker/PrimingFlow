@@ -1070,7 +1070,9 @@
   <span class="badge" id="appVersionBadge">v? / Google Flow</span>
   <span id="userNameDisplay" style="display:none"></span>
   <button id="headerLogoutBtn" class="btn-sm" onclick="doHeaderLogout()" style="display:none">로그아웃</button>
-  <button class="btn-sm" onclick="openGallery()" style="font-size:12px; margin-left:auto;">🖼 갤러리</button>
+  <button class="btn-sm" onclick="openVideoToText()" style="font-size:12px; margin-left:auto;">🎬 영상→텍스트</button>
+  <button class="btn-sm" onclick="openRecToRef()" style="font-size:12px;">🎤 녹음→참조음성</button>
+  <button class="btn-sm" onclick="openGallery()" style="font-size:12px;">🖼 갤러리</button>
   <button class="btn-sm" onclick="document.getElementById('helpModal').style.display='flex'" style="font-size:12px;">📖 사용법</button>
 </div>
 
@@ -2355,6 +2357,98 @@
   </div>
 </div>
 
+<!-- 🎬 영상→텍스트 모달 -->
+<div id="videoToTextModal" style="display:none; position:fixed; inset:0; background:rgba(58,52,46,0.5); z-index:999; align-items:center; justify-content:center;" onclick="if(event.target===this)closeVideoToText()">
+  <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:14px; width:min(90vw,820px); max-height:88vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:var(--shadow-lg);">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 24px; border-bottom:1px solid var(--border-soft);">
+      <h2 style="font-size:20px; color:var(--accent); margin:0;">🎬 영상 → 음성 추출 + 텍스트 변환</h2>
+      <button class="btn-sm" onclick="closeVideoToText()" style="font-size:18px;">✕</button>
+    </div>
+    <div style="padding:20px 24px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:14px;">
+      <div>
+        <label style="font-size:13px; color:var(--text-strong); display:block; margin-bottom:6px;">1️⃣ 동영상 파일</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="file" id="v2tFileInput" accept="video/*" style="flex:1; font-size:13px;" />
+          <button class="btn-sm" id="v2tExtractBtn" onclick="v2t_extract()" disabled>▶ 음성 추출</button>
+        </div>
+        <div id="v2tFileLabel" style="font-size:12px; color:var(--text-muted); margin-top:4px;"></div>
+      </div>
+
+      <div id="v2tAudioWrap" style="display:none;">
+        <label style="font-size:13px; color:var(--text-strong); display:block; margin-bottom:6px;">2️⃣ 추출된 음성 (mp3)</label>
+        <audio id="v2tAudio" controls style="width:100%;"></audio>
+      </div>
+
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <label style="font-size:13px; color:var(--text-strong);">3️⃣ STT 결과 (수정 가능)</label>
+          <button class="btn-sm" id="v2tSttBtn" onclick="v2t_runStt()" disabled style="font-size:12px;">📝 STT 변환</button>
+        </div>
+        <textarea id="v2tTextarea" placeholder="여기에 STT 결과가 표시됩니다. 직접 수정 가능합니다." style="width:100%; min-height:140px; padding:10px; font-size:13px; line-height:1.6; border:1px solid var(--border); border-radius:8px; background:var(--bg-card); color:var(--text-strong);"></textarea>
+        <div id="v2tStatus" style="font-size:12px; color:var(--text-muted); margin-top:4px;"></div>
+      </div>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap; padding-top:8px; border-top:1px solid var(--border-soft);">
+        <button class="btn-sm" onclick="v2t_saveMp3()" id="v2tSaveMp3Btn" disabled>💾 .mp3 저장</button>
+        <button class="btn-sm" onclick="v2t_saveTxt()" id="v2tSaveTxtBtn" disabled>💾 .txt 저장</button>
+        <button class="btn-sm" onclick="v2t_copyText()" id="v2tCopyBtn" disabled>📋 텍스트 복사</button>
+        <button class="btn-sm primary" onclick="v2t_sendToRefAudio()" id="v2tSendBtn" disabled style="margin-left:auto;">🎤 참조음성으로 등록 →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 🎤 녹음→참조음성 모달 -->
+<div id="recToRefModal" style="display:none; position:fixed; inset:0; background:rgba(58,52,46,0.5); z-index:999; align-items:center; justify-content:center;" onclick="if(event.target===this)closeRecToRef()">
+  <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:14px; width:min(92vw,900px); max-height:90vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:var(--shadow-lg);">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 24px; border-bottom:1px solid var(--border-soft);">
+      <h2 style="font-size:20px; color:var(--accent); margin:0;">🎤 녹음 → 참조음성 등록</h2>
+      <button class="btn-sm" onclick="closeRecToRef()" style="font-size:18px;">✕</button>
+    </div>
+    <div style="padding:20px 24px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:14px;">
+      <div>
+        <label style="font-size:13px; color:var(--text-strong); display:block; margin-bottom:6px;">1️⃣ 음성 파일 (m4a / mp3 / wav)</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="file" id="r2rFileInput" accept=".m4a,.mp3,.wav,audio/*" style="flex:1; font-size:13px;" />
+          <button class="btn-sm" id="r2rLoadBtn" onclick="r2r_load()" disabled>▶ 파형 표시</button>
+        </div>
+        <div id="r2rFileLabel" style="font-size:12px; color:var(--text-muted); margin-top:4px;"></div>
+      </div>
+
+      <div id="r2rWaveWrap" style="display:none;">
+        <label style="font-size:13px; color:var(--text-strong); display:block; margin-bottom:6px;">2️⃣ 파형 — 드래그로 자를 구간 선택</label>
+        <div id="r2rWaveform" style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:6px;"></div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:8px; font-size:12px;">
+          <button class="btn-sm" onclick="r2r_playPause()" id="r2rPlayBtn">▶ 재생</button>
+          <label style="display:flex; align-items:center; gap:4px; color:var(--text-strong);">
+            <input type="checkbox" id="r2rPlaySelectedOnly" checked /> 선택 구간만 재생
+          </label>
+          <span id="r2rRange" style="color:var(--text-muted); margin-left:auto;">전체</span>
+        </div>
+      </div>
+
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <label style="font-size:13px; color:var(--text-strong);">3️⃣ 참조 텍스트 (수정 가능)</label>
+          <button class="btn-sm" id="r2rSttBtn" onclick="r2r_runStt()" disabled style="font-size:12px;">📝 STT 자동 채우기</button>
+        </div>
+        <textarea id="r2rTextarea" placeholder="선택 구간의 대본을 입력하거나 STT 로 자동 채우세요." style="width:100%; min-height:90px; padding:10px; font-size:13px; line-height:1.6; border:1px solid var(--border); border-radius:8px; background:var(--bg-card); color:var(--text-strong);"></textarea>
+        <div id="r2rSttStatus" style="font-size:12px; color:var(--text-muted); margin-top:4px;"></div>
+      </div>
+
+      <div>
+        <label style="font-size:13px; color:var(--text-strong); display:block; margin-bottom:6px;">4️⃣ 저장 파일명 (확장자 없이)</label>
+        <input type="text" id="r2rFilename" style="width:100%; padding:8px 10px; font-size:13px; border:1px solid var(--border); border-radius:8px; background:var(--bg-card); color:var(--text-strong);" />
+      </div>
+
+      <div style="display:flex; gap:8px; padding-top:8px; border-top:1px solid var(--border-soft);">
+        <button class="btn-sm primary" onclick="r2r_save()" id="r2rSaveBtn" disabled style="margin-left:auto;">💾 참조음성 보관소에 저장</button>
+      </div>
+      <div id="r2rSaveStatus" style="font-size:12px; color:var(--text-muted);"></div>
+    </div>
+  </div>
+</div>
+
 <!-- 갤러리 모달 -->
 <div id="galleryModal" style="display:none; position:fixed; inset:0; background:rgba(58,52,46,0.5); z-index:999; align-items:center; justify-content:center;" onclick="if(event.target===this)closeGallery()">
   <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:14px; width:min(90vw,1100px); max-height:85vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:var(--shadow-lg);">
@@ -3526,13 +3620,363 @@ function openGallery() {
 function closeGallery() {
   document.getElementById('galleryModal').style.display = 'none';
 }
-// ESC 키로 갤러리 모달 닫기
+// ESC 키로 모달 닫기 (갤러리 / 영상→텍스트 / 녹음→참조음성)
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    const gm = document.getElementById('galleryModal');
-    if (gm && gm.style.display === 'flex') closeGallery();
-  }
+  if (e.key !== 'Escape') return;
+  const gm = document.getElementById('galleryModal');
+  if (gm && gm.style.display === 'flex') return closeGallery();
+  const vm = document.getElementById('videoToTextModal');
+  if (vm && vm.style.display === 'flex') return closeVideoToText();
+  const rm = document.getElementById('recToRefModal');
+  if (rm && rm.style.display === 'flex') return closeRecToRef();
 });
+
+// ────────────────────────────────────────────────────────────────────
+// 🎬 영상→텍스트 모달
+// ────────────────────────────────────────────────────────────────────
+const _v2tState = { videoPath: '', mp3Path: '' };
+
+function openVideoToText() {
+  document.getElementById('videoToTextModal').style.display = 'flex';
+}
+function closeVideoToText() {
+  document.getElementById('videoToTextModal').style.display = 'none';
+  try { document.getElementById('v2tAudio').pause(); } catch (_) {}
+}
+
+// 파일 input 핸들러
+(function bindV2t() {
+  document.getElementById('v2tFileInput').addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const { webUtils } = require('electron');
+    _v2tState.videoPath = webUtils.getPathForFile(f) || '';
+    _v2tState.mp3Path = '';
+    document.getElementById('v2tFileLabel').textContent = _v2tState.videoPath ? `파일: ${_v2tState.videoPath}` : `(경로 없음 — 파일을 직접 끌어다 놓으세요)`;
+    document.getElementById('v2tExtractBtn').disabled = !_v2tState.videoPath;
+    document.getElementById('v2tAudioWrap').style.display = 'none';
+    ['v2tSttBtn', 'v2tSaveMp3Btn', 'v2tSaveTxtBtn', 'v2tCopyBtn', 'v2tSendBtn'].forEach(id => document.getElementById(id).disabled = true);
+    document.getElementById('v2tTextarea').value = '';
+    document.getElementById('v2tStatus').textContent = '';
+  });
+})();
+
+async function v2t_extract() {
+  if (!_v2tState.videoPath) return alert('동영상 파일을 먼저 선택하세요.');
+  const btn = document.getElementById('v2tExtractBtn');
+  btn.disabled = true; btn.textContent = '⏳ 추출 중...';
+  document.getElementById('v2tStatus').textContent = '🔄 ffmpeg 로 음성 추출 중...';
+  try {
+    const MediaUtils = require('../core/media-utils');
+    const out = MediaUtils.tmpFile('.mp3');
+    await MediaUtils.extractAudioMp3(_v2tState.videoPath, out);
+    _v2tState.mp3Path = out;
+    const audio = document.getElementById('v2tAudio');
+    audio.src = 'file:///' + out.replace(/\\/g, '/');
+    document.getElementById('v2tAudioWrap').style.display = '';
+    document.getElementById('v2tSttBtn').disabled = false;
+    document.getElementById('v2tSaveMp3Btn').disabled = false;
+    document.getElementById('v2tStatus').textContent = `✅ 음성 추출 완료 — ${out}`;
+  } catch (e) {
+    document.getElementById('v2tStatus').textContent = '❌ ' + e.message;
+    alert('음성 추출 실패:\n' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '▶ 음성 추출';
+  }
+}
+
+async function v2t_runStt() {
+  if (!_v2tState.mp3Path) return alert('먼저 음성을 추출하세요.');
+  const btn = document.getElementById('v2tSttBtn');
+  btn.disabled = true; btn.textContent = '⏳ STT 변환 중...';
+  document.getElementById('v2tStatus').textContent = '🔄 OmniVoice /asr-upload 호출 (Whisper 첫 로드 시 5분+ 걸릴 수 있어요)...';
+  try {
+    const Asr = require('../tts/asr-client');
+    const text = await Asr.transcribe(_v2tState.mp3Path);
+    document.getElementById('v2tTextarea').value = text;
+    document.getElementById('v2tSaveTxtBtn').disabled = false;
+    document.getElementById('v2tCopyBtn').disabled = false;
+    document.getElementById('v2tSendBtn').disabled = false;
+    document.getElementById('v2tStatus').textContent = `✅ STT 완료 (${text.length}자)`;
+  } catch (e) {
+    document.getElementById('v2tStatus').textContent = '❌ ' + e.message;
+    alert('STT 실패:\n' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '📝 STT 변환';
+  }
+}
+
+async function v2t_saveMp3() {
+  if (!_v2tState.mp3Path) return;
+  const fs = require('fs');
+  const defaultName = 'extracted-' + Date.now() + '.mp3';
+  const savePath = await ipcRenderer.invoke('show-save-dialog', {
+    title: 'mp3 저장',
+    defaultPath: defaultName,
+    filters: [{ name: 'MP3', extensions: ['mp3'] }],
+  }).catch(() => null);
+  if (!savePath || !savePath.filePath) return;
+  try {
+    fs.copyFileSync(_v2tState.mp3Path, savePath.filePath);
+    document.getElementById('v2tStatus').textContent = `✅ mp3 저장: ${savePath.filePath}`;
+  } catch (e) {
+    alert('mp3 저장 실패: ' + e.message);
+  }
+}
+
+async function v2t_saveTxt() {
+  const text = document.getElementById('v2tTextarea').value || '';
+  if (!text.trim()) return alert('저장할 텍스트가 없습니다.');
+  const fs = require('fs');
+  const defaultName = 'transcript-' + Date.now() + '.txt';
+  const savePath = await ipcRenderer.invoke('show-save-dialog', {
+    title: 'txt 저장',
+    defaultPath: defaultName,
+    filters: [{ name: 'Text', extensions: ['txt'] }],
+  }).catch(() => null);
+  if (!savePath || !savePath.filePath) return;
+  try {
+    fs.writeFileSync(savePath.filePath, text, 'utf8');
+    document.getElementById('v2tStatus').textContent = `✅ txt 저장: ${savePath.filePath}`;
+  } catch (e) {
+    alert('txt 저장 실패: ' + e.message);
+  }
+}
+
+function v2t_copyText() {
+  const text = document.getElementById('v2tTextarea').value || '';
+  if (!text.trim()) return;
+  try {
+    require('electron').clipboard.writeText(text);
+    document.getElementById('v2tStatus').textContent = '📋 클립보드에 복사됨';
+  } catch (e) {
+    navigator.clipboard.writeText(text);
+  }
+}
+
+function v2t_sendToRefAudio() {
+  if (!_v2tState.mp3Path) return;
+  const text = document.getElementById('v2tTextarea').value || '';
+  closeVideoToText();
+  openRecToRef({ sourcePath: _v2tState.mp3Path, presetText: text, fromVideo: true });
+}
+
+// ────────────────────────────────────────────────────────────────────
+// 🎤 녹음→참조음성 모달
+// ────────────────────────────────────────────────────────────────────
+const _r2rState = { sourcePath: '', duration: 0, wavesurfer: null, region: null, regionsPlugin: null };
+
+function _r2rDefaultFilename() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `recording-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+
+function openRecToRef(preset) {
+  document.getElementById('recToRefModal').style.display = 'flex';
+  document.getElementById('r2rFilename').value = _r2rDefaultFilename();
+  document.getElementById('r2rTextarea').value = (preset && preset.presetText) || '';
+  document.getElementById('r2rSaveStatus').textContent = '';
+  document.getElementById('r2rSttStatus').textContent = '';
+  document.getElementById('r2rWaveWrap').style.display = 'none';
+  document.getElementById('r2rRange').textContent = '전체';
+  ['r2rSttBtn', 'r2rSaveBtn', 'r2rLoadBtn'].forEach(id => document.getElementById(id).disabled = true);
+  document.getElementById('r2rFileLabel').textContent = '';
+  _r2rState.sourcePath = '';
+  _r2rState.region = null;
+  _r2rDestroyWavesurfer();
+
+  if (preset && preset.sourcePath) {
+    _r2rState.sourcePath = preset.sourcePath;
+    document.getElementById('r2rFileLabel').textContent = preset.fromVideo ? `(영상→텍스트에서 인계: ${preset.sourcePath})` : preset.sourcePath;
+    document.getElementById('r2rLoadBtn').disabled = false;
+    // 자동 로드
+    setTimeout(() => r2r_load(), 50);
+  }
+}
+
+function closeRecToRef() {
+  document.getElementById('recToRefModal').style.display = 'none';
+  _r2rDestroyWavesurfer();
+}
+
+function _r2rDestroyWavesurfer() {
+  try { _r2rState.wavesurfer && _r2rState.wavesurfer.destroy(); } catch (_) {}
+  _r2rState.wavesurfer = null;
+  _r2rState.regionsPlugin = null;
+  _r2rState.region = null;
+}
+
+(function bindR2r() {
+  document.getElementById('r2rFileInput').addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const { webUtils } = require('electron');
+    _r2rState.sourcePath = webUtils.getPathForFile(f) || '';
+    document.getElementById('r2rFileLabel').textContent = _r2rState.sourcePath || '(경로 없음)';
+    document.getElementById('r2rLoadBtn').disabled = !_r2rState.sourcePath;
+    document.getElementById('r2rWaveWrap').style.display = 'none';
+    document.getElementById('r2rSttBtn').disabled = true;
+    document.getElementById('r2rSaveBtn').disabled = true;
+  });
+})();
+
+async function r2r_load() {
+  if (!_r2rState.sourcePath) return;
+  _r2rDestroyWavesurfer();
+  document.getElementById('r2rWaveWrap').style.display = '';
+  const container = document.getElementById('r2rWaveform');
+  container.innerHTML = '';
+
+  // wavesurfer.js 7.x — ESM only. 절대 경로(file://) 로 dynamic import.
+  let WaveSurfer, RegionsPlugin;
+  try {
+    const path = require('path');
+    const fs = require('fs');
+    const wsDir = path.join(path.dirname(require.resolve('../package.json')), 'node_modules', 'wavesurfer.js', 'dist');
+    const wsMain = path.join(wsDir, 'wavesurfer.esm.js');
+    const wsRegions = path.join(wsDir, 'plugins', 'regions.esm.js');
+    if (!fs.existsSync(wsMain) || !fs.existsSync(wsRegions)) {
+      throw new Error(`wavesurfer.js 파일이 없습니다: ${wsMain} (npm install 후 앱 재시작 필요)`);
+    }
+    const toUrl = (p) => 'file:///' + p.replace(/\\/g, '/');
+    WaveSurfer = (await import(toUrl(wsMain))).default;
+    RegionsPlugin = (await import(toUrl(wsRegions))).default;
+  } catch (e) {
+    document.getElementById('r2rSaveStatus').textContent = '❌ wavesurfer.js 로드 실패 — ' + e.message;
+    return;
+  }
+
+  const regions = RegionsPlugin.create();
+  _r2rState.regionsPlugin = regions;
+  const ws = WaveSurfer.create({
+    container,
+    waveColor: '#888',
+    progressColor: '#c89a6b',
+    cursorColor: '#fff',
+    height: 110,
+    plugins: [regions],
+  });
+  _r2rState.wavesurfer = ws;
+
+  ws.on('ready', () => {
+    _r2rState.duration = ws.getDuration();
+    // 기본 선택 구간: 전체 (혹은 0~min(전체, 8초))
+    const end = Math.min(_r2rState.duration, Math.max(_r2rState.duration * 0.3, 6));
+    const region = regions.addRegion({
+      start: 0,
+      end,
+      color: 'rgba(200, 154, 107, 0.25)',
+      drag: true,
+      resize: true,
+    });
+    _r2rState.region = region;
+    _r2rUpdateRangeLabel();
+    document.getElementById('r2rSttBtn').disabled = false;
+    document.getElementById('r2rSaveBtn').disabled = false;
+  });
+
+  regions.on('region-updated', (r) => { _r2rState.region = r; _r2rUpdateRangeLabel(); });
+  regions.on('region-created', (r) => {
+    // 새 region 생성 시 기존 region 제거 — 하나만 유지
+    if (_r2rState.region && _r2rState.region !== r) {
+      try { _r2rState.region.remove(); } catch (_) {}
+    }
+    _r2rState.region = r;
+    _r2rUpdateRangeLabel();
+  });
+
+  ws.on('finish', () => { document.getElementById('r2rPlayBtn').textContent = '▶ 재생'; });
+  ws.on('pause', () => { document.getElementById('r2rPlayBtn').textContent = '▶ 재생'; });
+  ws.on('play', () => { document.getElementById('r2rPlayBtn').textContent = '⏸ 일시정지'; });
+
+  try {
+    await ws.load('file:///' + _r2rState.sourcePath.replace(/\\/g, '/'));
+  } catch (e) {
+    document.getElementById('r2rSaveStatus').textContent = '❌ 오디오 로드 실패: ' + e.message;
+  }
+}
+
+function _r2rUpdateRangeLabel() {
+  const r = _r2rState.region;
+  if (!r) return;
+  const fmt = (s) => {
+    const m = Math.floor(s / 60), sec = (s % 60).toFixed(1);
+    return `${m}:${sec.padStart(4, '0')}`;
+  };
+  document.getElementById('r2rRange').textContent = `선택 ${fmt(r.start)} ~ ${fmt(r.end)} (${(r.end - r.start).toFixed(1)}s)`;
+}
+
+function r2r_playPause() {
+  const ws = _r2rState.wavesurfer;
+  if (!ws) return;
+  const onlySelected = document.getElementById('r2rPlaySelectedOnly').checked;
+  if (ws.isPlaying()) {
+    ws.pause();
+    return;
+  }
+  if (onlySelected && _r2rState.region) {
+    try { _r2rState.region.play(); return; } catch (_) {}
+  }
+  ws.play();
+}
+
+async function r2r_runStt() {
+  if (!_r2rState.sourcePath || !_r2rState.region) return;
+  const btn = document.getElementById('r2rSttBtn');
+  btn.disabled = true; btn.textContent = '⏳ STT...';
+  document.getElementById('r2rSttStatus').textContent = '🔄 선택 구간을 WAV 로 자른 뒤 OmniVoice /asr-upload 호출...';
+  try {
+    const MediaUtils = require('../core/media-utils');
+    const Asr = require('../tts/asr-client');
+    const tmpWav = MediaUtils.tmpFile('.wav');
+    await MediaUtils.convertToRefWav(_r2rState.sourcePath, tmpWav, {
+      startSec: _r2rState.region.start,
+      endSec: _r2rState.region.end,
+    });
+    const text = await Asr.transcribe(tmpWav);
+    document.getElementById('r2rTextarea').value = text;
+    document.getElementById('r2rSttStatus').textContent = `✅ STT 완료 (${text.length}자) — 필요하면 수정하세요.`;
+    // 임시 파일 정리
+    try { require('fs').unlinkSync(tmpWav); } catch (_) {}
+  } catch (e) {
+    document.getElementById('r2rSttStatus').textContent = '❌ ' + e.message;
+    alert('STT 실패:\n' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '📝 STT 자동 채우기';
+  }
+}
+
+async function r2r_save() {
+  if (!_r2rState.sourcePath || !_r2rState.region) return alert('파일과 선택 구간이 필요합니다.');
+  const name = (document.getElementById('r2rFilename').value || '').trim();
+  if (!name) return alert('파일명을 입력하세요.');
+  const refText = document.getElementById('r2rTextarea').value || '';
+  const btn = document.getElementById('r2rSaveBtn');
+  btn.disabled = true; btn.textContent = '⏳ 저장 중...';
+  document.getElementById('r2rSaveStatus').textContent = '🔄 ffmpeg 로 WAV 자르기 + 보관소 저장...';
+  try {
+    const MediaUtils = require('../core/media-utils');
+    const RefVault = require('../core/ref-audio-vault');
+    const fs = require('fs');
+    const tmpWav = MediaUtils.tmpFile('.wav');
+    await MediaUtils.convertToRefWav(_r2rState.sourcePath, tmpWav, {
+      startSec: _r2rState.region.start,
+      endSec: _r2rState.region.end,
+    });
+    const buf = fs.readFileSync(tmpWav);
+    const result = RefVault.saveItem(name, buf, refText);
+    try { fs.unlinkSync(tmpWav); } catch (_) {}
+    document.getElementById('r2rSaveStatus').textContent = `✅ 저장: ${result.wavPath}`;
+    // Voice Clone 드롭다운 자동 새로고침 + 새로 저장된 항목 자동 선택
+    try { if (typeof refreshRefAudioVault === 'function') refreshRefAudioVault(result.wavPath); } catch (_) {}
+  } catch (e) {
+    document.getElementById('r2rSaveStatus').textContent = '❌ ' + e.message;
+    alert('저장 실패:\n' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 참조음성 보관소에 저장';
+  }
+}
 
 // 갤러리: 출력 폴더의 이미지 로드
 let galleryCurrentPath = '';
