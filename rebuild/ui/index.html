@@ -2061,9 +2061,9 @@
       <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">
         음색 설명 (instruct) — <b style="color:var(--accent);">콤마(,)로 구분</b>, 영문 표현이 가장 안정적
       </label>
-      <textarea id="presetForm_instruct" rows="2"
+      <textarea id="presetForm_instruct" rows="1"
         placeholder="예: female, low pitch, warm tone, british accent"
-        style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.4;"></textarea>
+        style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 10px; border-radius:6px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.4; min-height:32px;"></textarea>
       <div style="font-size:11px; color:var(--text-muted); margin-top:6px; line-height:1.4;">
         💡 <b>짧은 토큰을 콤마로 구분</b>해서 입력하세요 — OmniVoice 는 자연어 문장이 아닌 <b>태그 분류</b> 모델입니다 (예: <code>male, elderly, low pitch</code>).<br>
         🎯 <b>시니어 음색 예</b>: <code>elderly, low pitch</code> / <code>male, elderly, very low pitch, whisper</code><br>
@@ -2075,8 +2075,8 @@
       <label style="display:block; font-size:12px; color:var(--text-soft); margin-top:12px; margin-bottom:4px;">
         시범 텍스트 — <span style="color:var(--text-muted);">이 문장으로 새 목소리를 시연. 보관소에 저장하면 그대로 .txt 가 됨</span>
       </label>
-      <textarea id="vdForm_text" rows="2"
-        style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.4;">우리 마음을 정약용의 가르침으로 회복해요.</textarea>
+      <textarea id="vdForm_text" rows="1"
+        style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 10px; border-radius:6px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.4; min-height:32px;">우리 마음을 정약용의 가르침으로 회복해요.</textarea>
 
       <!-- Voice Design 모드일 때 속도/Clone/언어/성우/다양성 5개를 한 줄에 모음 -->
       <!-- _vdMoveControlsToTopGrid 가 옛 wrapper 들을 이 grid 로 DOM 이동, Voice Clone 모드 진입 시 원위치 복원 -->
@@ -7106,9 +7106,13 @@ function _vdRenderChips() {
   const wrap = document.getElementById('vdForm_chips');
   if (!wrap) return;
   wrap.innerHTML = '';
+  // wrap 자체 inline style override — display/flex-direction/wrap/gap 명시
   wrap.style.display = 'flex';
   wrap.style.flexDirection = 'column';
-  wrap.style.gap = '2px';  // 행 사이 간격 축소
+  wrap.style.flexWrap = 'nowrap';
+  wrap.style.gap = '0';
+  wrap.style.margin = '0';
+  wrap.style.padding = '0';
 
   // 그룹별로 한 줄 — [라벨] [칩 칩 칩 ...]
   for (const grp of VD_CHIP_GROUPS) {
@@ -7119,13 +7123,16 @@ function _vdRenderChips() {
     row.style.flexWrap = 'wrap';
     row.style.alignItems = 'center';
     row.style.gap = '3px';
+    row.style.lineHeight = '1';
+    row.style.marginBottom = '2px';  // 행 간 명시적 통제 (gap 보다 안정적)
 
     const lb = document.createElement('span');
     lb.textContent = grp.label + (grp.mode === 'single' ? ' (택1)' : '');
     lb.style.fontSize = '11px';
     lb.style.color = 'var(--text-muted)';
-    lb.style.flex = '0 0 78px';
+    lb.style.flex = '0 0 70px';
     lb.style.fontWeight = '600';
+    lb.style.lineHeight = '1';
     lb.title = grp.mode === 'single'
       ? '같은 그룹에서 하나만 선택 — 다른 칩 클릭 시 자동 교체'
       : '여러 개 자유 조합 가능';
@@ -7136,10 +7143,12 @@ function _vdRenderChips() {
       chip.className = 'chip';
       chip.dataset.token = it.token;
       chip.dataset.group = it.group;
+      // .chip 베이스의 padding:5px 12px / font-size:13px 을 inline 으로 압축
       chip.style.cursor = 'pointer';
-      chip.style.padding = '2px 9px';   // 칩 자체 높이 축소
-      chip.style.fontSize = '12px';
-      chip.style.lineHeight = '1.4';
+      chip.style.padding = '3px 8px';
+      chip.style.fontSize = '11px';
+      chip.style.lineHeight = '1';
+      chip.style.borderRadius = '5px';
       chip.title = it.ko;
       chip.textContent = it.token;
       chip.onclick = () => vdAddInstructToken(it.token);
