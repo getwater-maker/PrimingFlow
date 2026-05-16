@@ -2073,7 +2073,7 @@
 
       <!-- 시범 텍스트 -->
       <label style="display:block; font-size:12px; color:var(--text-soft); margin-top:12px; margin-bottom:4px;">
-        시범 텍스트 — <span style="color:var(--text-muted);">이 문장으로 새 목소리를 시연. 보관소에 저장하면 그대로 .txt 가 됨</span>
+        시범 텍스트 — <span style="color:var(--text-muted);">이 문장으로 새 목소리를 시연. 보관소에 저장하면 그대로 .txt 가 됨 · <b>수정 시 자동 저장 (모든 미리듣기 공통)</b></span>
       </label>
       <textarea id="vdForm_text" rows="1"
         style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 10px; border-radius:6px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.4; min-height:32px;">우리 마음을 예수 그리스도의 가르침으로 회복해요.</textarea>
@@ -3694,6 +3694,59 @@ function openGallery() {
 function closeGallery() {
   document.getElementById('galleryModal').style.display = 'none';
 }
+// ────────────────────────────────────────────────────────────────────
+// 시범/미리듣기 텍스트 — 사용자가 수정하면 localStorage 에 자동 저장 + 다음 세션 복원.
+// 3개 입력란이 같은 키를 공유하므로 어디서 수정하든 다른 곳에도 반영.
+//   - presetForm_previewTextClone  (Voice Clone 미리듣기)
+//   - vdForm_text                  (Voice Design 시범 텍스트)
+//   - presetForm_previewText       (Supertonic 등 일반 미리듣기)
+// ────────────────────────────────────────────────────────────────────
+const PREVIEW_TEXT_STORE_KEY = 'flow_preview_text_v1';
+const PREVIEW_TEXT_IDS = ['presetForm_previewTextClone', 'vdForm_text', 'presetForm_previewText'];
+
+function loadPreviewText() {
+  try { return localStorage.getItem(PREVIEW_TEXT_STORE_KEY) || ''; }
+  catch (_) { return ''; }
+}
+function savePreviewText(v) {
+  try { localStorage.setItem(PREVIEW_TEXT_STORE_KEY, String(v || '')); }
+  catch (_) {}
+}
+function applyPreviewTextToAll(v) {
+  if (v === '' || v == null) return;
+  for (const id of PREVIEW_TEXT_IDS) {
+    const el = document.getElementById(id);
+    if (el && el.value !== v) el.value = v;
+  }
+}
+
+(function bindPreviewTextPersist() {
+  function init() {
+    const saved = loadPreviewText();
+    if (saved) applyPreviewTextToAll(saved);
+    for (const id of PREVIEW_TEXT_IDS) {
+      const el = document.getElementById(id);
+      if (!el || el.dataset.previewBound === '1') continue;
+      el.dataset.previewBound = '1';
+      el.addEventListener('input', () => {
+        const v = el.value;
+        savePreviewText(v);
+        // 다른 두 곳도 같이 동기화 (사용자가 의식하지 않아도 1곳만 관리)
+        for (const other of PREVIEW_TEXT_IDS) {
+          if (other === id) continue;
+          const o = document.getElementById(other);
+          if (o && o.value !== v) o.value = v;
+        }
+      });
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+
 // ESC 키로 모달 닫기 (갤러리 / 영상→텍스트 / 녹음→참조음성 / Voice Design 가챠)
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
@@ -7373,6 +7426,11 @@ function _vdInitDesignSection() {
   // guidance_scale 라벨을 Voice Design 모드용으로 변경 — 같은 슬라이더가 모드에 따라 의미가 달라짐
   const cfgLb = document.getElementById('presetForm_cfgLabelText');
   if (cfgLb) cfgLb.textContent = '토큰 영향력';
+  // 저장된 시범 텍스트 적용 (다른 모달에서 수정한 값이 있으면 반영)
+  try {
+    const saved = loadPreviewText();
+    if (saved) applyPreviewTextToAll(saved);
+  } catch (_) {}
 }
 
 async function vdSynthesize() {
