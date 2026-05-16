@@ -3720,6 +3720,25 @@ function applyPreviewTextToAll(v) {
   }
 }
 
+// ────────────────────────────────────────────────────────────────────
+// 모든 모달의 "배경(외부) 클릭으로 닫기" 동작 일괄 제거.
+// 사용자가 작업 중 실수로 모달 밖 클릭 시 데이터 잃는 사고 방지.
+// X 버튼 또는 명시적 닫기 버튼으로만 닫히도록 한다.
+// (inline onclick="if(event.target===this)..." 패턴을 attribute selector 로 일괄 매칭)
+// ────────────────────────────────────────────────────────────────────
+(function disableModalBackdropClose() {
+  function init() {
+    document.querySelectorAll('[onclick*="event.target===this"]').forEach(el => {
+      el.removeAttribute('onclick');
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+
 (function bindPreviewTextPersist() {
   function init() {
     const saved = loadPreviewText();
@@ -3905,23 +3924,50 @@ function _r2rDefaultFilename() {
 function openRecToRef(preset) {
   document.getElementById('recToRefModal').style.display = 'flex';
   document.getElementById('r2rFilename').value = _r2rDefaultFilename();
-  document.getElementById('r2rTextarea').value = (preset && preset.presetText) || '';
   document.getElementById('r2rSaveStatus').textContent = '';
   document.getElementById('r2rSttStatus').textContent = '';
   document.getElementById('r2rWaveWrap').style.display = 'none';
   document.getElementById('r2rRange').textContent = '전체';
-  ['r2rSttBtn', 'r2rSaveBtn', 'r2rLoadBtn'].forEach(id => document.getElementById(id).disabled = true);
-  document.getElementById('r2rFileLabel').textContent = '';
-  _r2rState.sourcePath = '';
   _r2rState.region = null;
   _r2rDestroyWavesurfer();
 
   if (preset && preset.sourcePath) {
+    // 영상→텍스트에서 인계 — 새 흐름 시작
+    document.getElementById('r2rTextarea').value = preset.presetText || '';
     _r2rState.sourcePath = preset.sourcePath;
     document.getElementById('r2rFileLabel').textContent = preset.fromVideo ? `(영상→텍스트에서 인계: ${preset.sourcePath})` : preset.sourcePath;
     document.getElementById('r2rLoadBtn').disabled = false;
-    // 자동 로드
+    document.getElementById('r2rSttBtn').disabled = true;
+    document.getElementById('r2rSaveBtn').disabled = true;
     setTimeout(() => r2r_load(), 50);
+    return;
+  }
+
+  // 일반 재진입 — input.files 에 이전 선택 파일이 남아있으면 sourcePath 복원
+  const input = document.getElementById('r2rFileInput');
+  const hasFile = input && input.files && input.files.length > 0;
+  if (hasFile) {
+    try {
+      const { webUtils } = require('electron');
+      const p = webUtils.getPathForFile(input.files[0]) || '';
+      _r2rState.sourcePath = p;
+      document.getElementById('r2rFileLabel').textContent = p || '(경로 없음)';
+      document.getElementById('r2rLoadBtn').disabled = !p;
+      document.getElementById('r2rSttBtn').disabled = true;
+      document.getElementById('r2rSaveBtn').disabled = true;
+    } catch (_) {
+      _r2rState.sourcePath = '';
+      document.getElementById('r2rFileLabel').textContent = '';
+      document.getElementById('r2rLoadBtn').disabled = true;
+      document.getElementById('r2rSttBtn').disabled = true;
+      document.getElementById('r2rSaveBtn').disabled = true;
+    }
+    // 텍스트박스는 사용자가 이전에 입력한 내용 유지 (덮어쓰지 않음)
+  } else {
+    _r2rState.sourcePath = '';
+    document.getElementById('r2rTextarea').value = '';
+    document.getElementById('r2rFileLabel').textContent = '';
+    ['r2rSttBtn', 'r2rSaveBtn', 'r2rLoadBtn'].forEach(id => document.getElementById(id).disabled = true);
   }
 }
 
