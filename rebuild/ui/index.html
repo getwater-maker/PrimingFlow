@@ -2845,10 +2845,11 @@ function _flushAutoSaveForActive() {
   try {
     const oldProj = window._currentProject;
     if (!oldProj || !oldProj.sentences || oldProj.sentences.length === 0) return;
-    const outDir = (typeof _projectOutputDir === 'function') ? _projectOutputDir(oldProj) : null;
-    if (!outDir) return;
+    // 첫 저장 전엔 자동저장 안 함 — 사용자가 명시적으로 저장한 프로젝트만 자동 보관소 갱신
+    if (!oldProj.pflowPath) return;
     const ProjectStore = require('../core/project-store');
-    ProjectStore.saveProject(oldProj, outDir);
+    const r = ProjectStore.saveProject(oldProj, { filePath: oldProj.pflowPath });
+    oldProj.pflowPath = r.path;
     if (typeof _updateAutoSaveIndicator === 'function') _updateAutoSaveIndicator('saved');
   } catch (e) {
     console.warn('[자동저장 flush]', e.message);
@@ -3197,15 +3198,15 @@ async function saveProjectFile() {
     alert('먼저 대본을 분할하세요 (저장할 작업이 없음)');
     return;
   }
-  const outDir = _projectOutputDir(proj);
-  if (!outDir) {
-    alert('출력 폴더가 설정되지 않았습니다 — 활성 프리셋의 출력 폴더 먼저 선택하세요');
-    return;
-  }
   try {
     _updateAutoSaveIndicator('saving');
     const ProjectStore = require('../core/project-store');
-    const r = ProjectStore.saveProject(proj, outDir);
+    // 보관 폴더(~/.flow-app/projects/)에 저장. 이전에 저장한 적 있으면 그 파일에 덮어쓰기.
+    const opts = proj.pflowPath
+      ? { filePath: proj.pflowPath }
+      : { name: proj.scriptFileName || proj.name || `project_${new Date().toISOString().slice(0,10)}` };
+    const r = ProjectStore.saveProject(proj, opts);
+    proj.pflowPath = r.path;  // 다음 저장부터 같은 위치 사용
     addLog(`프로젝트 저장 — ${r.path} (sentence ${r.sentencesCount} / 그룹 ${r.groupsCount}, ${Math.round(r.size / 1024)}KB)`, 'ok');
     _updateAutoSaveIndicator('saved');
   } catch (e) {
@@ -3228,15 +3229,17 @@ function _autoSaveProject(projectId) {
       ? window._projects.find(p => p.id === projectId)
       : window._currentProject;
     if (!proj || !proj.sentences || proj.sentences.length === 0) return;
-    const outDir = _projectOutputDir(proj);
-    if (!outDir) {
-      if (isActive) _updateAutoSaveIndicator('');  // 미저장 표시 유지
+    // 자동저장 — 사용자가 한 번이라도 [💾 프로젝트 저장] 을 눌렀거나 [📂 불러오기] 했을 때만
+    // 작동. 첫 저장 전엔 "미저장" 표시 유지 (보관 폴더에 마음대로 파일 만들지 않음).
+    if (!proj.pflowPath) {
+      if (isActive) _updateAutoSaveIndicator('');
       return;
     }
     try {
       if (isActive) _updateAutoSaveIndicator('saving');
       const ProjectStore = require('../core/project-store');
-      ProjectStore.saveProject(proj, outDir);
+      const r = ProjectStore.saveProject(proj, { filePath: proj.pflowPath });
+      proj.pflowPath = r.path; // 안전망 — 이름 충돌 등으로 경로 바뀌었을 경우
       if (isActive) _updateAutoSaveIndicator('saved');
     } catch (e) {
       console.warn('[자동저장]', e.message);
@@ -3246,24 +3249,25 @@ function _autoSaveProject(projectId) {
 }
 
 async function loadProjectFile() {
-  // ipcRenderer.invoke('select-file') 같은 헬퍼가 있으면 좋겠지만, 일단 webkitdirectory 우회 — 그냥 <input type=file>
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.pflow,application/json';
-  input.onchange = async (e) => {
-    const f = e.target.files && e.target.files[0];
-    if (!f) return;
-    let filePath;
-    try {
-      const { webUtils } = require('electron');
-      filePath = webUtils.getPathForFile(f);
-    } catch {
-      filePath = f.path || '';
-    }
-    if (!filePath) {
-      addLog('[프로젝트 불러오기] 파일 경로 추출 실패', 'err');
-      return;
-    }
+  // 보관 폴더(~/.flow-app/projects/) 를 시작 위치로 한 file open dialog.
+  // 사용자가 원하면 다른 폴더(예: 옛 .pflow 가 있던 출력 폴더)로 이동 가능.
+  const ProjectStore = require('../core/project-store');
+  const projectsDir = ProjectStore.getProjectsDir();
+  const result = await ipcRenderer.invoke('show-open-dialog', {
+    title: '프로젝트 불러오기',
+    defaultPath: projectsDir,
+    filters: [{ name: 'PrimingFlow Project', extensions: ['pflow'] }, { name: '전체', extensions: ['*'] }],
+    properties: ['openFile'],
+  }).catch(() => null);
+  if (!result || result.canceled || !result.filePaths || result.filePaths.length === 0) return;
+  const filePath = result.filePaths[0];
+  await _loadProjectFromPath(filePath);
+}
+
+async function _loadProjectFromPath(filePath) {
+  if (!filePath) return;
+  // 본문은 기존 흐름 그대로 — onchange 안에 있던 부분을 함수로 추출
+  {
     try {
       const ProjectStore = require('../core/project-store');
       const { project, stats } = ProjectStore.loadProject(filePath);
@@ -3326,8 +3330,7 @@ async function loadProjectFile() {
       addLog(`프로젝트 불러오기 실패: ${e.message}`, 'err');
       alert('프로젝트 불러오기 실패:\n' + e.message);
     }
-  };
-  input.click();
+  }
 }
 
 async function openCurrentOutputFolder() {

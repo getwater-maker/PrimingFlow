@@ -36,7 +36,7 @@ try {
   process.stderr.write(`[auto-updater] setup failed: ${err && err.stack ? err.stack : err}\n`);
 }
 
-// 표준 다이얼로그 IPC (main.js 난독화로 등록되지 않은 핸들러 — renderer 의 show-save-dialog 호출용)
+// 표준 다이얼로그 IPC (main.js 난독화로 등록되지 않은 핸들러)
 try {
   const { ipcMain, dialog, BrowserWindow } = require('electron');
   ipcMain.handle('show-save-dialog', async (event, options) => {
@@ -45,8 +45,15 @@ try {
       ? await dialog.showSaveDialog(win, options || {})
       : await dialog.showSaveDialog(options || {});
   });
+  // 프로젝트 불러오기 — defaultPath 지원되는 file open dialog 가 필요
+  ipcMain.handle('show-open-dialog', async (event, options) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    return win
+      ? await dialog.showOpenDialog(win, options || {})
+      : await dialog.showOpenDialog(options || {});
+  });
 } catch (err) {
-  process.stderr.write(`[ipc] show-save-dialog handler failed: ${err && err.stack ? err.stack : err}\n`);
+  process.stderr.write(`[ipc] dialog handlers failed: ${err && err.stack ? err.stack : err}\n`);
 }
 
 require('./main');

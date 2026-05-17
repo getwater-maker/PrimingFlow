@@ -1,22 +1,63 @@
 'use strict';
 
 /**
- * 프로젝트 저장/불러오기 — _currentProject 를 출력 폴더 안 project.pflow 로 직렬화.
+ * 프로젝트 저장/불러오기 — _currentProject 를 .pflow 로 직렬화.
  *
- * 핵심 설계:
+ * 핵심 설계 (v2 — 보관 폴더 분리):
+ *   - 저장 위치: ~/.flow-app/projects/<safe-name>.pflow (출력 폴더와 무관한 전용 폴더)
  *   - 자산 경로 (ttsAudioPath/imagePath/videoPath/videoSourceImage) 는 outputDir 기준
- *     상대경로로 저장 → 폴더 통째 이동/복사해도 호환.
+ *     상대경로로 저장. outputDir 자체는 .pflow 안에 명시 기록 → 보관 폴더와 자산 분리.
  *   - 외부 경로(outputDir 밖)는 절대경로 그대로 유지 (안전).
- *   - atomic write: project.pflow.tmp → rename. 백업 1개 (project.pflow.bak).
+ *   - atomic write: <name>.pflow.tmp → rename. 백업 1개 (<name>.pflow.bak).
  *   - 로드 시 자산 파일 존재 검증 — 없으면 status='idle' 로 reset, 누락 통계 반환.
+ *
+ * 호환성:
+ *   - 옛 .pflow (출력 폴더 안 project.pflow) 도 그대로 로드. outputDir 가 .pflow 안에
+ *     없으면 path.dirname(filePath) 를 fallback.
  */
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const FILE_NAME = 'project.pflow';
 const BAK_NAME = 'project.pflow.bak';
 const CURRENT_VERSION = 1;
+
+const PROJECTS_DIR = path.join(os.homedir(), '.flow-app', 'projects');
+
+function ensureProjectsDir() {
+  try { fs.mkdirSync(PROJECTS_DIR, { recursive: true }); }
+  catch (e) { console.error('[project-store] mkdir 실패:', e.message); }
+  return PROJECTS_DIR;
+}
+
+function getProjectsDir() {
+  ensureProjectsDir();
+  return PROJECTS_DIR;
+}
+
+/** Windows/Unix 금지 문자 제거 + 공백 정리 + 확장자 제거 */
+function _sanitizeName(name) {
+  let s = String(name || '').trim();
+  s = s.replace(/\.pflow$/i, '');
+  s = s.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+  s = s.replace(/\s+/g, ' ').trim();
+  if (!s) s = 'project_' + Date.now();
+  return s;
+}
+
+/** 보관 폴더 안에 이미 같은 이름의 .pflow 가 있으면 ' (2)', ' (3)' 접미사 */
+function _uniqueNameInProjectsDir(safeName) {
+  ensureProjectsDir();
+  const taken = (suffix) => fs.existsSync(path.join(PROJECTS_DIR, safeName + suffix + '.pflow'));
+  if (!taken('')) return safeName;
+  for (let i = 2; i < 1000; i++) {
+    const suffix = ` (${i})`;
+    if (!taken(suffix)) return safeName + suffix;
+  }
+  return safeName + '_' + Date.now();
+}
 
 /** 절대경로 → outputDir 기준 상대경로. outputDir 밖이면 절대경로 그대로. */
 function _toRel(absPath, outputDir) {
@@ -42,49 +83,85 @@ function _toAbs(relOrAbs, outputDir) {
 }
 
 /**
+ * 프로젝트 저장.
+ *
  * @param {object} project — window._currentProject
- * @param {string} [targetDir] — outputDir 강제 지정 (없으면 project.outputDir/imageOutputDir 사용)
+ * @param {object|string} [opts] — 옵션 (문자열이면 옛 시그니처 호환: targetDir 로 간주)
+ *   opts.filePath  {string} — 명시적 저장 경로 (재저장용). proj.pflowPath 와 동일.
+ *   opts.name      {string} — 새 저장명 (보관 폴더 안). filePath 보다 후순위.
  * @returns {{ path:string, size:number, sentencesCount:number, groupsCount:number, savedAt:string }}
  */
-function saveProject(project, targetDir) {
+function saveProject(project, opts) {
   if (!project) throw new Error('project 가 null');
-  const outDir = targetDir || project.outputDir || project.imageOutputDir;
-  if (!outDir) throw new Error('출력 폴더가 설정되지 않음 — 프리셋의 출력 폴더 먼저 선택');
-  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+
+  // 옛 시그니처 호환: 두 번째 인자가 문자열이면 폴더 경로로 간주 (외부 직접 호출에 대비)
+  if (typeof opts === 'string') {
+    opts = { _legacyTargetDir: opts };
+  }
+  opts = opts || {};
+
+  // 저장 위치 결정 우선순위:
+  //   1) opts.filePath (명시 — 재저장/자동저장)
+  //   2) project.pflowPath (이전에 저장한 위치 — 재저장)
+  //   3) opts.name (새 이름 → 보관 폴더 안 새 파일)
+  //   4) 자동 이름 (project.scriptFileName / project.name / 'project_<ts>') → 보관 폴더 안 새 파일
+  //   5) opts._legacyTargetDir (호환)
+  let target;
+  if (opts.filePath) {
+    target = opts.filePath;
+  } else if (project.pflowPath && fs.existsSync(path.dirname(project.pflowPath))) {
+    target = project.pflowPath;
+  } else if (opts._legacyTargetDir) {
+    target = path.join(opts._legacyTargetDir, FILE_NAME);
+  } else {
+    const rawName = opts.name
+      || project.scriptFileName
+      || project.name
+      || `project_${new Date().toISOString().slice(0, 10)}`;
+    const safe = _sanitizeName(rawName);
+    const unique = _uniqueNameInProjectsDir(safe);
+    target = path.join(getProjectsDir(), unique + '.pflow');
+  }
+
+  const saveDir = path.dirname(target);
+  if (!fs.existsSync(saveDir)) fs.mkdirSync(saveDir, { recursive: true });
+
+  // 자산 경로 상대화는 outputDir 기준 (보관 폴더와 무관)
+  const outDir = project.outputDir || project.imageOutputDir || null;
 
   // 깊은 복사 + 자산 경로 상대화
   const clone = JSON.parse(JSON.stringify(project));
-  for (const s of (clone.sentences || [])) {
-    if (s.ttsAudioPath) s.ttsAudioPath = _toRel(s.ttsAudioPath, outDir);
+  if (outDir) {
+    for (const s of (clone.sentences || [])) {
+      if (s.ttsAudioPath) s.ttsAudioPath = _toRel(s.ttsAudioPath, outDir);
+    }
+    for (const g of (clone.groups || [])) {
+      if (g.imagePath)        g.imagePath        = _toRel(g.imagePath, outDir);
+      if (g.videoPath)        g.videoPath        = _toRel(g.videoPath, outDir);
+      if (g.videoSourceImage) g.videoSourceImage = _toRel(g.videoSourceImage, outDir);
+    }
   }
-  for (const g of (clone.groups || [])) {
-    if (g.imagePath)        g.imagePath        = _toRel(g.imagePath, outDir);
-    if (g.videoPath)        g.videoPath        = _toRel(g.videoPath, outDir);
-    if (g.videoSourceImage) g.videoSourceImage = _toRel(g.videoSourceImage, outDir);
-  }
+  // pflowPath 는 저장 시점에 결정 — clone 에는 굳이 안 넣음 (외부에서 setter 로 갱신)
+  delete clone.pflowPath;
 
   const payload = Object.assign({
     version: CURRENT_VERSION,
     savedAt: new Date().toISOString(),
   }, clone);
-  // outputDir 자체는 로드 시 파일 위치로 덮어쓰니 굳이 저장 안 해도 되지만 디버깅 편의로 남김
-  payload.outputDir = outDir;
+  if (outDir) payload.outputDir = outDir;
 
-  const target = path.join(outDir, FILE_NAME);
-  const tmp = target + '.tmp';
-  const bak = path.join(outDir, BAK_NAME);
-
-  // 기존 파일 백업 (1개만 유지)
+  // 백업 — 기존 .pflow 가 있으면 같은 폴더 안 <name>.pflow.bak 으로 1개 유지
   if (fs.existsSync(target)) {
+    const bak = target.replace(/\.pflow$/i, '') + '.pflow.bak';
     try { fs.copyFileSync(target, bak); } catch (e) { /* 무시 */ }
   }
 
   // atomic write
+  const tmp = target + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(payload, null, 2), 'utf-8');
   try {
     fs.renameSync(tmp, target);
   } catch (e) {
-    // 일부 시스템에서 같은 device 가 아닐 때 EXDEV — copy+unlink fallback
     fs.copyFileSync(tmp, target);
     try { fs.unlinkSync(tmp); } catch {}
   }
@@ -97,6 +174,28 @@ function saveProject(project, targetDir) {
     groupsCount: (clone.groups || []).length,
     savedAt: payload.savedAt,
   };
+}
+
+/** 보관 폴더 안 .pflow 파일 목록 (최신순). 로드/관리 UI 용. */
+function listProjects() {
+  ensureProjectsDir();
+  try {
+    const files = fs.readdirSync(PROJECTS_DIR);
+    const items = files
+      .filter(f => f.toLowerCase().endsWith('.pflow') && !f.toLowerCase().endsWith('.pflow.bak'))
+      .map(f => {
+        const full = path.join(PROJECTS_DIR, f);
+        let stat;
+        try { stat = fs.statSync(full); } catch { return null; }
+        return { name: f.replace(/\.pflow$/i, ''), path: full, mtime: stat.mtimeMs, size: stat.size };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.mtime - a.mtime);
+    return items;
+  } catch (e) {
+    console.error('[project-store] listProjects 실패:', e.message);
+    return [];
+  }
 }
 
 /**
@@ -115,7 +214,12 @@ function loadProject(filePath) {
   if (!data || typeof data !== 'object') throw new Error('잘못된 프로젝트 파일 형식');
 
   data = _migrateIfNeeded(data);
-  const outDir = path.dirname(filePath);
+
+  // 자산 기준 폴더(outDir) 결정:
+  //   1) .pflow 안에 저장된 outputDir (v2 새 형식 — 보관 폴더와 자산 폴더 분리)
+  //   2) path.dirname(filePath)  (v1 옛 형식 — .pflow 가 자산과 같은 폴더)
+  const savedOutDir = (data.outputDir && fs.existsSync(data.outputDir)) ? data.outputDir : null;
+  const outDir = savedOutDir || path.dirname(filePath);
 
   const stats = {
     ttsMissing: 0, imageMissing: 0, videoMissing: 0,
@@ -164,13 +268,15 @@ function loadProject(filePath) {
     }
   }
 
-  // outputDir 은 파일 위치 기준으로 항상 덮어씀 (다른 PC/위치로 이동 호환)
+  // outputDir 보존 — 저장된 값이 유효하면 그대로, 아니면 .pflow 위치(=옛 형식)로 fallback
   data.outputDir = outDir;
   // imageOutputDir 검증/추정
   if (!data.imageOutputDir || !fs.existsSync(data.imageOutputDir)) {
     const guess = path.join(outDir, 'images');
     if (fs.existsSync(guess)) data.imageOutputDir = guess;
   }
+  // 로드된 .pflow 의 절대경로를 proj.pflowPath 에 기록 → 이후 자동저장/재저장 시 같은 위치 사용
+  data.pflowPath = filePath;
 
   return { project: data, stats };
 }
@@ -193,6 +299,10 @@ module.exports = {
   saveProject,
   loadProject,
   findProjectFile,
+  listProjects,
+  getProjectsDir,
+  ensureProjectsDir,
+  PROJECTS_DIR,
   FILE_NAME,
   CURRENT_VERSION,
 };
