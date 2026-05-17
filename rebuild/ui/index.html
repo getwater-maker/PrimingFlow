@@ -1293,10 +1293,11 @@
 
       <!-- 실행 + 일괄 액션 (통합: 작업시작 섹션 내부) -->
       <div style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:12px;">
-        <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px; margin-bottom:8px;">
-          <button class="btn btn-sm-action" id="startBtn" onclick="generateAll()" title="이미지 + TTS + 도입부 영상 + .vrew 파일까지 한 번에 자동 제작" style="font-weight:700;">▶ 자동제작</button>
+        <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px; margin-bottom:6px;">
+          <button class="btn btn-sm-action" id="startBtn" onclick="generateAll()" title="현재 활성 탭의 대본만 자동 제작 (이미지 + TTS + 도입부 영상 + .vrew)" style="font-weight:700;">▶ 자동제작</button>
           <button class="btn btn-sm-action" id="grokLoginBtn" onclick="openGrokLogin()" title="Grok 자동화 크롬을 띄우고 grok.com 로그인 페이지로 이동 (영상 생성 전 X 계정 로그인 권장)">🔑 그록 로그인</button>
         </div>
+        <button class="btn btn-sm-action" id="startAllProjectsBtn" onclick="generateAllProjects()" title="열려있는 모든 탭을 순차적으로 자동제작 (탭1 완료 → 탭2 자동 시작 → ...)" style="width:100%; margin-bottom:8px; background:var(--accent-soft); color:var(--accent-hover); border:1px solid var(--accent); font-weight:700;">▶▶ 모든 탭 순차 자동제작</button>
         <div style="margin-bottom:8px; font-size:12px; color:var(--text-muted);">
           <label style="display:flex; align-items:center; gap:6px; cursor:pointer;" title="[▶ 자동제작] 클릭 시 도입부 그룹 이미지가 완성되는 즉시 Grok 으로 순차 영상 변환을 시작합니다. 본론은 이미지 그대로.">
             <input type="checkbox" id="autoIntroVideoToggle" checked />
@@ -10175,6 +10176,90 @@ async function generateSelectedGroupImages() {
 // 한 버튼으로 [이미지 생성] → [TTS 변환] 일괄 진행.
 // .vrew 빌드는 별도 버튼([브루생성])으로 분리 — 검토 후 빌드.
 // 폴더 구조: <outDir>/{images, tts} — 각 단계 실패해도 다음 단계 시도.
+// ────────────────────────────────────────────────────────────────────
+// 모든 탭 순차 자동제작 — 탭 1 완료 → 탭 2 자동 시작 → ... → 마지막 탭
+// 사전 검증으로 모든 탭이 분할된 상태인지 확인. 중간 실패 시 사용자에게 계속/중단 선택.
+// 각 탭의 generateAll() 은 활성 탭만 처리하므로 switchProject 로 매 단계 전환.
+// ────────────────────────────────────────────────────────────────────
+async function generateAllProjects() {
+  const projects = [...(window._projects || [])];
+  if (projects.length === 0) { alert('탭이 없습니다.'); return; }
+  if (projects.length === 1) {
+    alert('탭이 1개라 일반 [▶ 자동제작]과 동일합니다 — 그대로 진행합니다.');
+    return generateAll();
+  }
+
+  // 사전 검증 — 모든 탭에 분할된 그룹/문장이 있어야 함
+  const invalid = projects.filter(p => !p.groups || p.groups.length === 0);
+  if (invalid.length > 0) {
+    alert(
+      '다음 탭은 대본 분할이 안 됐습니다:\n\n' +
+      invalid.map(p => `• ${p.name || p.id}`).join('\n') +
+      '\n\n각 탭에서 대본 분할을 먼저 완료한 뒤 다시 시도하세요.'
+    );
+    return;
+  }
+
+  const summary = projects.map((p, i) =>
+    `${i + 1}. ${p.name || p.id} — 그룹 ${p.groups.length} · 문장 ${(p.sentences || []).length}`
+  ).join('\n');
+  const ok = confirm(
+    `${projects.length}개 탭을 순차로 자동제작합니다.\n\n${summary}\n\n` +
+    `각 탭이 끝나면 자동으로 다음 탭이 시작됩니다. 진행하시겠습니까?`
+  );
+  if (!ok) return;
+
+  const startedAt = Date.now();
+  let completed = 0;
+  let failed = 0;
+  const failedNames = [];
+
+  for (let i = 0; i < projects.length; i++) {
+    const p = projects[i];
+    const label = p.name || p.id;
+    // 탭 전환 (활성 탭이어야 generateAll 이 그 프로젝트 처리)
+    try {
+      if (typeof switchProject === 'function') switchProject(p.id);
+      else window._activeProjectId = p.id;
+    } catch (_) {}
+    // DOM 갱신 1프레임 대기
+    await new Promise(r => setTimeout(r, 120));
+
+    addLog(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
+    addLog(`[모든 탭 ${i + 1}/${projects.length}] ▶ '${label}' 시작`, 'info');
+
+    try {
+      await generateAll();
+      completed++;
+      addLog(`[모든 탭 ${i + 1}/${projects.length}] ✅ '${label}' 완료`, 'ok');
+    } catch (e) {
+      failed++;
+      failedNames.push(label);
+      addLog(`[모든 탭 ${i + 1}/${projects.length}] ❌ '${label}' 예외: ${e.message}`, 'err');
+      const cont = confirm(
+        `'${label}' 작업 중 예외:\n${e.message}\n\n` +
+        `다음 탭으로 계속 진행할까요?\n(취소하면 여기서 중단)`
+      );
+      if (!cont) {
+        addLog(`[모든 탭] 사용자가 중단을 선택 — 종료 (${completed} 완료 / ${failed} 실패 / ${projects.length - i - 1} 미진행)`, 'info');
+        break;
+      }
+    }
+  }
+
+  const elapsed = Math.round((Date.now() - startedAt) / 1000);
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  const failPart = failed > 0 ? `, ❌ 실패 ${failed} (${failedNames.join(', ')})` : '';
+  addLog(`━━━ 모든 탭 순차 자동제작 종료 — ✅ ${completed}${failPart}, ${m}분 ${s}초 ━━━`, failed === 0 ? 'ok' : 'err');
+  alert(
+    `모든 탭 순차 자동제작 종료\n\n` +
+    `✅ 완료: ${completed}개\n` +
+    (failed > 0 ? `❌ 실패: ${failed}개 (${failedNames.join(', ')})\n` : '') +
+    `⏱ 총 ${m}분 ${s}초`
+  );
+}
+
 async function generateAll() {
   const proj = window._currentProject;
   if (!proj || !proj.groups || proj.groups.length === 0) {
