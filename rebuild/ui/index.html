@@ -2242,7 +2242,13 @@
 
         <!-- 본문 자막 — 크기/정렬/위치/너비/색상 (영상.vrew 검증 기준값) -->
         <div style="margin-bottom:10px;">
-          <div style="font-weight:600; margin-bottom:6px;">📝 본문 자막</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font-weight:600;">📝 본문 자막</span>
+            <label style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-soft); cursor:pointer;" title="긴 문장이 설정값(긴 문장 임계) 글자수를 넘어가면 자동으로 sub-clip 으로 분할해 자막을 여러 줄로 표시. 끄면 한 문장 = 한 자막 줄 그대로.">
+              <input type="checkbox" id="presetForm_disableLongSplit" style="cursor:pointer;">
+              <span>긴 문장 분할 끄기</span>
+            </label>
+          </div>
           <div style="display:flex; align-items:center; gap:5px; font-size:12px; flex-wrap:wrap;">
             <!-- 첫 옵션이 라벨 (value="" → collectCaptionStyleOpts 의 fallback 적용). 라벨만 보고 선택 안 하면 기본값. -->
             <select id="captionSize" title="자막 크기 (px)" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:2px 4px; font-size:12px; border-radius:3px;">
@@ -5208,6 +5214,8 @@ function _splitScriptImpl() {
     const { buildGroups, buildGroupsHybrid } = require('../core/group-builder');
 
     const hybrid = splitHybrid(text);
+    // 활성 프리셋의 '긴 문장 분할 끄기' 옵션 반영 — group-builder 에 전달
+    const disableLongSplit = _isLongSplitDisabled();
     let result;
     if (hybrid.hasBrackets || hybrid.hasMdIntro) {
       // 대괄호 또는 md 도입부 중 하나라도 있으면 하이브리드 모드
@@ -5215,6 +5223,7 @@ function _splitScriptImpl() {
         shortLen, longLen,
         introSentenceSize: introSize,
         mainSentenceSize: mainSize,
+        disableLongSplit,
       });
       const introCnt  = result.groups.filter(g => g.isIntro).length;
       const bracketCnt = result.groups.filter(g => g.isBracket).length;
@@ -5231,6 +5240,7 @@ function _splitScriptImpl() {
       result = buildGroups(intro.items.map(i => i.text), {
         stages: [{ fromGroup: 1, toGroup: null, sentenceSize: mainSize }],
         shortLen, longLen,
+        disableLongSplit,
       });
       if (stagesNote) stagesNote.style.display = 'none';
     }
@@ -5346,6 +5356,11 @@ function _splitScriptImpl() {
 
 // 긴 문장만 AI 분할로 vrewClips 갱신. 백그라운드 진행 + 진행률 로그.
 async function _refineLongSentencesWithAI(project, longLen) {
+  // 활성 프리셋의 '긴 문장 분할 끄기' 옵션 ON 이면 AI 분할도 skip — 한 문장 = 한 자막 줄 유지
+  if (_isLongSplitDisabled()) {
+    addLog('[AI 분할] 활성 프리셋의 "긴 문장 분할 끄기" 옵션 ON → 스킵', 'info');
+    return;
+  }
   const SecretStore = require('../tts/secret-store');
   const gem = SecretStore.get('gemini');
   if (!gem || !gem.key) {
@@ -7181,6 +7196,10 @@ function openPresetModal(presetId) {
   const defaultEl = document.getElementById('presetForm_isDefault');
   if (defaultEl) defaultEl.checked = !!p.isDefault;
 
+  // 긴 문장 분할 비활성화 토글 — 새 필드 (옛 프리셋엔 없음 → false 폴백)
+  const disableSplitEl = document.getElementById('presetForm_disableLongSplit');
+  if (disableSplitEl) disableSplitEl.checked = !!p.disableLongSplit;
+
   // 엔진 chip active 표시
   document.querySelectorAll('#presetForm_engineChips .chip').forEach(c => {
     c.classList.toggle('active', c.dataset.val === p.engine);
@@ -8157,6 +8176,8 @@ function _readPresetForm() {
   };
   preset.silenceSec = parseFloat(document.getElementById('presetForm_silenceSec')?.value);
   if (isNaN(preset.silenceSec)) preset.silenceSec = 0.8;
+  // 긴 문장 분할 비활성화 (default false — 분할 ON 유지)
+  preset.disableLongSplit = !!document.getElementById('presetForm_disableLongSplit')?.checked;
   if (engine === 'omnivoice') {
     let refAudio = document.getElementById('presetForm_refAudioName').dataset.fullPath || '';
     if (!refAudio) {
@@ -8432,6 +8453,18 @@ function _ensureActivePreset() {
     return false;
   }
   return true;
+}
+
+/** 활성 프리셋의 '긴 문장 분할 끄기' 옵션을 반환. 옵션 ON 이면 true. */
+function _isLongSplitDisabled() {
+  try {
+    if (!_activePresetId) return false;
+    const PresetStore = require('../tts/preset-store');
+    const p = PresetStore.getById(_activePresetId);
+    return !!(p && p.disableLongSplit);
+  } catch (_) {
+    return false;
+  }
 }
 
 // ── 글로벌 발음 사전 모달 ────────────────────────────────────────────────────
@@ -10989,6 +11022,7 @@ async function saveVrew(opts = {}) {
 
   try {
     const { buildVrew } = require('../vrew/vrew-builder');
+    const _disableLongSplitFlag = _isLongSplitDisabled();
     const result = await buildVrew({
       sentences: proj.sentences,
       groups: proj.groups,
@@ -10998,6 +11032,7 @@ async function saveVrew(opts = {}) {
         aiNotice: collectAiNoticeOpts(),
         logo: collectLogoOpts(),
         captionStyle: collectCaptionStyleOpts(),
+        disableLongSplit: _disableLongSplitFlag,
         logger: (msg) => addLog(msg, 'info'),
       },
     });
@@ -11014,6 +11049,7 @@ async function saveVrew(opts = {}) {
       const fcpResult = buildFcpxml(proj, fcpxmlPath, {
         aiNotice: collectAiNoticeOpts(),
         kenburns: true,
+        disableLongSplit: _disableLongSplitFlag,
         log: (msg) => addLog(msg, 'info'),
       });
       addLog(`.fcpxml 저장 완료: ${fcpResult.path} — ${fcpResult.clipCount} clips, ${fcpResult.durationSec.toFixed(1)}초`, 'ok');

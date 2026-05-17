@@ -720,9 +720,12 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
     };
 
     // (c) sub-clip 펼치기 — 1 sub-clip = 1 Vrew clip
+    // opts.disableLongSplit=true 면 vrewClips 가 비어있어도 자동 분할 안 함
     let subClips;
     if (s.vrewClips && s.vrewClips.length > 0) {
       subClips = s.vrewClips;
+    } else if (opts && opts.disableLongSplit) {
+      subClips = [{ text: s.text, weight: 1.0 }];
     } else {
       const auto = splitLongSentenceAlgo(s.text, VREW_MAX_CHARS);
       subClips = (auto.length > 0) ? auto : [{ text: s.text, weight: 1.0 }];

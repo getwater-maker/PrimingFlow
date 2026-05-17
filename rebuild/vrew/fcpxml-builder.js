@@ -74,11 +74,14 @@ function nextId(prefix = 'r') {
 // ─── 자막 sub-clip 펼치기 ──────────────────────────────────────────
 // vrew-builder 와 같은 splitLongSentenceAlgo 사용 — 같은 sub-clip 경계
 
-function expandSentenceToClips(sentence) {
+function expandSentenceToClips(sentence, disableLongSplit) {
   // 우선 sentence.vrewClips 가 이미 있으면 그대로 사용 (AI 분할 결과 보존)
+  // disableLongSplit=true 면 vrewClips 비어있어도 자동 분할 안 함 (한 문장 = 한 자막 줄)
   let subClips;
   if (sentence.vrewClips && sentence.vrewClips.length > 0) {
     subClips = sentence.vrewClips;
+  } else if (disableLongSplit) {
+    subClips = [{ text: sentence.text, weight: 1.0 }];
   } else {
     const auto = splitLongSentenceAlgo(sentence.text, VREW_MAX_CHARS);
     subClips = (auto && auto.length > 0) ? auto : [{ text: sentence.text, weight: 1.0 }];
@@ -271,7 +274,7 @@ function buildFcpxml(project, outPath, opts = {}) {
     let subClipAccumSec = 0;
     for (const s of gc.sentences) {
       const sDur = Math.max(0.5, parseFloat(s.ttsDurationSec) || 1.0);
-      const expandedClips = expandSentenceToClips(s);
+      const expandedClips = expandSentenceToClips(s, !!opts.disableLongSplit);
       let subAcc = 0;
       for (const sc of expandedClips) {
         const subDur = sDur * sc.ratio;

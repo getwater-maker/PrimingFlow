@@ -24,6 +24,15 @@ const { Sentence, Group, makeSentenceIder, finalizeGroupIds } = require('./proje
 const { splitLongSentenceAlgo } = require('./long-sentence-splitter/algo-splitter');
 
 /**
+ * sentence 의 vrewClips 결정 — 긴 문장이면 splitLongSentenceAlgo 로 분할.
+ * thresholds.disableLongSplit=true 면 분할 안 함 (한 문장 = 한 sub-clip).
+ */
+function _buildVrewClips(text, isLong, vrewMaxChars, disableLongSplit) {
+  if (!isLong || disableLongSplit) return [{ text: text, weight: 1.0 }];
+  return splitLongSentenceAlgo(text, vrewMaxChars);
+}
+
+/**
  * 현재 그룹 번호에 해당하는 stage 의 sentenceSize 반환.
  * @param {Array<{fromGroup:number, toGroup:number|null, sentenceSize:number}>} stages
  * @param {number} gNum - 현재 그룹 번호 (1-based)
@@ -60,6 +69,7 @@ function _normalizeStages(thresholds) {
 function buildGroups(sentenceTexts, thresholds) {
   const { shortLen, longLen } = thresholds;
   const vrewMaxChars = thresholds.vrewMaxChars || longLen;
+  const disableLongSplit = !!thresholds.disableLongSplit;
   const stages = _normalizeStages(thresholds);
 
   // 1단계: Sentence 객체 생성 + 짧은/긴 문장 판정 + vrew 클립 자동 분할 (알고리즘)
@@ -71,12 +81,8 @@ function buildGroups(sentenceTexts, thresholds) {
     s.isLong = s.charCount > longLen;
 
     // 8단계: 긴 문장은 알고리즘 분할로 vrewClips 미리 채움.
-    // AI 분할은 사용자가 명시적으로 요청 시 .vrew 저장 시점에 업그레이드.
-    if (s.isLong) {
-      s.vrewClips = splitLongSentenceAlgo(text, vrewMaxChars);
-    } else {
-      s.vrewClips = [{ text: text, weight: 1.0 }];
-    }
+    // disableLongSplit=true 면 분할 안 함 (한 문장 = 한 자막 줄).
+    s.vrewClips = _buildVrewClips(text, s.isLong, vrewMaxChars, disableLongSplit);
     return s;
   });
 
@@ -129,6 +135,7 @@ function buildGroups(sentenceTexts, thresholds) {
 function buildGroupsWithSections(items, thresholds) {
   const { shortLen, longLen } = thresholds;
   const vrewMaxChars = thresholds.vrewMaxChars || longLen;
+  const disableLongSplit = !!thresholds.disableLongSplit;
 
   const sid = makeSentenceIder();
   const sentences = items.map((item, i) => {
@@ -136,9 +143,7 @@ function buildGroupsWithSections(items, thresholds) {
     s.sectionTitle = item.sectionTitle || null;
     s.isShort = s.charCount < shortLen;
     s.isLong = s.charCount > longLen;
-    s.vrewClips = s.isLong
-      ? splitLongSentenceAlgo(item.text, vrewMaxChars)
-      : [{ text: item.text, weight: 1.0 }];
+    s.vrewClips = _buildVrewClips(item.text, s.isLong, vrewMaxChars, disableLongSplit);
     return s;
   });
 
@@ -181,6 +186,7 @@ function buildGroupsWithSections(items, thresholds) {
 function buildGroupsWithIntro(items, thresholds) {
   const { shortLen, longLen, introSentenceSize, mainSentenceSize } = thresholds;
   const vrewMaxChars = thresholds.vrewMaxChars || longLen;
+  const disableLongSplit = !!thresholds.disableLongSplit;
 
   const sid = makeSentenceIder();
   const sentences = items.map((item, i) => {
@@ -188,9 +194,7 @@ function buildGroupsWithIntro(items, thresholds) {
     s.isShort = s.charCount < shortLen;
     s.isLong = s.charCount > longLen;
     s.isIntro = !!item.isIntro;
-    s.vrewClips = s.isLong
-      ? splitLongSentenceAlgo(item.text, vrewMaxChars)
-      : [{ text: item.text, weight: 1.0 }];
+    s.vrewClips = _buildVrewClips(item.text, s.isLong, vrewMaxChars, disableLongSplit);
     return s;
   });
 
@@ -255,6 +259,7 @@ function buildGroupsWithIntro(items, thresholds) {
 function buildGroupsHybrid(items, thresholds) {
   const { shortLen, longLen, introSentenceSize, mainSentenceSize } = thresholds;
   const vrewMaxChars = thresholds.vrewMaxChars || longLen;
+  const disableLongSplit = !!thresholds.disableLongSplit;
 
   const sid = makeSentenceIder();
   const sentences = items.map((item, i) => {
@@ -264,9 +269,7 @@ function buildGroupsHybrid(items, thresholds) {
     s.isIntro = !!item.isIntro;
     s.sectionTitle = item.sectionTitle || null;
     s.mode = item.mode;
-    s.vrewClips = s.isLong
-      ? splitLongSentenceAlgo(item.text, vrewMaxChars)
-      : [{ text: item.text, weight: 1.0 }];
+    s.vrewClips = _buildVrewClips(item.text, s.isLong, vrewMaxChars, disableLongSplit);
     return s;
   });
 
