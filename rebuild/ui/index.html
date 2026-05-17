@@ -3727,13 +3727,76 @@ function applyPreviewTextToAll(v) {
 // 모든 모달의 "배경(외부) 클릭으로 닫기" 동작 일괄 제거.
 // 사용자가 작업 중 실수로 모달 밖 클릭 시 데이터 잃는 사고 방지.
 // X 버튼 또는 명시적 닫기 버튼으로만 닫히도록 한다.
-// (inline onclick="if(event.target===this)..." 패턴을 attribute selector 로 일괄 매칭)
+//
+// 단, 사용자가 "닫으려 했음"을 인지할 수 있도록 외부 클릭 시 시각 힌트:
+//   1) 모달 내용 살짝 펄스
+//   2) X 버튼(✕)에 강조 링 0.8초
+// → 사용자가 모달이 떠있다는 사실을 분명히 인식하고 X 를 누르도록 유도.
 // ────────────────────────────────────────────────────────────────────
+const _MODAL_IDS = [
+  'helpModal',
+  'styleManagerOverlay',
+  'scriptInputModal',
+  'globalDictModal',
+  'scriptDictModal',
+  'apiKeysModal',
+  'channelModal',
+  'presetModal',
+  'ttsServerModal',
+  'vdGachaModal',
+  'videoToTextModal',
+  'recToRefModal',
+  'galleryModal',
+];
+
+// 응급 처치 — 콘솔에서 강제로 떠있는 모달 닫기 (디버깅용)
+window.forceCloseAllModals = function () {
+  let closed = 0;
+  for (const id of _MODAL_IDS) {
+    const el = document.getElementById(id);
+    if (el && getComputedStyle(el).display !== 'none') {
+      console.log('[forceCloseAllModals] 닫음:', id);
+      el.style.display = 'none';
+      closed++;
+    }
+  }
+  return closed;
+};
+
 (function disableModalBackdropClose() {
+  function _hintCloseButton(modal) {
+    if (!modal) return;
+    const inner = modal.firstElementChild;
+    if (inner) {
+      inner.style.transition = 'transform 0.18s ease';
+      inner.style.transform = 'scale(1.015)';
+      setTimeout(() => { inner.style.transform = ''; }, 200);
+    }
+    // X 버튼 후보 — 'btn-sm' 안에 '✕' 텍스트가 있는 것을 우선, 없으면 첫 buttonss
+    const buttons = modal.querySelectorAll('button');
+    let xBtn = null;
+    for (const b of buttons) {
+      if (b.textContent && b.textContent.trim() === '✕') { xBtn = b; break; }
+    }
+    if (!xBtn && buttons.length > 0) xBtn = buttons[0];
+    if (xBtn) {
+      const orig = xBtn.style.boxShadow;
+      xBtn.style.transition = 'box-shadow 0.25s ease';
+      xBtn.style.boxShadow = '0 0 0 4px var(--accent), 0 0 0 8px var(--accent-soft)';
+      setTimeout(() => { xBtn.style.boxShadow = orig || ''; }, 900);
+    }
+  }
   function init() {
-    document.querySelectorAll('[onclick*="event.target===this"]').forEach(el => {
+    for (const id of _MODAL_IDS) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      el.onclick = null;
       el.removeAttribute('onclick');
-    });
+      // 외부 클릭 = 닫기 시도로 간주 → 닫지 않지만 X 버튼 안내
+      el.addEventListener('click', (e) => {
+        if (e.target === el) _hintCloseButton(el);
+      });
+    }
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
