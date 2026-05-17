@@ -5480,13 +5480,13 @@ function renderTaskList(project) {
         }
       }, 50);
     } else if (g.videoStatus === 'generating') {
-      const url = g.imagePath ? 'file:///' + encodeURI(g.imagePath.replace(/\\/g, '/')) : '';
+      const url = g.imagePath ? (typeof _fileUrlForImage === 'function' ? _fileUrlForImage(g.imagePath) : 'file:///' + encodeURI(g.imagePath.replace(/\\/g, '/'))) : '';
       img.innerHTML = (url ? `<img src="${url}" alt="그룹 ${g.num}" style="width:100%; height:100%; object-fit:cover; border-radius:6px; opacity:0.5;">` : '') +
         `<div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(240,180,60,0.4); border-radius:6px; color:#fff; font-size:12px; font-weight:600; text-align:center; padding:6px;">⏳<br>비디오 생성중</div>`;
       img.style.position = 'relative';
       img.classList.add('has-image');
     } else if (g.imagePath) {
-      const url = 'file:///' + encodeURI(g.imagePath.replace(/\\/g, '/'));
+      const url = (typeof _fileUrlForImage === 'function') ? _fileUrlForImage(g.imagePath) : 'file:///' + encodeURI(g.imagePath.replace(/\\/g, '/'));
       img.innerHTML =
         `<img src="${url}" alt="그룹 ${g.num}" style="width:100%; height:100%; object-fit:cover; border-radius:6px;">` +
         `<button class="group-media-trash" type="button" title="이미지 제거" style="${TRASH_STYLE}">🗑</button>`;
@@ -10954,6 +10954,21 @@ function _findProjectByGroupId(groupId) {
   return null;
 }
 
+// file:// 이미지 URL 빌더 — 재생성 시 같은 파일명을 덮어쓰면 Chromium 이 캐시된 옛 이미지를
+// 보여주는 문제를 회피. mtimeMs 를 hash fragment 로 붙여 파일이 갱신되면 URL 이 자동으로
+// 달라지게 함 (서버에 안 보내지는 fragment 라 부작용 X — 동일 audio URL 빌더와 같은 패턴).
+function _fileUrlForImage(absPath) {
+  if (!absPath) return '';
+  const encoded = 'file:///' + encodeURI(absPath.replace(/\\/g, '/'));
+  try {
+    const fs = require('fs');
+    const st = fs.statSync(absPath);
+    return encoded + '#mt=' + Math.floor(st.mtimeMs);
+  } catch {
+    return encoded;
+  }
+}
+
 function _setGroupImageThumbnail(groupId, imgPath) {
   // (PR5) 활성 탭이 아닌 다른 탭의 이미지 task 일 수도 있어 모든 프로젝트 탐색
   const owner = _findProjectByGroupId(groupId);
@@ -10961,11 +10976,9 @@ function _setGroupImageThumbnail(groupId, imgPath) {
   if (g) g.imagePath = imgPath;
   const box = document.querySelector(`.group-image[data-group-id="${groupId}"]`);
   if (!box) return;
-  const url = 'file:///' + encodeURI(imgPath.replace(/\\/g, '/'));
+  const url = _fileUrlForImage(imgPath);
   box.innerHTML = `<img src="${url}" alt="" style="width:100%; height:100%; object-fit:cover; border-radius:6px;">`;
   box.classList.add('has-image');
-  // 동일 파일명을 재생성 시 브라우저 캐시 회피용 쿼리스트링 추가는 file:// 환경에서 효과 적음
-  // 대신 element 를 destroy 하고 재생성한 위 innerHTML 으로 우회됨
 }
 
 // flow-engine 이 보내는 image-done 이벤트 → 그룹 매핑 → 카드 썸네일 자동 표시
