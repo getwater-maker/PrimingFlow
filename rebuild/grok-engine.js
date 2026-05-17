@@ -378,21 +378,22 @@ class GrokEngine {
       this.log(`[Grok] 이미지 업로드: ${path.basename(imagePath)}`);
       if (abortSignal && abortSignal()) return { success: false, error: '사용자 중단' };
 
-      // 7. 모션 프롬프트 입력 — 자연스러운 타이핑 속도 (delay 16ms, 약 분당 380자)
-      //    감속 이력: 10 → 13 → 16 (사용자 요청에 따라 단계적 감속).
+      // 7. 모션 프롬프트 입력 — 일관된 타이핑 페이스.
+      //    배경: Playwright keyboard.type 의 { delay } 옵션은 OS 스케줄링 의존이라
+      //    자동제작 중(이미지/TTS 동시 진행으로 main thread 부하 ↑) vs 단독 호출 시
+      //    실제 페이스가 흐트러져 사용자가 다른 속도로 느낌. 명시적 waitForTimeout 으로
+      //    분리해서 부하와 무관한 일정 페이스 보장 (자동제작·선택그룹·범위 모두 동일).
+      const TYPING_INTERVAL_MS = 22;  // 약 분당 280자 — 자연스러운 사람 페이스
       const promptEl = await this.page.$(GROK_SELECTORS.promptInput);
       if (promptEl) {
         await promptEl.click();
-        const tagName = await promptEl.evaluate(el => el.tagName.toLowerCase());
-        if (tagName === 'textarea' || tagName === 'input') {
-          // textarea 도 keyboard.type 으로 변경 — 자연스러운 타이핑 속도 적용
-          await this.page.keyboard.type(motion, { delay: 16 });
-        } else {
-          // contenteditable
-          await this.page.keyboard.type(motion, { delay: 16 });
+        // textarea / input / contenteditable 모두 동일하게 글자 단위 타이핑 + 일정 sleep
+        for (const ch of motion) {
+          await this.page.keyboard.type(ch);
+          await this.page.waitForTimeout(TYPING_INTERVAL_MS);
         }
         await this.page.waitForTimeout(500);
-        this.log(`[Grok] 모션 프롬프트 입력: "${motion.substring(0, 40)}..." (delay 16ms)`);
+        this.log(`[Grok] 모션 프롬프트 입력: "${motion.substring(0, 40)}..." (interval ${TYPING_INTERVAL_MS}ms)`);
       } else {
         this.log('[Grok] ⚠️ 프롬프트 입력 영역 못 찾음 — 빈 프롬프트로 진행');
       }
