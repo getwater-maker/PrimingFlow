@@ -188,9 +188,12 @@ class TTSManager {
     } else {
       this._maybeRefreshDictAsync();
     }
+    // 순서: 사용자 사전 먼저 → 일반 정규화. 사전이 항상 우선되어 사용자 명시 발음이
+    // 자동 숫자 변환에 덮이지 않게 보장 (예: 사전 "6월"→"유월" 이 정규화 "6월"→"육월"
+    // 보다 우선되어야 한다).
     const { applyOmniVoiceDict, normalizeForTTS } = require('./text-pronouncer');
-    const normalized = normalizeForTTS(text);
-    const processed = applyOmniVoiceDict(normalized, this._dictCache);
+    const dictApplied = applyOmniVoiceDict(text, this._dictCache);
+    const processed = normalizeForTTS(dictApplied);
     const id = opts.provider || 'omnivoice';
     const p = this.providers.get(id);
     if (!p || !p.ready) {
