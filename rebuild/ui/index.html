@@ -11225,6 +11225,44 @@ ipcRenderer.on('image-done', (_, payload) => {
   }
 });
 
+// 응급 헬퍼 — 그룹 카드 이미지가 새로 만든 결과로 갱신 안 됐을 때 사용자가 F12 콘솔에서
+// window.forceReloadGroupImages() 호출하면 imageOutputDir 폴더의 '그룹 NN_' prefix 파일을
+// 모든 그룹에 다시 매핑 + renderTaskList 호출. 사용자 콘솔 명령 부담을 줄임.
+window.forceReloadGroupImages = function (projectArg) {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const proj = projectArg || window._currentProject;
+    if (!proj || !proj.groups) {
+      console.error('[forceReloadGroupImages] 활성 프로젝트 없음');
+      return 0;
+    }
+    const imgDir = proj.imageOutputDir;
+    if (!imgDir || !fs.existsSync(imgDir)) {
+      console.error('[forceReloadGroupImages] imageOutputDir 없음:', imgDir);
+      return 0;
+    }
+    const files = fs.readdirSync(imgDir).filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f));
+    let matched = 0;
+    for (const g of proj.groups) {
+      const groupPrefix = `그룹 ${String(g.num).padStart(2, '0')}_`;
+      const file = files.find(f => f.startsWith(groupPrefix));
+      if (file) {
+        const full = path.join(imgDir, file);
+        if (g.imagePath !== full) matched++;
+        g.imagePath = full;
+        g.imageStatus = 'done';
+      }
+    }
+    if (typeof renderTaskList === 'function') renderTaskList(proj);
+    if (typeof addLog === 'function') addLog(`[forceReload] ${matched}/${proj.groups.length} 그룹 이미지 강제 갱신`, 'ok');
+    return matched;
+  } catch (e) {
+    console.error('[forceReloadGroupImages] 예외:', e);
+    return 0;
+  }
+};
+
 ipcRenderer.on('done', () => {
   setTimeout(() => {
     const order = window._pendingGroupOrder || [];
@@ -11265,6 +11303,16 @@ ipcRenderer.on('done', () => {
         }
       });
       if (typeof _autoSaveProject === 'function') _autoSaveProject(ownerProjectId);
+
+      // 추가 안전망 — pendingGroupOrder 가 동시 작업으로 오염됐거나 _renameToGroupPrefix 가
+      // 실패한 케이스 대비. 해당 프로젝트의 imageOutputDir 폴더를 직접 스캔해서 '그룹 NN_'
+      // prefix 파일을 모든 그룹에 매핑. 사용자가 콘솔 명령 안 쳐도 자동 갱신.
+      const ownerProj = (typeof _findProjectByGroupId === 'function')
+        ? _findProjectByGroupId(order[0])
+        : null;
+      if (ownerProj && typeof window.forceReloadGroupImages === 'function') {
+        window.forceReloadGroupImages(ownerProj);
+      }
     } catch (e) {
       console.error('[group-image] 폴백 스캔 실패:', e);
     }
