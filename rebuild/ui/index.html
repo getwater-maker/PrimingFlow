@@ -8870,6 +8870,7 @@ function _appendSilenceToWav(wavBuf, silenceSec) {
 // (PR4) 큐 진입점 — 호출자가 await convertSentence(sid, opts) 패턴 그대로 사용 가능.
 // 큐가 없으면(폴백) 직접 실행. 정상 흐름은 push → run 안에서 _convertSentenceImpl 실행.
 async function convertSentence(sid, _opts = {}) {
+  if (!_ensureActivePreset()) return;
   const proj = window._currentProject;
   if (!proj) return false;
   const projectId = proj.id;
@@ -9499,6 +9500,7 @@ function _getGrokEngine() {
  * 그록은 _grokConvertActive 별도 플래그 사용 (TTS 변환과 독립적으로 동작)
  */
 async function convertGroupVideo(groupId, opts = {}) {
+  if (!_ensureActivePreset()) return;
   addLog(`[Grok] convertGroupVideo 호출 (groupId=${groupId})`, 'info');
   // (PR5) 큐 진입점 — 사전 검증 후 큐에 push. 본문은 task 안에서 실행.
   const _projForValidation = window._currentProject;
@@ -9799,6 +9801,7 @@ async function retryFailedVideos() {
 
 /** 사용자가 체크박스로 선택한 그룹들만 일괄 비디오 변환 */
 async function convertSelectedGroupsVideo() {
+  if (!_ensureActivePreset()) return;
   try {
     const proj = window._currentProject;
     if (!proj) { addLog('먼저 대본을 분할하세요', 'err'); return; }
@@ -9819,6 +9822,7 @@ async function convertSelectedGroupsVideo() {
 
 /** 그룹 번호 범위로 일괄 비디오 변환 */
 async function convertGroupRangeVideo() {
+  if (!_ensureActivePreset()) return;
   try {
     const proj = window._currentProject;
     if (!proj) { addLog('먼저 대본을 분할하세요', 'err'); return; }
@@ -9880,6 +9884,7 @@ window._ttsConvertActive = false;
 
 // 일괄 변환 버튼 핸들러 — 변환 중이면 중지(어떤 모드든), 아니면 시작 (토글)
 function onBatchConvertClick() {
+  if (!_ensureActivePreset()) return;
   if (window._ttsConvertActive) {
     window._ttsConvertActive = false;
     addLog('변환 중지 요청됨…', 'info');
@@ -9941,6 +9946,7 @@ function _renderRtfBadge() {
 try { _renderRtfBadge(); } catch (_) {}
 
 async function convertAllSentences(opts = {}) {
+  if (!_ensureActivePreset()) return;
   const proj = window._currentProject;
   if (!proj || !proj.sentences || proj.sentences.length === 0) {
     if (!opts.silent) alert('먼저 대본을 분할하세요');
@@ -10084,6 +10090,7 @@ function _resolveOutputDir(channel) {
 }
 
 async function generateAllImages() {
+  if (!_ensureActivePreset()) return;
   const proj = window._currentProject;
   if (!proj || !proj.groups || proj.groups.length === 0) {
     alert('먼저 대본을 분할하세요');
@@ -10095,6 +10102,7 @@ async function generateAllImages() {
 
 // 이미지가 비어있는 그룹만 선별해서 생성 (이미 채워진 그룹은 건너뜀)
 async function generateEmptyGroupImages() {
+  if (!_ensureActivePreset()) return;
   const proj = window._currentProject;
   if (!proj || !proj.groups || proj.groups.length === 0) {
     alert('먼저 대본을 분할하세요');
@@ -10166,6 +10174,7 @@ function removeGroupVideo(groupId) {
 
 /** 좌상단 체크박스로 선택된 그룹들만 이미지 생성/재생성 (영상의 convertSelectedGroupsVideo 와 짝) */
 async function generateSelectedGroupImages() {
+  if (!_ensureActivePreset()) return;
   const proj = window._currentProject;
   if (!proj || !proj.groups || proj.groups.length === 0) {
     alert('먼저 대본을 분할하세요');
@@ -10493,6 +10502,7 @@ async function generateAll() {
 }
 
 async function regenerateGroups(groupIds) {
+  if (!_ensureActivePreset()) return;
   if (!groupIds || groupIds.length === 0) return;
   await _runGroupImageGeneration(groupIds, '재생성');
 }
@@ -10764,6 +10774,7 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
 // 핵심: 한 sentence = 1 TTS 음성, N vrewClips = sourceIn/sourceOut 시간 슬라이스
 // vrew-builder 가 직접 .vrew 파일 생성 (IPC 안 거침 — main.js 의존성 없음)
 async function saveVrew(opts = {}) {
+  if (!_ensureActivePreset()) return { skipped: true };
   const proj = window._currentProject;
   if (!proj || !proj.groups || proj.groups.length === 0) {
     if (!opts.silent) alert('먼저 대본을 분할하세요');
