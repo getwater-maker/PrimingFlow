@@ -2414,6 +2414,38 @@
       <div id="ttsServer_omnivoiceStatus" style="font-size:12px; margin-top:6px; color:var(--text-muted);"></div>
     </div>
 
+    <!-- Supertonic -->
+    <div style="margin-bottom:12px; padding:12px; background:var(--bg-soft); border-radius:8px; border:1px solid var(--border-soft);">
+      <div style="font-size:14px; font-weight:600; color:var(--text-strong); margin-bottom:10px;">
+        Supertonic <span style="font-size:12px; color:var(--text-muted);">(포트 9882 — CPU 백엔드)</span>
+      </div>
+      <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px; line-height:1.5;">
+        💡 같은 PC 의 로컬 CPU(127.0.0.1)에 설치하거나, 한 PC 에 설치하고 다른 PC 에서 LAN/Tailscale 로 호출 가능 (OmniVoice 와 동일 패턴).
+      </div>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <input type="text" id="ttsServer_supertonicUrl" placeholder="http://127.0.0.1:9882 또는 http://192.168.0.X:9882"
+          style="flex:1; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 10px; border-radius:6px; font-size:13px;">
+        <button class="btn-sm" onclick="autoDiscoverTtsServer('supertonic')" style="white-space:nowrap;">🔍 자동 탐색</button>
+        <button class="btn-sm" onclick="testTtsServer('supertonic')" style="white-space:nowrap;">연결 테스트</button>
+      </div>
+      <!-- 빠른 전환 슬롯 (집 LAN / 출장 Tailscale) -->
+      <div style="margin-top:6px; padding:6px 8px; background:var(--bg-input); border-radius:5px; font-size:12px;">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+          <span style="width:54px; color:var(--text-soft); flex:none;">🏠 집:</span>
+          <span id="ttsServer_supertonic_homeUrl" style="flex:1; color:var(--text-muted); font-family:'Cascadia Code',monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">(저장 안됨)</span>
+          <button class="btn-sm" onclick="ttsSlotApply('supertonic','home')" style="font-size:11px; padding:2px 8px;">적용</button>
+          <button class="btn-sm" onclick="ttsSlotSave('supertonic','home')" style="font-size:11px; padding:2px 8px;">현재값 저장</button>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span style="width:54px; color:var(--text-soft); flex:none;">✈️ 출장:</span>
+          <span id="ttsServer_supertonic_travelUrl" style="flex:1; color:var(--text-muted); font-family:'Cascadia Code',monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">(저장 안됨)</span>
+          <button class="btn-sm" onclick="ttsSlotApply('supertonic','travel')" style="font-size:11px; padding:2px 8px;">적용</button>
+          <button class="btn-sm" onclick="ttsSlotSave('supertonic','travel')" style="font-size:11px; padding:2px 8px;">현재값 저장</button>
+        </div>
+      </div>
+      <div id="ttsServer_supertonicStatus" style="font-size:12px; margin-top:6px; color:var(--text-muted);"></div>
+    </div>
+
     <div style="display:flex; gap:6px; margin-top:4px;">
       <button class="btn btn-primary" onclick="saveTtsServerSettings()" style="flex:1;">💾 저장 후 적용</button>
       <button class="btn-sm" onclick="closeTtsServerModal()" style="background:var(--bg-soft); border:1px solid var(--border);">취소</button>
@@ -7933,7 +7965,7 @@ function ttsSlotSave(provider, slot) {
 
 function _refreshTtsSlotDisplay() {
   const slots = _loadTtsSlots();
-  for (const p of ['omnivoice']) {
+  for (const p of ['omnivoice', 'supertonic']) {
     for (const s of ['home', 'travel']) {
       const el = document.getElementById(`ttsServer_${p}_${s}Url`);
       if (!el) continue;
@@ -7952,13 +7984,19 @@ function _refreshTtsSlotDisplay() {
 function openTtsServerModal() {
   const TtsConfig = require('../tts/tts-config');
   const SecretStore = require('../tts/secret-store');
+  // OmniVoice
   const c = TtsConfig.getProvider('omnivoice');
   document.getElementById('ttsServer_omnivoiceUrl').value = c.baseUrl || '';
   document.getElementById('ttsServer_omnivoiceStatus').textContent = '';
-  // API 키 로드
   const s = SecretStore.get('omnivoice') || {};
   const keyEl = document.getElementById('ttsServer_omnivoiceApiKey');
   if (keyEl) keyEl.value = s.apiKey || '';
+  // Supertonic
+  const sc = TtsConfig.getProvider('supertonic');
+  const supEl = document.getElementById('ttsServer_supertonicUrl');
+  if (supEl) supEl.value = sc.baseUrl || '';
+  const supStatus = document.getElementById('ttsServer_supertonicStatus');
+  if (supStatus) supStatus.textContent = '';
   _refreshTtsSlotDisplay();
   document.getElementById('ttsServerModal').style.display = 'flex';
 }
@@ -8086,10 +8124,9 @@ async function saveTtsServerSettings() {
   const { getInstance } = require('../tts/tts-manager');
   const mgr = getInstance();
 
+  // OmniVoice
   const omniUrl = document.getElementById('ttsServer_omnivoiceUrl').value.trim() || 'http://127.0.0.1:9881';
   TtsConfig.setProvider('omnivoice', { baseUrl: omniUrl });
-
-  // API 키 저장 (빈 값이면 인증 미사용)
   const apiKey = (document.getElementById('ttsServer_omnivoiceApiKey')?.value || '').trim();
   if (apiKey) {
     SecretStore.set('omnivoice', { apiKey });
@@ -8097,8 +8134,13 @@ async function saveTtsServerSettings() {
     SecretStore.remove('omnivoice');
   }
 
+  // Supertonic
+  const supUrl = (document.getElementById('ttsServer_supertonicUrl')?.value || '').trim() || 'http://127.0.0.1:9882';
+  TtsConfig.setProvider('supertonic', { baseUrl: supUrl });
+
   await mgr.refreshProvider('omnivoice');
-  addLog(`TTS 서버 설정 저장 완료 — OmniVoice 재연결 중${apiKey ? ' (🔐 API 키 활성화)' : ''}`, 'info');
+  await mgr.refreshProvider('supertonic');
+  addLog(`TTS 서버 설정 저장 완료 — OmniVoice/Supertonic 재연결 중${apiKey ? ' (🔐 API 키 활성화)' : ''}`, 'info');
   closeTtsServerModal();
   setTimeout(renderPresets, 1500);
 }
