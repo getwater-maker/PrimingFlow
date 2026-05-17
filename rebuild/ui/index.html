@@ -1297,7 +1297,7 @@
           <button class="btn btn-sm-action" id="startBtn" onclick="generateAll()" title="현재 활성 탭의 대본만 자동 제작 (이미지 + TTS + 도입부 영상 + .vrew)" style="font-weight:700;">▶ 자동제작</button>
           <button class="btn btn-sm-action" id="grokLoginBtn" onclick="openGrokLogin()" title="Grok 자동화 크롬을 띄우고 grok.com 로그인 페이지로 이동 (영상 생성 전 X 계정 로그인 권장)">🔑 그록 로그인</button>
         </div>
-        <button class="btn btn-sm-action" id="startAllProjectsBtn" onclick="generateAllProjects()" title="⚠️ multi-project 격리 버그(두 번째 탭의 이미지/영상이 첫 번째 탭 결과로 오염) 진단 중 — 일시 비활성화" style="width:100%; margin-bottom:8px; opacity:0.5; cursor:not-allowed; background:var(--bg-soft); color:var(--text-muted); border:1px dashed var(--border);" disabled>⚠️ 모든 탭 순차 자동제작 (점검 중)</button>
+        <button class="btn btn-sm-action" id="startAllProjectsBtn" onclick="generateAllProjects()" title="열려있는 모든 탭을 순차적으로 자동제작 (탭1 완료 → 탭2 자동 시작 → ...)" style="width:100%; margin-bottom:8px; background:var(--accent-soft); color:var(--accent-hover); border:1px solid var(--accent); font-weight:700;">▶▶ 모든 탭 순차 자동제작</button>
         <div style="margin-bottom:8px; font-size:12px; color:var(--text-muted);">
           <label style="display:flex; align-items:center; gap:6px; cursor:pointer;" title="[▶ 자동제작] 클릭 시 도입부 그룹 이미지가 완성되는 즉시 Grok 으로 순차 영상 변환을 시작합니다. 본론은 이미지 그대로.">
             <input type="checkbox" id="autoIntroVideoToggle" checked />
@@ -10340,21 +10340,10 @@ async function generateSelectedGroupImages() {
 // 각 탭의 generateAll() 은 활성 탭만 처리하므로 switchProject 로 매 단계 전환.
 // ────────────────────────────────────────────────────────────────────
 async function generateAllProjects() {
-  // ⚠️ v1.12.6 hotfix — multi-project 격리 결함 진단 전까지 차단.
-  // 사용자 보고: 두 번째 탭 자동제작이 첫 번째 탭의 이미지/영상을 그대로 사용한
-  // 채로 .vrew 빌드 (vrew self-check 의 그룹 수가 첫 번째 대본 수치로 나옴).
-  // root cause: switchProject 후 saveVrew/이미지 task 가 두 번째 탭의 groups 가 아닌
-  // 무언가 공유 상태를 참조 — 정밀 디버깅 후 v1.12.7+ 에서 다시 활성화.
-  alert(
-    '⚠️ "모든 탭 순차 자동제작" 일시 비활성화\n\n' +
-    'multi-project 격리 결함이 발견되어(두 번째 탭이 첫 번째 탭의 이미지·영상을\n' +
-    '사용하는 버그) 진단·수정 전까지 차단합니다.\n\n' +
-    '⮕ 임시 대안: 각 탭에서 [▶ 자동제작] 을 따로 누르세요.\n' +
-    '   한 탭의 모달이 ✓확인으로 활성화되면 닫고, 다음 탭으로 전환·시작.'
-  );
-  return;
-  // (아래 코드는 v1.12.7+ 진단 완료 후 재활성화)
-  /* eslint-disable */
+  // v1.13.4 — multi-project 격리 결함 root cause 진단 + fix 완료.
+  // F12 콘솔 객체 동일성 검증으로 데이터 격리는 OK 확인 (groups/sentences 모두 다른 객체).
+  // 결함 원인 — saveVrew 가 자체 const proj = window._currentProject; 재참조 시 타이밍에
+  // 따라 다른 탭이 활성이었음. fix — generateAll 이 saveVrew 호출 시 opts.proj 명시 전달.
   const projects = [...(window._projects || [])];
   if (projects.length === 0) { alert('탭이 없습니다.'); return; }
   if (projects.length === 1) {
@@ -10615,7 +10604,9 @@ async function generateAll() {
   // Vrew 자동 빌드 — embedded 모드 (saveVrew 가 모달을 새로 띄우지 않고 기존 step 갱신만)
   try {
     _updateAutoStep('vrew', { status: '빌드 시작...' });
-    const vrewResult = await saveVrew({ embedded: true, silent: false, autoFillTts: false, skipTts: ttsDone < sentenceCount });
+    // proj 를 명시 전달 — saveVrew 안 _currentProject 재참조 시 타이밍에 따라 다른 탭으로
+    // 바뀌는 multi-project 격리 결함(v1.12.6 발견) 의 root cause 차단.
+    const vrewResult = await saveVrew({ embedded: true, silent: false, autoFillTts: false, skipTts: ttsDone < sentenceCount, proj });
     if (vrewResult && vrewResult.success) {
       _updateAutoStep('vrew', { status: `✅ ${vrewResult.clipCount} clips`, done: true });
     } else if (vrewResult && vrewResult.cancelled) {
@@ -10915,7 +10906,10 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
 // vrew-builder 가 직접 .vrew 파일 생성 (IPC 안 거침 — main.js 의존성 없음)
 async function saveVrew(opts = {}) {
   if (!_ensureActivePreset()) return { skipped: true };
-  const proj = window._currentProject;
+  // 호출자가 opts.proj 를 명시 전달하면 그것 우선 — multi-project 자동제작에서 saveVrew 가
+  // 자기 탭의 데이터를 정확히 빌드하도록 보장 (window._currentProject 재참조 시 타이밍
+  // 문제로 다른 탭이 활성일 수 있음).
+  const proj = opts.proj || window._currentProject;
   if (!proj || !proj.groups || proj.groups.length === 0) {
     if (!opts.silent) alert('먼저 대본을 분할하세요');
     return { skipped: true };
