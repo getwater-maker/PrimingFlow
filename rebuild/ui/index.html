@@ -1640,7 +1640,10 @@
   <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; width:460px; max-width:92vw; box-shadow:var(--shadow-lg); display:flex; flex-direction:column; overflow:hidden;">
     <div style="padding:16px 20px; border-bottom:1px solid var(--border-soft); display:flex; justify-content:space-between; align-items:center;">
       <h3 id="autoProgressTitle" style="font-size:15px; color:var(--accent); margin:0; font-weight:700;">작업 진행 중</h3>
-      <button class="btn-sm" id="autoProgressCloseBtn" onclick="_closeAutoProgress()" style="font-size:13px; opacity:0.5; cursor:not-allowed;" disabled title="작업 중에는 닫을 수 없습니다">✕</button>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <button class="btn-sm" id="autoProgressStopBtn" onclick="cancelAutoGeneration()" style="font-size:12px; padding:4px 10px; background:var(--danger); color:#fff; font-weight:600; display:none;" title="진행 중인 작업을 즉시 중단 (Flow 이미지 / Grok 영상 / 모달 폴링)">⏹ 중지</button>
+        <button class="btn-sm" id="autoProgressCloseBtn" onclick="_closeAutoProgress()" style="font-size:13px; opacity:0.5; cursor:not-allowed;" disabled title="작업 중에는 닫을 수 없습니다">✕</button>
+      </div>
     </div>
     <div id="autoProgressBody" style="padding:16px 20px; display:flex; flex-direction:column; gap:10px; font-size:13px;">
       <!-- 진행 단계 행들이 동적으로 들어감 -->
@@ -9038,6 +9041,7 @@ function _showAutoProgress(title, steps) {
   const titleEl = document.getElementById('autoProgressTitle');
   const body = document.getElementById('autoProgressBody');
   const closeBtn = document.getElementById('autoProgressCloseBtn');
+  const stopBtn = document.getElementById('autoProgressStopBtn');
   const summary = document.getElementById('autoProgressSummary');
   if (!modal) return;
   titleEl.textContent = title || '작업 진행 중';
@@ -9053,6 +9057,14 @@ function _showAutoProgress(title, steps) {
   closeBtn.style.fontWeight = '';
   closeBtn.style.padding = '';
   closeBtn.style.borderColor = '';
+  // 중지 버튼 활성화 — 작업 진행 중에는 표시
+  if (stopBtn) {
+    stopBtn.style.display = '';
+    stopBtn.disabled = false;
+    stopBtn.textContent = '⏹ 중지';
+  }
+  // 글로벌 cancel 신호 초기화 (이전 작업의 잔재 제거)
+  window._autoCancelRequested = false;
   body.innerHTML = '';
   for (const step of (steps || [])) {
     const row = document.createElement('div');
@@ -9109,7 +9121,10 @@ function _updateAutoStep(id, patch) {
 
 function _finishAutoProgress(summary) {
   const closeBtn = document.getElementById('autoProgressCloseBtn');
+  const stopBtn = document.getElementById('autoProgressStopBtn');
   const sumEl = document.getElementById('autoProgressSummary');
+  // 중지 버튼 숨김 — 작업 종료된 시점이라 무의미
+  if (stopBtn) stopBtn.style.display = 'none';
   if (closeBtn) {
     closeBtn.disabled = false;
     closeBtn.style.opacity = '1';
@@ -9135,6 +9150,55 @@ function _closeAutoProgress() {
   if (closeBtn && closeBtn.disabled) return;
   modal.style.display = 'none';
   if (_autoProgressTimer) { clearInterval(_autoProgressTimer); _autoProgressTimer = null; }
+}
+
+// 자동제작 중지 — 진행 중인 모든 자원별 작업에 중단 신호.
+// 사용자가 자동제작 모달의 ⏹ 중지 버튼 또는 ESC 로 호출.
+async function cancelAutoGeneration() {
+  if (!confirm(
+    '⏹ 자동제작을 중지할까요?\n\n' +
+    '진행 중인 작업이 모두 멈춥니다:\n' +
+    '  · Flow 이미지 생성\n' +
+    '  · Grok 비디오 변환\n' +
+    '  · TTS 일괄 변환\n\n' +
+    '이미 만들어진 자산(이미지/TTS/영상)은 그대로 유지됩니다.'
+  )) return;
+
+  addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'err');
+  addLog('🛑 사용자가 자동제작 중지 요청 — 모든 작업 중단', 'err');
+
+  // 1. 전역 cancel 신호 — generateAll 의 polling 루프 + 후속 task 진입 차단
+  window._autoCancelRequested = true;
+  window._autoPollActive = false;
+
+  // 2. Flow 이미지 생성 중지 (flow-engine 의 stop-generation IPC)
+  try {
+    if (typeof getSelectedProfile === 'function') {
+      await ipcRenderer.invoke('stop-generation', getSelectedProfile());
+    } else {
+      await ipcRenderer.invoke('stop-generation', 'default');
+    }
+    addLog('[중지] Flow 이미지 생성 중단 요청 전송', 'info');
+  } catch (e) {
+    addLog(`[중지] Flow stop-generation 실패: ${e.message}`, 'info');
+  }
+
+  // 3. Grok 비디오 변환 중지 (abortSignal 콜백이 이 플래그 감지)
+  try {
+    window._grokConvertActive = false;
+    addLog('[중지] Grok 비디오 변환 중단 신호', 'info');
+  } catch (_) {}
+
+  // 4. TTS 일괄 변환 중단 신호 (convertAllSentences 측에서 폴링 시 사용)
+  try {
+    window._ttsAbortRequested = true;
+    addLog('[중지] TTS 일괄 변환 중단 신호', 'info');
+  } catch (_) {}
+
+  // 5. 진행 모달 종료 — 사용자가 ✓확인 누를 수 있게 X 활성화
+  try { _finishAutoProgress('🛑 사용자 중지'); } catch (_) {}
+
+  addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'err');
 }
 
 // file:// audio URL 빌더 — 재변환 후 같은 경로의 mp3/wav 가 캐시되어 옛 소리가 들리는
@@ -10354,10 +10418,11 @@ async function generateAll() {
   _showAutoProgress('자동제작 진행 중', progressSteps);
 
   // 백그라운드 폴링 — 1초 간격으로 현재 진행 상태 모달에 반영
-  let _autoPollActive = true;
+  // window 글로벌화 — cancelAutoGeneration() 에서 외부 중단 가능
+  window._autoPollActive = true;
   (async function _autoProgressPoll() {
     const fsP = require('fs');
-    while (_autoPollActive) {
+    while (window._autoPollActive) {
       try {
         const imgDone = proj.groups.filter(g => g.imagePath && fsP.existsSync(g.imagePath)).length;
         _updateAutoStep('img', { current: imgDone, total: groupCount, status: imgDone >= groupCount ? '완료' : '진행 중' });
@@ -10463,7 +10528,7 @@ async function generateAll() {
   try { _updateProgress && _updateProgress(); } catch {}
 
   // 폴링 종료 + 마지막 한 번 확정 갱신
-  _autoPollActive = false;
+  window._autoPollActive = false;
   try {
     _updateAutoStep('img',  { current: imgDone,    total: groupCount,    status: '완료', done: imgDone >= groupCount });
     _updateAutoStep('tts',  { current: ttsDone,    total: sentenceCount, status: '완료', done: ttsDone >= sentenceCount });
