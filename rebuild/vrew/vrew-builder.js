@@ -600,12 +600,16 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
         sourceFileType: 'ASSET_VIDEO', fileLocation: 'IN_MEMORY',
       });
 
-      // 비디오 트랙 — 5% 확대 + 가운데 정렬로 letterbox 띠 제거.
+      // 비디오 트랙 — 8% 확대 + 가운데 정렬로 letterbox 띠 + 인코딩 artifact 제거.
       // (사용자가 Vrew 에서 수동으로 하던 "영상 키우고 가운데 정렬" 자동화)
-      // 영상 비율(예: 1280x704=1.818) 과 화면 16:9(=1.778) 비율 차이 ≈ 2.3% 라
-      // 5% 마진이면 letterbox 완전 가림 + 좌우 살짝(2.5%)만 화면 밖으로 잘림.
-      const SCALE  = 1.05;
-      const OFFSET = (1 - SCALE) / 2;      // = -0.025 (가운데 정렬)
+      //
+      // 비율 차이: 영상(예: 1280x704=1.818) ↔ 화면 16:9(=1.778) ≈ 2.3%
+      // 5% 마진(이전 값)이면 letterbox 자체는 가려지지만 Grok 출력의 영상 마지막
+      // 1~2픽셀 row 가 흰색 인코딩 artifact 로 남는 케이스 발견 → 사용자가 화면
+      // 하단에 얇은 흰 줄을 봤음. 8% 마진으로 늘려서 가장자리 픽셀까지 화면 밖으로
+      // 밀어냄 (각 변 4%씩 잘림 — 영상 중앙 콘텐츠는 그대로 보존).
+      const SCALE  = 1.08;
+      const OFFSET = (1 - SCALE) / 2;      // = -0.04 (가운데 정렬)
       pj.props.tracks[videoTid] = {
         trackId: videoTid, mediaId: mid,
         xPos: OFFSET, yPos: OFFSET, height: SCALE, width: SCALE,
