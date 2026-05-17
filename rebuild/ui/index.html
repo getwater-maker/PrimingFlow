@@ -3548,8 +3548,11 @@ function addLog(msg, type = '') {
 }
 
 // ─── 프로젝트 출력 폴더 통합 헬퍼 ─────────────────────
-// 모든 출력 (이미지 / TTS / .vrew) 이 같은 "프리셋이름_MMDD" 폴더 하위에 저장.
+// 모든 출력 (이미지 / TTS / 비디오 / 자막 / .vrew) 이 같은 "MMDD_<대본이름>" 폴더 하위에 저장.
 // 첫 호출 시 결정 후 proj.outputDir 에 캐시 — 한 프로젝트 안에서는 항상 동일.
+//
+// 폴더명 우선순위 — 대본 파일명(가장 식별 명확) > 프리셋 이름 > 'project'.
+// 옛 'vrew' fallback 제거 (다른 대본의 결과와 폴더가 섞이지 않게).
 function _getProjectOutputDir() {
   const proj = window._currentProject;
   if (proj && proj.outputDir) return proj.outputDir;
@@ -3561,10 +3564,14 @@ function _getProjectOutputDir() {
   if (!baseOutDir) return null;
 
   const safe = (s) => String(s || '').replace(/[\\/:*?"<>|]/g, '').trim();
-  const presetLabel = safe(activePreset && activePreset.name) || 'vrew';
+  // 대본 파일명 > 프리셋 이름 > 'project' 순으로 라벨 결정
+  const nameLabel = safe(window._scriptFileName)
+    || safe(proj && proj.scriptFileName)
+    || safe(activePreset && activePreset.name)
+    || 'project';
   const today = new Date();
   const mmdd = `${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
-  const folderName = `${mmdd}_${presetLabel}`;
+  const folderName = `${mmdd}_${nameLabel}`;
 
   const path = require('path');
   const fs = require('fs');
