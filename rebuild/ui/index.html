@@ -10898,6 +10898,23 @@ async function saveVrew(opts = {}) {
     addLog(`  → ${result.clipCount} clips${result.missing.length ? ' (TTS 누락 #' + result.missing.join(',') + ')' : ''}`, 'info');
     setVrewStep({ status: `✅ 완료 — ${result.clipCount} clips`, done: true });
 
+    // ── Premiere Pro 호환 FCPXML 도 같이 저장 ─────────────────────
+    // 같은 폴더에 같은 basename 의 .fcpxml. Premiere Pro / DaVinci Resolve /
+    // Final Cut Pro 가 모두 import 가능 — 사용자가 원하는 도구로 자유롭게 후작업.
+    try {
+      const { buildFcpxml } = require('../vrew/fcpxml-builder');
+      const fcpxmlPath = vrewPath.replace(/\.vrew$/i, '') + '.fcpxml';
+      const fcpResult = buildFcpxml(proj, fcpxmlPath, {
+        aiNotice: collectAiNoticeOpts(),
+        kenburns: true,
+        log: (msg) => addLog(msg, 'info'),
+      });
+      addLog(`.fcpxml 저장 완료: ${fcpResult.path} — ${fcpResult.clipCount} clips, ${fcpResult.durationSec.toFixed(1)}초`, 'ok');
+    } catch (e) {
+      addLog(`[FCPXML] 저장 실패 (vrew 는 정상): ${e.message}`, 'err');
+      console.error('[saveFcpxml]', e);
+    }
+
     // vrew 폴더 자동 열기 — 사용자 정책: 항상 (vrew 저장 / 자동제작 둘 다)
     try {
       await ipcRenderer.invoke('open-folder', finalDir);
