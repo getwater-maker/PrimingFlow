@@ -289,7 +289,9 @@ class GrokEngine {
 
       // 4. /imagine 진입 (이전 결과 페이지 /imagine/post/... 에 있으면 메인으로 이동)
       if (!this.page.url().endsWith('/imagine') && !this.page.url().endsWith('/imagine/')) {
-        await this.page.goto(GROK_URL, { waitUntil: 'networkidle', timeout: 30000 });
+        // waitUntil 'networkidle' → 'load' — Grok SPA 의 background API 호출이 끊이지 않아
+      // networkidle 가 timeout 되는 케이스 회피. load 면 DOM 준비됐을 때 즉시 진행.
+      await this.page.goto(GROK_URL, { waitUntil: 'load', timeout: 30000 });
         await this.page.waitForTimeout(2000);
       }
       // 진입 후 떠있는 모든 dialog 닫기
@@ -399,22 +401,46 @@ class GrokEngine {
       }
       if (abortSignal && abortSignal()) return { success: false, error: '사용자 중단' };
 
-      // 8. Submit — submit 버튼 우선, 안 되면 Enter 키
-      await this._dismissAnyDialog();
-      const submitBtn = await this.page.$(GROK_SELECTORS.submitButton);
-      if (submitBtn) {
-        await submitBtn.click();
-      } else {
-        await this.page.keyboard.press('Enter');
-      }
-      this.log('[Grok] 생성 요청 전송 — 결과 페이지로 이동 대기');
+      // 8. Submit — submit 버튼 우선 + Enter 키 백업 (둘 다 시도해서 robust ↑)
+      // 9. URL 이 /imagine/post/<UUID> 로 변경되는 것 감지 (timeout 30→90 초)
+      //
+      // 이전 30초 timeout 으로 인한 실패가 잦았음:
+      //   - Grok 서버 부하 시 submit 응답이 30초 넘김
+      //   - submit 버튼 클릭만으로 form 트리거 안 되는 케이스 발견
+      //
+      // 강화: 첫 시도 실패 시 한 번 더 (페이지 새로고침 + 재시도) — Grok UI 잔여 상태 해소.
+      const _trySubmitAndWait = async () => {
+        await this._dismissAnyDialog();
+        const submitBtn = await this.page.$(GROK_SELECTORS.submitButton);
+        if (submitBtn) {
+          try { await submitBtn.click(); } catch (_) {}
+        }
+        // 버튼 클릭 후에도 안 됐을 케이스 대비해서 Enter 도 발사 (이미 페이지 전환된 경우엔 무시됨)
+        try { await this.page.keyboard.press('Enter'); } catch (_) {}
+        this.log('[Grok] 생성 요청 전송 — 결과 페이지로 이동 대기 (최대 90초)');
+        await this.page.waitForURL(/\/imagine\/post\//, { timeout: 90000 });
+      };
 
-      // 9. URL 이 /imagine/post/<UUID> 로 변경되는 것 감지
       try {
-        await this.page.waitForURL(/\/imagine\/post\//, { timeout: 30000 });
+        await _trySubmitAndWait();
         this.log(`[Grok] 결과 페이지 진입: ${this.page.url()}`);
       } catch (e) {
-        return { success: false, error: '결과 페이지로 이동 안 됨 (30초 timeout). 입력/Submit 단계 selector 확인 필요' };
+        // 1차 실패 — 페이지 새로고침 + 1회 재시도
+        this.log(`[Grok] 1차 submit 실패 (${e.message}) — 페이지 새로고침 후 1회 재시도`);
+        try {
+          await this.page.reload({ waitUntil: 'load', timeout: 30000 });
+          await this.page.waitForTimeout(2000);
+          // 이 시점 URL 이 결과 페이지(/imagine/post/...) 면 사실은 submit 이 됐는데
+          // waitForURL 만 못 잡은 케이스 — 그대로 진행
+          if (/\/imagine\/post\//.test(this.page.url())) {
+            this.log(`[Grok] reload 후 이미 결과 페이지에 있음: ${this.page.url()}`);
+          } else {
+            await _trySubmitAndWait();
+            this.log(`[Grok] 결과 페이지 진입(재시도): ${this.page.url()}`);
+          }
+        } catch (e2) {
+          return { success: false, error: `결과 페이지로 이동 안 됨 (재시도 후 실패: ${e2.message})` };
+        }
       }
 
       // 10. 비디오 생성 완료 대기 (폴링)
