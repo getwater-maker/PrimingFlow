@@ -264,13 +264,14 @@ function addAiNoticeTrack(pj, opt, clipDurations, log) {
   //   outlineColor — 외곽선 색
   //   outlineNone  — true 면 outline-on:'false' 로 외곽선 비활성
   //   bgColor      — 배경 색 (6자리 hex 그대로 = 100% 불투명)
-  //   bgNone       — true 면 배경 투명 (#00000000)
+  //   bgNone       — true 면 --textbox-color attribute 자체를 제거해 투명 처리.
+  //                  (이전엔 '#00000000' 으로 보냈는데 Vrew 4.0.1 의 color-hex 가
+  //                   8자리 hex 를 인식 못 하고 흰색 default 로 fallback 되는 문제)
   const fontColor    = String(opt.fontColor    || opt.color || '#FFFFFF');
   const outlineColor = String(opt.outlineColor || '#000000');
   const bgRaw        = String(opt.bgColor      || '#FFFFFF').toLowerCase();
   const bgNone       = !!opt.bgNone;
   const outlineNone  = !!opt.outlineNone;
-  const bgValue      = bgNone ? '#00000000' : bgRaw;
 
   const textAttrs = {
     size: String(opt.fontSize || '75'),
@@ -282,6 +283,14 @@ function addAiNoticeTrack(pj, opt, clipDurations, log) {
     ...(opt.bold   ? { bold: true }   : {}),
     ...(opt.italic ? { italic: true } : {}),
   };
+
+  // customAttributes — bgNone 이면 --textbox-color 항목 자체를 빼서 Vrew 가 투명 처리
+  const customAttributes = [
+    { attributeName: '--textbox-align', type: 'textbox-align', value: 'start' },
+  ];
+  if (!bgNone) {
+    customAttributes.unshift({ attributeName: '--textbox-color', type: 'color-hex', value: bgRaw });
+  }
 
   pj.props.tracks[tid] = {
     trackId: tid,
@@ -302,10 +311,7 @@ function addAiNoticeTrack(pj, opt, clipDurations, log) {
     durationSeconds,
     importType: 'copy_and_paste',
     enabledInlineTypes: ['bold','italic','font','size','color','background','outline-color','shadow-color'],
-    customAttributes: [
-      { attributeName: '--textbox-color', type: 'color-hex', value: bgValue },
-      { attributeName: '--textbox-align', type: 'textbox-align', value: 'start' },
-    ],
+    customAttributes,
     assetEffectInfo: { type: 'fade-in', duration: opt.fadeMs || 1500, startDelay: startDelayMs },
     stats: { styledInFloatingMenu: true, styledInPanel: false },
     scaleFactor: 1.7777777777777777,
