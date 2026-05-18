@@ -3950,9 +3950,14 @@ function _v2tDetectKind(file) {
       document.getElementById('v2tFileLabel').textContent = filePath ? `🎵 음성 파일: ${filePath}` : '(경로 없음)';
       extractBtn.disabled = true;
       extractBtn.textContent = '✓ 음성 파일 (추출 불필요)';
-      // 오디오 미리듣기 즉시 표시
+      // 오디오 미리듣기 즉시 표시 (경로의 #/공백/한글 등 안전 인코딩)
       const audio = document.getElementById('v2tAudio');
-      audio.src = 'file:///' + filePath.replace(/\\/g, '/');
+      try {
+        audio.src = require('url').pathToFileURL(filePath).href;
+      } catch (_) {
+        audio.src = 'file:///' + encodeURI(filePath.replace(/\\/g, '/'));
+      }
+      audio.load();
       document.getElementById('v2tAudioWrap').style.display = '';
       document.getElementById('v2tAudioLabel').textContent = '2️⃣ 음성 (원본)';
       // STT + 저장 즉시 활성
@@ -3986,7 +3991,12 @@ async function v2t_extract() {
     await MediaUtils.extractAudioMp3(_v2tState.videoPath, out);
     _v2tState.mp3Path = out;
     const audio = document.getElementById('v2tAudio');
-    audio.src = 'file:///' + out.replace(/\\/g, '/');
+    try {
+      audio.src = require('url').pathToFileURL(out).href;
+    } catch (_) {
+      audio.src = 'file:///' + encodeURI(out.replace(/\\/g, '/'));
+    }
+    audio.load();
     document.getElementById('v2tAudioWrap').style.display = '';
     document.getElementById('v2tSttBtn').disabled = false;
     document.getElementById('v2tSaveMp3Btn').disabled = false;
@@ -4270,7 +4280,10 @@ async function r2r_load() {
   ws.on('play', () => { document.getElementById('r2rPlayBtn').textContent = '⏸ 일시정지'; });
 
   try {
-    await ws.load('file:///' + _r2rState.sourcePath.replace(/\\/g, '/'));
+    let wsUrl;
+    try { wsUrl = require('url').pathToFileURL(_r2rState.sourcePath).href; }
+    catch (_) { wsUrl = 'file:///' + encodeURI(_r2rState.sourcePath.replace(/\\/g, '/')); }
+    await ws.load(wsUrl);
   } catch (e) {
     document.getElementById('r2rSaveStatus').textContent = '❌ 오디오 로드 실패: ' + e.message;
   }
