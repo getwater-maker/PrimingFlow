@@ -587,6 +587,34 @@ async def asr_status():
     return {"loaded": _asr_loaded}
 
 
+def _run_asr_pipeline(audio_path: str) -> str:
+    """OmniVoice._asr_pipe 를 직접 호출 — 30초 넘는 long-form 오디오 자동 청크 처리.
+
+    OmniVoice.transcribe() 는 kwargs 미지원이라 Whisper 의 30초 제한 회피 옵션을
+    전달 불가 → 내부 pipe (transformers AutomaticSpeechRecognitionPipeline) 를 직접 사용.
+
+    - chunk_length_s=30: Whisper 의 mel 입력 한계와 정확히 일치, 슬라이딩 윈도우로 자동 분할
+    - return_timestamps=True: long-form generation 활성화 (chunk_length_s 와 함께 필수)
+    - batch_size=8: GPU 가속 — 청크들을 병렬 처리
+    - stride_length_s=(5, 5): 청크 경계 단어 보존을 위한 5초 좌우 겹침 (기본값)
+
+    짧은 오디오(<30s) 도 동일 경로로 동작 — 청크 1개 + 약간의 timestamp 토큰 오버헤드만.
+    """
+    pipe = getattr(_model, "_asr_pipe", None)
+    if pipe is None:
+        raise RuntimeError("ASR pipeline 이 없습니다 — load_asr_model 호출 실패")
+
+    result = pipe(
+        audio_path,
+        chunk_length_s=30,
+        stride_length_s=(5, 5),
+        batch_size=8,
+        return_timestamps=True,
+    )
+    text = result.get("text", "") if isinstance(result, dict) else str(result)
+    return text.strip()
+
+
 @app.post("/asr")
 async def transcribe(req: ASRRequest):
     """음성 파일의 텍스트를 자동 추출한다 (로컬 경로 전달, 같은 머신 전용)."""
@@ -606,7 +634,7 @@ async def transcribe(req: ASRRequest):
             logger.info("ASR 모델 로드 완료")
 
         logger.info("ASR 시작: %s", req.audio_path)
-        text = _model.transcribe(req.audio_path)
+        text = _run_asr_pipeline(req.audio_path)
         logger.info("ASR 완료: %s → '%s'", req.audio_path, text[:100])
 
         return {"text": text}
@@ -639,7 +667,7 @@ async def transcribe_upload(file: UploadFile = File(...)):
             logger.info("ASR 모델 로드 완료")
 
         logger.info("ASR(upload) 시작: %s", tmp_path)
-        text = _model.transcribe(str(tmp_path))
+        text = _run_asr_pipeline(str(tmp_path))
         logger.info("ASR(upload) 완료: %s → '%s'", tmp_path, text[:100])
         return {"text": text}
 
