@@ -1366,36 +1366,34 @@
           </div>
         </div>
 
-        <!-- 비율 + 매수 한 줄 -->
-        <div style="display:flex; gap:12px;">
+        <!-- 비율 + 매수 한 줄 (Flow UI 변경으로 자동 설정 실패 — Flow 창에서 직접 설정) -->
+        <div style="display:flex; gap:12px; opacity:0.55;">
           <div class="setting" style="flex:1;">
             <label>비율</label>
-            <div class="chip-group" id="ratioChips">
+            <div class="chip-group" id="ratioChips" style="pointer-events:none;">
               <div class="chip active" data-val="16:9">16:9</div>
-              <!-- <div class="chip" data-val="4:3">4:3</div>
-              <div class="chip" data-val="1:1">1:1</div>
-              <div class="chip" data-val="3:4">3:4</div>
-              <div class="chip" data-val="9:16">9:16</div> -->
             </div>
           </div>
           <div class="setting" style="flex:1;">
             <label>매수</label>
-            <div class="chip-group" id="countChips">
+            <div class="chip-group" id="countChips" style="pointer-events:none;">
               <div class="chip active" data-val="x1">x1</div>
-              <!-- <div class="chip" data-val="x2">x2</div>
-              <div class="chip" data-val="x3">x3</div>
-              <div class="chip" data-val="x4">x4</div> -->
             </div>
           </div>
         </div>
 
-        <div class="setting">
+        <div class="setting" style="opacity:0.55;">
           <label>모델</label>
-          <select id="modelSelect">
+          <select id="modelSelect" disabled>
             <option value="Nano Banana 2">Nano Banana 2</option>
             <option value="Nano Banana Pro">Nano Banana Pro</option>
             <option value="Imagen 4">Imagen 4</option>
           </select>
+        </div>
+
+        <div style="font-size:11px; color:var(--warning); line-height:1.5; padding:8px 10px; border:1px dashed var(--warning); border-radius:6px; margin-top:6px;">
+          ⚠ <b>비율 / 매수 / 모델</b>은 Google Flow UI 변경으로 자동 설정이 끊겼습니다.<br>
+          → <b>Flow Chrome 창에서 직접 한 번만 설정</b>해 주세요 (Flow 가 기억합니다).
         </div>
 
       </div>
@@ -1410,30 +1408,35 @@
           </div>
         </div>
 
-        <!-- 비율 + 매수 한 줄 (이미지 섹션과 동일한 정렬) -->
-        <div style="display:flex; gap:12px;">
+        <!-- 비율 + 매수 한 줄 (Flow UI 변경으로 자동 설정 실패 — Flow 창에서 직접 설정) -->
+        <div style="display:flex; gap:12px; opacity:0.55;">
           <div class="setting" style="flex:1;">
             <label>비율</label>
-            <div class="chip-group" id="videoRatioChips">
+            <div class="chip-group" id="videoRatioChips" style="pointer-events:none;">
               <div class="chip active" data-val="16:9">16:9</div>
               <div class="chip" data-val="9:16">9:16</div>
             </div>
           </div>
           <div class="setting" style="flex:1;">
             <label>매수</label>
-            <div class="chip-group" id="videoCountChips">
+            <div class="chip-group" id="videoCountChips" style="pointer-events:none;">
               <div class="chip active" data-val="x1">x1</div>
               <div class="chip" data-val="x2">x2</div>
             </div>
           </div>
         </div>
 
-        <div class="setting">
+        <div class="setting" style="opacity:0.55;">
           <label>모델</label>
-          <select id="videoModelSelect">
+          <select id="videoModelSelect" disabled>
             <option value="Veo 3.1 - Fast">Veo 3.1 Fast</option>
             <option value="Veo 3.1">Veo 3.1</option>
           </select>
+        </div>
+
+        <div style="font-size:11px; color:var(--warning); line-height:1.5; padding:8px 10px; border:1px dashed var(--warning); border-radius:6px; margin-top:6px;">
+          ⚠ <b>비율 / 매수 / 모델</b>은 Google Flow UI 변경으로 자동 설정이 끊겼습니다.<br>
+          → <b>Flow Chrome 창에서 직접 한 번만 설정</b>해 주세요 (Flow 가 기억합니다).
         </div>
 
         <div style="font-size:12px; color:var(--warning); margin-top:8px;">
@@ -3997,11 +4000,44 @@ async function v2t_extract() {
   }
 }
 
+// STT 진행 상태 헬퍼 — Whisper 첫 로드 5분+ 동안 사용자에게 살아있음 표시.
+// statusEl 에 1초마다 경과시간 + 단계별 안내 + 스피너를 갱신.
+function _sttProgressStart(statusEl, btn, btnIdleText, btnBusyText) {
+  const startedAt = Date.now();
+  const frames = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+  let i = 0;
+  if (btn) { btn.disabled = true; btn.textContent = btnBusyText; }
+  function fmt(sec) {
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return m > 0 ? `${m}분 ${String(s).padStart(2,'0')}초` : `${s}초`;
+  }
+  function tick() {
+    const sec = Math.floor((Date.now() - startedAt) / 1000);
+    let hint;
+    if (sec < 10)        hint = '백엔드에 파일 업로드 중...';
+    else if (sec < 30)   hint = 'Whisper 가 음성 분석 중...';
+    else if (sec < 90)   hint = 'Whisper 가 처음 호출되면 모델 로드에 1~5분 걸려요 — 정상입니다.';
+    else if (sec < 240)  hint = '모델 로드 중 (보통 90~240초) — 끊지 말고 기다려 주세요.';
+    else                 hint = '오래 걸리네요... GPU PC 가 켜져있는지, OmniVoice 가 9881 에서 응답하는지 확인.';
+    statusEl.textContent = `${frames[i++ % frames.length]} STT 변환 중 (경과 ${fmt(sec)}) — ${hint}`;
+  }
+  tick();
+  const timer = setInterval(tick, 1000);
+  return {
+    stop(finalText) {
+      clearInterval(timer);
+      if (btn) { btn.disabled = false; btn.textContent = btnIdleText; }
+      if (typeof finalText === 'string') statusEl.textContent = finalText;
+    },
+    elapsedSec() { return Math.floor((Date.now() - startedAt) / 1000); }
+  };
+}
+
 async function v2t_runStt() {
   if (!_v2tState.mp3Path) return alert('먼저 음성을 추출하세요.');
   const btn = document.getElementById('v2tSttBtn');
-  btn.disabled = true; btn.textContent = '⏳ STT 변환 중...';
-  document.getElementById('v2tStatus').textContent = '🔄 OmniVoice /asr-upload 호출 (Whisper 첫 로드 시 5분+ 걸릴 수 있어요)...';
+  const statusEl = document.getElementById('v2tStatus');
+  const progress = _sttProgressStart(statusEl, btn, '📝 STT 변환', '⏳ STT 변환 중...');
   try {
     const Asr = require('../tts/asr-client');
     const text = await Asr.transcribe(_v2tState.mp3Path);
@@ -4009,12 +4045,10 @@ async function v2t_runStt() {
     document.getElementById('v2tSaveTxtBtn').disabled = false;
     document.getElementById('v2tCopyBtn').disabled = false;
     document.getElementById('v2tSendBtn').disabled = false;
-    document.getElementById('v2tStatus').textContent = `✅ STT 완료 (${text.length}자)`;
+    progress.stop(`✅ STT 완료 (${text.length}자, ${progress.elapsedSec()}초 소요)`);
   } catch (e) {
-    document.getElementById('v2tStatus').textContent = '❌ ' + e.message;
+    progress.stop('❌ ' + e.message);
     alert('STT 실패:\n' + e.message);
-  } finally {
-    btn.disabled = false; btn.textContent = '📝 STT 변환';
   }
 }
 
@@ -4269,26 +4303,32 @@ function r2r_playPause() {
 async function r2r_runStt() {
   if (!_r2rState.sourcePath || !_r2rState.region) return;
   const btn = document.getElementById('r2rSttBtn');
-  btn.disabled = true; btn.textContent = '⏳ STT...';
-  document.getElementById('r2rSttStatus').textContent = '🔄 선택 구간을 WAV 로 자른 뒤 OmniVoice /asr-upload 호출...';
+  const statusEl = document.getElementById('r2rSttStatus');
+  statusEl.textContent = '🔄 선택 구간을 WAV 로 자르는 중...';
+  let tmpWav = null;
   try {
     const MediaUtils = require('../core/media-utils');
     const Asr = require('../tts/asr-client');
-    const tmpWav = MediaUtils.tmpFile('.wav');
+    tmpWav = MediaUtils.tmpFile('.wav');
     await MediaUtils.convertToRefWav(_r2rState.sourcePath, tmpWav, {
       startSec: _r2rState.region.start,
       endSec: _r2rState.region.end,
     });
-    const text = await Asr.transcribe(tmpWav);
-    document.getElementById('r2rTextarea').value = text;
-    document.getElementById('r2rSttStatus').textContent = `✅ STT 완료 (${text.length}자) — 필요하면 수정하세요.`;
-    // 임시 파일 정리
-    try { require('fs').unlinkSync(tmpWav); } catch (_) {}
+    const progress = _sttProgressStart(statusEl, btn, '📝 STT 자동 채우기', '⏳ STT...');
+    try {
+      const text = await Asr.transcribe(tmpWav);
+      document.getElementById('r2rTextarea').value = text;
+      progress.stop(`✅ STT 완료 (${text.length}자, ${progress.elapsedSec()}초 소요) — 필요하면 수정하세요.`);
+    } catch (e) {
+      progress.stop('❌ ' + e.message);
+      alert('STT 실패:\n' + e.message);
+    }
   } catch (e) {
-    document.getElementById('r2rSttStatus').textContent = '❌ ' + e.message;
-    alert('STT 실패:\n' + e.message);
-  } finally {
+    statusEl.textContent = '❌ ' + e.message;
     btn.disabled = false; btn.textContent = '📝 STT 자동 채우기';
+    alert('WAV 자르기 실패:\n' + e.message);
+  } finally {
+    if (tmpWav) { try { require('fs').unlinkSync(tmpWav); } catch (_) {} }
   }
 }
 
