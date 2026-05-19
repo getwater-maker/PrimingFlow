@@ -1345,6 +1345,9 @@
           <!-- Row 4 -->
           <button class="btn btn-sm-action" id="batchConvertBtn" onclick="onBatchConvertClick()" title="모든 문장 TTS 변환">🎙 TTS 변환</button>
           <button class="btn btn-sm-action" onclick="saveVrew()" title="현재 프로젝트를 Vrew 4.0.1 호환 .vrew 파일로 저장">💾 Vrew</button>
+
+          <!-- Row 5: Adobe Premiere Pro 호환 XML (FCP7 XMEML v5) 풀폭 -->
+          <button class="btn btn-sm-action" onclick="savePremiereXml()" title="Adobe Premiere Pro (FCP7 XML) 형식으로 시퀀스 저장 + 자막 .srt 동봉. 이미지·오디오·자막 트랙 정렬된 상태로 프리미어 가져오기 가능" style="grid-column: span 2;">🎬 프리미어 XML 저장</button>
         </div>
         <!-- 실패 영상 재시도: 평소엔 숨김, videoStatus='fail' 인 그룹 1개 이상일 때만 표시 -->
         <button class="btn btn-sm-action" id="retryFailedVideoBtn"
@@ -11054,6 +11057,85 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
 // ─── 8-D: .vrew 저장 (TTS ≠ 자막 분리) ──────────────────────────────
 // 핵심: 한 sentence = 1 TTS 음성, N vrewClips = sourceIn/sourceOut 시간 슬라이스
 // vrew-builder 가 직접 .vrew 파일 생성 (IPC 안 거침 — main.js 의존성 없음)
+// ─── Adobe Premiere Pro XML 내보내기 ───────────────────────────────
+// FCP7 XMEML v5 — Premiere 2025 호환. saveVrew 와 같은 입력 데이터 (sentences + groups)
+// 를 받아 .xml + .srt 한 쌍 출력. 자막은 별도 .srt 로 동봉 (프리미어가 캡션 트랙으로 import).
+async function savePremiereXml() {
+  if (!_ensureActivePreset()) return;
+
+  const proj = window._currentProject;
+  if (!proj || !proj.groups || proj.groups.length === 0) {
+    alert('먼저 대본을 분할하세요');
+    return;
+  }
+
+  const path = require('path');
+  const safe = (s) => String(s || '').replace(/[\\/:*?"<>|]/g, '').trim();
+
+  // 1. 출력 폴더 확인 (saveVrew 와 동일 패턴)
+  let finalDir = _getProjectOutputDir();
+  if (!finalDir) {
+    addLog('[프리미어 XML] 출력 폴더 미설정 — 폴더 선택 대화상자 오픈', 'info');
+    const picked = await ipcRenderer.invoke('select-folder').catch(() => null);
+    if (!picked) {
+      addLog('[프리미어 XML] 사용자 취소', 'info');
+      return;
+    }
+    outputDir = picked;
+    finalDir = _getProjectOutputDir();
+    if (!finalDir) {
+      alert('출력 폴더를 먼저 선택하세요');
+      return;
+    }
+  }
+
+  // 2. TTS 미변환 확인 — 있으면 사용자 선택
+  const noTts = proj.sentences.filter(s => s.ttsStatus !== 'done' || !s.ttsAudioPath);
+  if (noTts.length > 0) {
+    const ok = confirm(
+      `TTS 미변환 ${noTts.length}/${proj.sentences.length}개.\n\n` +
+      `[확인] = 음성 없이 XML 저장 (이미지 트랙만, 그 자리는 무음 공백)\n` +
+      `[취소] = 먼저 🎙 TTS 변환 실행 후 다시 시도`
+    );
+    if (!ok) return;
+  }
+
+  // 3. 빌드 + 저장
+  try {
+    const { buildPremiereXml } = require('../vrew/premiere-xml-builder');
+    const baseName = safe(proj.name || proj.title || 'sequence') || 'sequence';
+    const xmlPath = path.join(finalDir, baseName + '.xml');
+
+    addLog(`[프리미어 XML] 빌드 시작 — ${xmlPath}`, 'info');
+    const result = await buildPremiereXml({
+      sentences: proj.sentences,
+      groups: proj.groups,
+      xmlPath,
+      opts: {
+        logger: (m) => addLog(m, 'info'),
+        sequenceName: baseName,
+      },
+    });
+
+    addLog(
+      `[프리미어 XML] ✅ 저장 완료 — 총 ${result.totalSeconds.toFixed(1)}초, ` +
+      `이미지 ${result.videoClipCount}개, 오디오 ${result.audioClipCount}개`,
+      'ok'
+    );
+    addLog(`[프리미어 XML] 자막 SRT 동봉: ${result.srtPath}`, 'info');
+
+    // 4. 출력 폴더 자동 열기 (saveVrew 와 동일)
+    try {
+      await ipcRenderer.invoke('open-folder', finalDir);
+    } catch (e) {
+      addLog(`[프리미어 XML] 폴더 열기 실패: ${e.message}`, 'info');
+    }
+  } catch (e) {
+    addLog(`[프리미어 XML] 실패: ${e.message}`, 'err');
+    alert('프리미어 XML 생성 실패:\n' + e.message);
+  }
+}
+
 async function saveVrew(opts = {}) {
   if (!_ensureActivePreset()) return { skipped: true };
   // 호출자가 opts.proj 를 명시 전달하면 그것 우선 — multi-project 자동제작에서 saveVrew 가
