@@ -6,7 +6,7 @@
   "main": "bootstrap.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win nsis --x64"
+    "dist": "electron-builder --win nsis --x64 --publish always"
   },
   "dependencies": {
     "adm-zip": "^0.5.17",
