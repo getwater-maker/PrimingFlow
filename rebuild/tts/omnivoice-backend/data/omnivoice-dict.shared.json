@@ -55,8 +55,18 @@
     "enabled": true
   },
   {
-    "source": "24시간",
-    "pron": "이십사 시간",
+    "source": "수라간",
+    "pron": "수랏깐",
+    "enabled": true
+  },
+  {
+    "source": "수라상",
+    "pron": "수랏쌍",
+    "enabled": true
+  },
+  {
+    "source": "10월",
+    "pron": "시월",
     "enabled": true
   }
 ]

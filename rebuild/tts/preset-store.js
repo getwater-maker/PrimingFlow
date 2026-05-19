@@ -25,6 +25,8 @@
  *     logoPath: 'D:/.../logo.png',
  *     profileId: 'default',       // Google 계정 프로필
  *     instruct: '사극풍 한국 회화...',
+ *     presetPrompt: '30대 한국 남성, ...',  // 메인 "미디어 설정 > 사전 설정" 입력란에 자동 채워질 키워드
+ *     styleId: 'k-webtoon',       // 이미지 스타일 (style-store.js 의 BUILT_IN_STYLES 또는 사용자 추가)
  *   }
  *
  * 시드 프리셋: 파일이 처음 생성될 때만 채움.

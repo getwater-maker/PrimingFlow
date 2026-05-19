@@ -1072,6 +1072,7 @@
   <button id="headerLogoutBtn" class="btn-sm" onclick="doHeaderLogout()" style="display:none">로그아웃</button>
   <button class="btn-sm" onclick="openVideoToText()" style="font-size:12px; margin-left:auto;">🎬 영상→텍스트</button>
   <button class="btn-sm" onclick="openRecToRef()" style="font-size:12px;">🎤 녹음→참조음성</button>
+  <button class="btn-sm" onclick="openRefAudioVault()" style="font-size:12px;" title="~/.flow-app/ref-audio/ — 녹음→참조음성에서 저장된 WAV+TXT 묶음 폴더를 탐색기로 엽니다">📂 참조음성 폴더</button>
   <button class="btn-sm" onclick="openGallery()" style="font-size:12px;">🖼 갤러리</button>
   <button class="btn-sm" onclick="document.getElementById('helpModal').style.display='flex'" style="font-size:12px;">📖 사용법</button>
 </div>
@@ -1222,18 +1223,18 @@
     <div class="section">
       <div class="section-title">📂 작업 시작<span id="rtfBadge" class="section-title-badge" title="Real-Time Factor — 작업시간 / 오디오길이. 낮을수록 빠름">RTF —</span></div>
 
-      <!-- 대본 입력 — 첨부 / 직접 입력 / 저장폴더 보기 -->
-      <div style="display:flex; gap:6px; margin-bottom:8px;">
-        <button class="btn-sm" onclick="openFile()" style="flex:1; padding:6px 10px;">📂 대본 첨부</button>
-        <button class="btn-sm" onclick="openScriptInputModal()" style="flex:1; padding:6px 10px;">✏️ 직접 입력</button>
-        <button class="btn-sm" onclick="openCurrentOutputFolder()" id="folderBtn" title="현재 활성 프리셋의 출력 폴더를 윈도우 탐색기로 열기" style="flex:1; padding:6px 10px;">📂 저장폴더 보기</button>
+      <!-- 작업 시작 버튼 5개 — 한 grid 3-col 로 묶어 모두 같은 너비 강제 (첫 줄 3개 / 둘째 줄 2개) -->
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin-bottom:6px;">
+        <button class="btn-sm" onclick="openFile()" style="padding:6px 10px;">📂 대본 첨부</button>
+        <button class="btn-sm" onclick="openScriptInputModal()" style="padding:6px 10px;">✏️ 직접 입력</button>
+        <button class="btn-sm" onclick="openCurrentOutputFolder()" id="folderBtn" title="현재 활성 프리셋의 출력 폴더를 윈도우 탐색기로 열기" style="padding:6px 10px;">📂 저장폴더 보기</button>
+        <button class="btn-sm" onclick="saveProjectFile()" id="projectSaveBtn" title="현재 작업 상태(분할/sentence/그룹/자산 경로)를 출력 폴더 안 project.pflow 로 저장" style="padding:6px 10px;">💾 저장</button>
+        <button class="btn-sm" onclick="loadProjectFile()" title="저장한 project.pflow 를 열어 작업 이어가기" style="padding:6px 10px;">📂 불러오기</button>
       </div>
 
-      <!-- 프로젝트 저장/불러오기 — 작업 상태(분할/sentence/그룹/자산) 를 출력 폴더 안 project.pflow 로 -->
-      <div style="display:flex; gap:6px; margin-bottom:8px; align-items:center;">
-        <button class="btn-sm" onclick="saveProjectFile()" id="projectSaveBtn" title="현재 작업 상태(분할/sentence/그룹/자산 경로)를 출력 폴더 안 project.pflow 로 저장" style="flex:1; padding:6px 10px;">💾 프로젝트 저장</button>
-        <button class="btn-sm" onclick="loadProjectFile()" title="저장한 project.pflow 를 열어 작업 이어가기" style="flex:1; padding:6px 10px;">📂 프로젝트 불러오기</button>
-        <span id="autoSaveIndicator" title="자동 저장 상태" style="flex:none; width:140px; font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 6px; text-align:right;">— 미저장</span>
+      <!-- 자동저장 상태 라벨 — 그룹 안 중앙 정렬 -->
+      <div style="text-align:center; margin-bottom:8px;">
+        <span id="autoSaveIndicator" title="자동 저장 상태" style="font-size:11px; color:var(--text-muted); white-space:nowrap;">— 미저장</span>
       </div>
 
       <!-- 채널 영역은 좌측 프리셋으로 통합됨 (2026-05) — 드롭다운/버튼 폐기 -->
@@ -1293,6 +1294,20 @@
 
       <!-- 실행 + 일괄 액션 (통합: 작업시작 섹션 내부) -->
       <div style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:12px;">
+        <!-- 🎬 Grok 비디오 모션 프롬프트 — 이미지를 애니메이션으로 만들 때 Grok 에 전달되는 문구 -->
+        <!--    값은 ~/.flow-app/grok-config.json 의 defaultMotionPrompt 로 영구 저장. -->
+        <!--    빈 값이면 Grok 자체 디폴트 동작. -->
+        <div style="margin-bottom:8px;">
+          <label for="grokMotionPromptInput" style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:3px;">
+            🎬 Grok 비디오 모션 프롬프트 <span style="color:var(--text-soft); font-size:10px;">(이미지 → 애니메이션 변환 시 사용)</span>
+          </label>
+          <textarea id="grokMotionPromptInput" rows="2"
+            style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 8px; border-radius:6px; font-size:12px; resize:vertical;"
+            placeholder="예: natural slow motion, cinematic feel"
+            title="이 문구가 Grok 비디오 생성 시 모션 프롬프트로 전달됩니다. 입력 끝낼 때 자동 저장 (~/.flow-app/grok-config.json)."
+            onchange="onGrokMotionPromptChange()"></textarea>
+        </div>
+
         <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px; margin-bottom:6px;">
           <button class="btn btn-sm-action" id="startBtn" onclick="generateAll()" title="현재 활성 탭의 대본만 자동 제작 (이미지 + TTS + 도입부 영상 + .vrew)" style="font-weight:700;">▶ 자동제작</button>
           <button class="btn btn-sm-action" id="grokLoginBtn" onclick="openGrokLogin()" title="Grok 자동화 크롬을 띄우고 grok.com 로그인 페이지로 이동 (영상 생성 전 X 계정 로그인 권장)">🔑 그록 로그인</button>
@@ -1976,6 +1991,17 @@
         <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">스타일 (이미지 생성)</label>
         <select id="presetForm_styleId" style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 10px; border-radius:6px; font-size:14px;"></select>
       </div>
+    </div>
+
+    <!-- 이미지 사전설정 키워드 — 프리셋 선택 시 메인의 "미디어 설정 > 사전 설정" 입력란에 자동 반영 -->
+    <div id="presetForm_presetPromptRow" style="margin-bottom:10px;">
+      <label for="presetForm_presetPrompt" style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">
+        이미지 사전설정 키워드
+        <span style="color:var(--text-muted); font-size:11px;">(프리셋 선택 시 미디어 설정의 "사전 설정" 입력칸에 자동 채워짐 — 모든 장면 공통 적용)</span>
+      </label>
+      <textarea id="presetForm_presetPrompt" rows="2"
+        style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); border-radius:6px; padding:8px; font-size:13px; resize:vertical;"
+        placeholder="예: 30대 한국 남성, 짧은 머리, 회색 양복, 현대 사무실 배경, 따뜻한 조명"></textarea>
     </div>
 
     <!-- 3+4행 통합: 속도 + 문장 무음 + Clone 강도 + 언어 (한 줄, OmniVoice 시 4컬럼) -->
@@ -3752,6 +3778,23 @@ function openGallery() {
 function closeGallery() {
   document.getElementById('galleryModal').style.display = 'none';
 }
+
+// 참조음성 보관소 폴더 열기 — ~/.flow-app/ref-audio/ 를 윈도우 탐색기로
+// (🎤 녹음→참조음성 + Voice Design 저장 결과물이 모이는 전역 보관소)
+async function openRefAudioVault() {
+  try {
+    const RefVault = require('../core/ref-audio-vault');
+    const dir = RefVault.getVaultDir();
+    const err = await RefVault.openInExplorer();
+    if (err) {
+      addLog(`[참조음성 폴더] 열기 실패: ${err}`, 'warn');
+    } else {
+      addLog(`[참조음성 폴더] ${dir} 열림`, 'info');
+    }
+  } catch (e) {
+    addLog(`[참조음성 폴더] 오류: ${e.message}`, 'warn');
+  }
+}
 // ────────────────────────────────────────────────────────────────────
 // 시범/미리듣기 텍스트 — 사용자가 수정하면 localStorage 에 자동 저장 + 다음 세션 복원.
 // 3개 입력란이 같은 키를 공유하므로 어디서 수정하든 다른 곳에도 반영.
@@ -3987,8 +4030,14 @@ async function v2t_extract() {
   document.getElementById('v2tStatus').textContent = '🔄 ffmpeg 로 음성 추출 중...';
   try {
     const MediaUtils = require('../core/media-utils');
-    const out = MediaUtils.tmpFile('.mp3');
-    await MediaUtils.extractAudioMp3(_v2tState.videoPath, out);
+    const path = require('path');
+    // 출력 경로 = 동영상과 같은 폴더 + 같은 파일명 (확장자만 .mp3)
+    // 같은 이름의 mp3 가 이미 있으면 ffmpeg -y 가 덮어씀 (의도된 동작)
+    const videoPath = _v2tState.videoPath;
+    const videoDir = path.dirname(videoPath);
+    const videoBase = path.basename(videoPath, path.extname(videoPath));
+    const out = path.join(videoDir, videoBase + '.mp3');
+    await MediaUtils.extractAudioMp3(videoPath, out);
     _v2tState.mp3Path = out;
     const audio = document.getElementById('v2tAudio');
     try {
@@ -4000,7 +4049,7 @@ async function v2t_extract() {
     document.getElementById('v2tAudioWrap').style.display = '';
     document.getElementById('v2tSttBtn').disabled = false;
     document.getElementById('v2tSaveMp3Btn').disabled = false;
-    document.getElementById('v2tStatus').textContent = `✅ 음성 추출 완료 — ${out}`;
+    document.getElementById('v2tStatus').textContent = `✅ 음성 추출 완료 — ${out} (동영상과 같은 폴더에 저장됨)`;
   } catch (e) {
     document.getElementById('v2tStatus').textContent = '❌ ' + e.message;
     alert('음성 추출 실패:\n' + e.message);
@@ -6821,7 +6870,7 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// 활성 프리셋의 채널 정보를 메인 화면에 반영 (출력 폴더 / Google 계정)
+// 활성 프리셋의 채널 정보를 메인 화면에 반영 (출력 폴더 / Google 계정 / 이미지 사전설정 키워드)
 function _applyActivePresetToMainScreen(p) {
   if (!p) return;
   // 출력 폴더
@@ -6838,6 +6887,12 @@ function _applyActivePresetToMainScreen(p) {
   if (profileSel && p.profileId) {
     const has = Array.from(profileSel.options).some(o => o.value === p.profileId);
     if (has) profileSel.value = p.profileId;
+  }
+  // 이미지 사전설정 키워드 → 메인 "미디어 설정 > 사전 설정" 입력란
+  // 프리셋 필드가 정의된 경우에만 덮어쓰기 (옛 프리셋의 undefined 는 무시 → 사용자 임시 입력 보존)
+  if (Object.prototype.hasOwnProperty.call(p, 'presetPrompt')) {
+    const mainPromptEl = document.getElementById('presetPrompt');
+    if (mainPromptEl) mainPromptEl.value = p.presetPrompt || '';
   }
 }
 
@@ -7335,6 +7390,10 @@ function openPresetModal(presetId) {
       styleSelEl.value = p.styleId;
     }
   }
+
+  // 이미지 사전설정 키워드 — 옛 프리셋엔 없을 수도 있어 '' 폴백
+  const ppEl = document.getElementById('presetForm_presetPrompt');
+  if (ppEl) ppEl.value = p.presetPrompt || '';
 
 
   // voice select 의 onchange 재바인딩 후 강제 트리거 (Clone 영역 표시 갱신)
@@ -8283,6 +8342,10 @@ function _readPresetForm() {
   // 이미지 생성 스타일 (프리셋별 다르게 운영 가능)
   const _styleEl = document.getElementById('presetForm_styleId');
   preset.styleId = (_styleEl && _styleEl.value) || '';
+
+  // 이미지 사전설정 키워드 — 메인 "미디어 설정 > 사전 설정" 에 자동 반영될 값
+  const _presetPromptEl = document.getElementById('presetForm_presetPrompt');
+  preset.presetPrompt = (_presetPromptEl && _presetPromptEl.value || '').trim();
   return preset;
 }
 
@@ -9672,6 +9735,38 @@ async function previewAllSentences() {
 
 // 그룹 단위 TTS 일괄 변환 — 그룹 카드의 [🎙 그룹 TTS 변환] 버튼
 // ─── Grok 비디오 변환 (그룹 단위) ─────────────────────
+
+// ─ Grok 비디오 모션 프롬프트 입력란 ↔ grok-store.defaultMotionPrompt 양방향 동기화.
+//   페이지 로드 시: store → UI 채움
+//   사용자 onchange: UI → store 저장
+//   생성 흐름: 별도 처리 불필요 — grok-engine.js 가 빈 prompt 시 store.defaultMotionPrompt 폴백
+function _initGrokMotionPromptInput() {
+  try {
+    const GrokStore = require('../tts/grok-store');
+    const cfg = GrokStore.load();
+    const el = document.getElementById('grokMotionPromptInput');
+    if (el && typeof cfg.defaultMotionPrompt === 'string') el.value = cfg.defaultMotionPrompt;
+  } catch (e) {
+    console.error('[grok-motion-prompt init]', e);
+  }
+}
+function onGrokMotionPromptChange() {
+  try {
+    const el = document.getElementById('grokMotionPromptInput');
+    if (!el) return;
+    const GrokStore = require('../tts/grok-store');
+    GrokStore.update({ defaultMotionPrompt: el.value.trim() });
+  } catch (e) {
+    console.error('[grok-motion-prompt save]', e);
+  }
+}
+// DOM 준비 즉시 초기화 (스크립트가 HTML 뒤에 있어도 안전한 패턴)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', _initGrokMotionPromptInput);
+} else {
+  _initGrokMotionPromptInput();
+}
+
 // 싱글톤 GrokEngine 인스턴스 — 한 번 띄운 브라우저는 다음 변환에서도 재사용
 let _grokEngineInstance = null;
 function _getGrokEngine() {
@@ -10482,6 +10577,8 @@ async function generateAll() {
     return;
   }
   if (!_ensureActivePreset()) return;
+  // 모션 프롬프트 입력란이 onchange 발화 전이라도 자동제작 시작 시 강제 sync
+  try { onGrokMotionPromptChange(); } catch (_) {}
   const groupCount = proj.groups.length;
   const sentenceCount = proj.sentences.length;
   const fsCheck = require('fs');
