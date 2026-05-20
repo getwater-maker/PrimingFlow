@@ -449,9 +449,26 @@ class GrokEngine {
       const TIMEOUT_MS = 5 * 60 * 1000;  // 최대 5분
       const startedAt = Date.now();
       let videoUrl = null;
+      // 720p → 480p 강등 감지 — grok.com 의 [role=alert] 토스트("720p rate limit reached. Switched to 480p.")
+      // 가 뜨면 grok.com 이 자체적으로 강등해서 영상 만들기 시작함. 우리는 사실 감지만 하면 됨.
+      // 한 영상당 한 번만 로그 + 결과에 downgradedTo:'480p' 플래그.
+      let _downgradeDetected = false;
       while (Date.now() - startedAt < TIMEOUT_MS) {
         if (abortSignal && abortSignal()) return { success: false, error: '사용자 중단' };
         await this.page.waitForTimeout(POLL_INTERVAL);
+
+        // 토스트 텍스트 감지 — 매 폴링마다 (5초 간격)
+        if (!_downgradeDetected) {
+          try {
+            const toastTexts = await this.page.$$eval('[role="alert"], [role="status"], [data-sonner-toast]',
+              els => els.map(e => (e.textContent || '').trim()).filter(t => t.length > 0));
+            const hit = toastTexts.find(t => /720p.*rate.*limit.*480p|switched\s+to\s+480p/i.test(t));
+            if (hit) {
+              _downgradeDetected = true;
+              this.log(`[Grok] ⚠️ 720p 한도 도달 — grok.com 이 480p 로 자동 강등 ("${hit.slice(0, 80)}")`);
+            }
+          } catch (_) { /* 토스트 selector 미존재는 무시 */ }
+        }
 
         // <video> 요소에서 src 추출 시도
         const v = await this.page.$(GROK_SELECTORS.videoElement);
@@ -503,7 +520,7 @@ class GrokEngine {
             await download.saveAs(outputPath);
             GrokStore.markUsed();
             this.log(`[Grok] ✅ 비디오 저장 완료: ${outputPath}`);
-            return { success: true, videoPath: outputPath };
+            return { success: true, videoPath: outputPath, downgradedTo: _downgradeDetected ? '480p' : null };
           } catch (e) {
             this.log(`[Grok] 다운로드 이벤트 timeout — video src fallback 시도: ${e.message}`);
             // fallback A: video element 의 src 가 https URL 이면 직접 fetch
@@ -514,7 +531,7 @@ class GrokEngine {
                 fs.writeFileSync(outputPath, buf);
                 GrokStore.markUsed();
                 this.log(`[Grok] ✅ video URL 직접 다운로드: ${outputPath}`);
-                return { success: true, videoPath: outputPath };
+                return { success: true, videoPath: outputPath, downgradedTo: _downgradeDetected ? '480p' : null };
               } catch {}
             }
             // fallback B: video element 가 blob: 면 페이지 안에서 fetch → base64 → 디스크 저장
@@ -538,7 +555,7 @@ class GrokEngine {
                 fs.writeFileSync(outputPath, Buffer.from(pure, 'base64'));
                 GrokStore.markUsed();
                 this.log(`[Grok] ✅ blob video → base64 저장: ${outputPath}`);
-                return { success: true, videoPath: outputPath };
+                return { success: true, videoPath: outputPath, downgradedTo: _downgradeDetected ? '480p' : null };
               }
             } catch (e2) {
               this.log(`[Grok] base64 fallback 실패: ${e2.message}`);
@@ -558,7 +575,7 @@ class GrokEngine {
           fs.writeFileSync(outputPath, buf);
           GrokStore.markUsed();
           this.log(`[Grok] ✅ 비디오 URL 다운로드 완료: ${outputPath}`);
-          return { success: true, videoPath: outputPath };
+          return { success: true, videoPath: outputPath, downgradedTo: _downgradeDetected ? '480p' : null };
         } catch (e) {
           return { success: false, error: `video URL 다운로드 실패: ${e.message}` };
         }

@@ -1038,6 +1038,168 @@
   @media (max-width: 1100px) {
     .workspace-grid { grid-template-columns: 1fr; }
   }
+
+  /* ─── 자동제작 진행 모달 — 신규 박스/Chip ─── */
+  .auto-current-box {
+    background: var(--bg-soft);
+    border-radius: 8px;
+    padding: 10px 12px;
+    border-left: 3px solid var(--accent);
+  }
+  .auto-current-box .auto-current-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+    letter-spacing: 0.04em;
+  }
+  .auto-current-box .auto-current-text {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.3;
+  }
+  .auto-current-box .auto-current-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .auto-eta-box {
+    background: rgba(0,0,0,0.02);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .auto-eta-box .auto-eta-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .auto-eta-box .auto-eta-line .lbl { opacity: 0.8; }
+  .auto-stuck-box {
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 12px;
+    display: none;
+  }
+  .auto-stuck-box.warn {
+    background: rgba(232,168,76,0.18);
+    border-left: 3px solid var(--warning, #e8a84c);
+    color: var(--text);
+  }
+  .auto-stuck-box.danger {
+    background: rgba(196,88,74,0.18);
+    border-left: 3px solid var(--danger, #c4584a);
+    color: var(--text);
+  }
+  .auto-stuck-box .auto-stuck-title { font-weight: 700; margin-bottom: 2px; }
+  .auto-stuck-box .auto-stuck-reason { font-size: 11px; opacity: 0.9; }
+  .auto-mini-log {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    line-height: 1.45;
+    height: 108px;
+    overflow-y: auto;
+    background: var(--bg-soft);
+    border-radius: 6px;
+    padding: 6px 8px;
+    border: 1px solid var(--border-soft);
+  }
+  .auto-mini-log .ring-line { white-space: pre-wrap; word-break: break-word; }
+  .auto-mini-log .ring-line.err  { color: var(--danger, #c4584a); }
+  .auto-mini-log .ring-line.warn { color: var(--warning, #e8a84c); }
+  .auto-mini-log .ring-line.ok   { color: var(--success, #5fa777); }
+  .auto-mini-log .ring-line.info { color: var(--text-muted); }
+  .auto-mini-log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+  .auto-mini-log-header a {
+    color: var(--accent);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .auto-mini-log-header a:hover { text-decoration: underline; }
+
+  /* 최소화된 우하단 floating chip */
+  #autoProgressMini {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 999;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    padding: 10px 14px;
+    min-width: 240px;
+    max-width: 320px;
+    cursor: pointer;
+    display: none;
+    user-select: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  #autoProgressMini:hover { border-color: var(--accent); }
+  #autoProgressMini .mini-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+  #autoProgressMini .mini-header .mini-restore {
+    font-size: 11px;
+    color: var(--accent);
+  }
+  #autoProgressMini .mini-pct {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1.1;
+  }
+  #autoProgressMini .mini-label {
+    font-size: 12px;
+    color: var(--text);
+    margin-top: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #autoProgressMini .mini-elapsed {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  #autoProgressMini .mini-stuck {
+    font-size: 11px;
+    color: var(--warning, #e8a84c);
+    margin-top: 4px;
+    font-weight: 600;
+    display: none;
+  }
+  #autoProgressMini.chip-done {
+    border-color: var(--success, #5fa777);
+    box-shadow: 0 0 0 2px rgba(95,167,119,0.35), var(--shadow-lg);
+  }
+  #autoProgressMini.chip-done .mini-pct { color: var(--success, #5fa777); }
+  #autoProgressMini.chip-fail {
+    border-color: var(--danger, #c4584a);
+    box-shadow: 0 0 0 2px rgba(196,88,74,0.35), var(--shadow-lg);
+  }
+  #autoProgressMini.chip-fail .mini-pct { color: var(--danger, #c4584a); }
+  #autoProgressMini.chip-stuck { animation: chip-pulse 1.4s ease-in-out infinite; }
+  @keyframes chip-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(232,168,76,0.6), var(--shadow-lg); }
+    50%      { box-shadow: 0 0 0 8px rgba(232,168,76,0), var(--shadow-lg); }
+  }
 </style>
 </head>
 <body>
@@ -1293,7 +1455,7 @@
       </div>
 
       <!-- 실행 + 일괄 액션 (통합: 작업시작 섹션 내부) -->
-      <div style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:12px;">
+      <div id="actionPanel" style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:12px;">
         <!-- 🎬 Grok 비디오 모션 프롬프트 — 이미지를 애니메이션으로 만들 때 Grok 에 전달되는 문구 -->
         <!--    값은 ~/.flow-app/grok-config.json 의 defaultMotionPrompt 로 영구 저장. -->
         <!--    빈 값이면 Grok 자체 디폴트 동작. -->
@@ -1344,7 +1506,10 @@
 
           <!-- Row 4 -->
           <button class="btn btn-sm-action" id="batchConvertBtn" onclick="onBatchConvertClick()" title="모든 문장 TTS 변환">🎙 TTS 변환</button>
-          <button class="btn btn-sm-action" onclick="saveVrew()" title="현재 프로젝트를 Vrew 4.0.1 호환 .vrew 파일로 저장">💾 Vrew</button>
+          <button class="btn btn-sm-action" onclick="openTtsImportFromTab()" title="다른 탭에서 TTS 변환된 음성을 같은 대본의 같은 문장으로 가져오기 (경로만 참조 — 파일 복사 X)">🔗 다른 탭 TTS</button>
+
+          <!-- Row 5: Vrew 풀폭 -->
+          <button class="btn btn-sm-action" onclick="saveVrew()" title="현재 프로젝트를 Vrew 4.0.1 호환 .vrew 파일로 저장" style="grid-column: span 2;">💾 Vrew</button>
 
           <!-- Row 5: Adobe Premiere Pro 호환 XML (FCP7 XMEML v5) 풀폭 -->
           <button class="btn btn-sm-action" onclick="savePremiereXml()" title="Adobe Premiere Pro (FCP7 XML) 형식으로 시퀀스 저장 + 자막 .srt 동봉. 이미지·오디오·자막 트랙 정렬된 상태로 프리미어 가져오기 가능" style="grid-column: span 2;">🎬 프리미어 XML 저장</button>
@@ -1658,22 +1823,81 @@
 
 <!-- 자동제작 / Vrew 진행 모달 — 작업 중 화면 가운데 작은 박스로 진행 상황 표시 -->
 <div id="autoProgressModal" style="display:none; position:fixed; inset:0; background:rgba(58,52,46,0.5); z-index:1000; align-items:center; justify-content:center;">
-  <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; width:460px; max-width:92vw; box-shadow:var(--shadow-lg); display:flex; flex-direction:column; overflow:hidden;">
+  <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; width:520px; max-width:92vw; max-height:92vh; box-shadow:var(--shadow-lg); display:flex; flex-direction:column; overflow:hidden;">
     <div style="padding:16px 20px; border-bottom:1px solid var(--border-soft); display:flex; justify-content:space-between; align-items:center;">
       <h3 id="autoProgressTitle" style="font-size:15px; color:var(--accent); margin:0; font-weight:700;">작업 진행 중</h3>
       <div style="display:flex; gap:6px; align-items:center;">
         <button class="btn-sm" id="autoProgressStopBtn" onclick="cancelAutoGeneration()" style="font-size:12px; padding:4px 10px; background:var(--danger); color:#fff; font-weight:600; display:none;" title="진행 중인 작업을 즉시 중단 (Flow 이미지 / Grok 영상 / 모달 폴링)">⏹ 중지</button>
+        <button class="btn-sm" id="autoProgressMinBtn" onclick="_minimizeAutoProgress()" style="font-size:14px; padding:4px 10px;" title="최소화 — 작업은 계속 진행되며 화면 우하단 카드로 축소됩니다">—</button>
         <button class="btn-sm" id="autoProgressCloseBtn" onclick="_closeAutoProgress()" style="font-size:13px; opacity:0.5; cursor:not-allowed;" disabled title="작업 중에는 닫을 수 없습니다">✕</button>
       </div>
     </div>
-    <div id="autoProgressBody" style="padding:16px 20px; display:flex; flex-direction:column; gap:10px; font-size:13px;">
+    <div id="autoProgressBody" style="padding:16px 20px; display:flex; flex-direction:column; gap:10px; font-size:13px; overflow-y:auto;">
       <!-- 진행 단계 행들이 동적으로 들어감 -->
+    </div>
+    <!-- 현재 처리 중 항목 박스 -->
+    <div id="autoCurrentItemBox" class="auto-current-box" style="margin:0 20px 10px 20px; display:none;">
+      <div class="auto-current-label">지금 ▸</div>
+      <div id="autoCurrentItemText" class="auto-current-text">준비 중…</div>
+      <div id="autoCurrentItemSub" class="auto-current-sub"></div>
+    </div>
+    <!-- ETA 박스 -->
+    <div id="autoEtaBox" class="auto-eta-box" style="margin:0 20px 10px 20px; display:none;">
+      <div class="auto-eta-line"><span class="lbl">🖼 이미지</span><span id="autoEta_img">—</span></div>
+      <div class="auto-eta-line"><span class="lbl">🎙 TTS</span><span id="autoEta_tts">—</span></div>
+      <div class="auto-eta-line" id="autoEtaLine_video" style="display:none;"><span class="lbl">🎬 영상</span><span id="autoEta_video">—</span></div>
+    </div>
+    <!-- Stuck 경고 박스 (기본 hidden) -->
+    <div id="autoStuckBox" class="auto-stuck-box warn" style="margin:0 20px 10px 20px;">
+      <div id="autoStuckTitle" class="auto-stuck-title">⚠ 진행이 멈춘 것 같습니다</div>
+      <div id="autoStuckReason" class="auto-stuck-reason"></div>
+    </div>
+    <!-- Mini-log 영역 -->
+    <div id="autoMiniLogBox" style="margin:0 20px 12px 20px; display:none;">
+      <div class="auto-mini-log-header">
+        <span>📋 최근 로그</span>
+        <a onclick="_openFullLogPanel()" title="로그 탭으로 이동">▸ 풀로그 열기</a>
+      </div>
+      <div id="autoMiniLog" class="auto-mini-log"></div>
     </div>
     <div id="autoProgressFooter" style="padding:10px 20px 14px 20px; font-size:12px; color:var(--text-muted); border-top:1px solid var(--border-soft); display:flex; justify-content:space-between; align-items:center;">
       <span id="autoProgressElapsed">경과: 0초</span>
       <span id="autoProgressSummary"></span>
     </div>
   </div>
+</div>
+
+<!-- 다른 탭에서 TTS 가져오기 모달 — 탭 선택 + 매칭 미리보기 -->
+<div id="ttsImportModal" style="display:none; position:fixed; inset:0; background:rgba(58,52,46,0.5); z-index:1000; align-items:center; justify-content:center;" onclick="if(event.target===this)_closeTtsImportModal()">
+  <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; width:560px; max-width:94vw; max-height:88vh; box-shadow:var(--shadow-lg); display:flex; flex-direction:column; overflow:hidden;">
+    <div style="padding:16px 20px; border-bottom:1px solid var(--border-soft); display:flex; justify-content:space-between; align-items:center;">
+      <h3 style="font-size:15px; color:var(--accent); margin:0; font-weight:700;">🔗 다른 탭에서 TTS 가져오기</h3>
+      <button class="btn-sm" onclick="_closeTtsImportModal()" style="font-size:13px;">✕</button>
+    </div>
+    <div style="padding:14px 20px; font-size:12px; color:var(--text-muted); border-bottom:1px solid var(--border-soft);">
+      같은 대본을 다른 탭에서 TTS 변환했다면, 그 음성을 현재 탭의 같은 문장에 연결합니다. <b>파일은 복사하지 않고 경로만 참조</b>합니다 — 원본 탭/파일을 삭제하면 음성도 함께 사라집니다.
+    </div>
+    <div id="ttsImportTabList" style="padding:14px 20px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; font-size:13px;">
+      <!-- 탭 목록이 동적으로 채워짐 -->
+    </div>
+    <div id="ttsImportPreview" style="padding:0 20px 14px 20px; font-size:12px; color:var(--text-muted); display:none;"></div>
+    <div style="padding:12px 20px 16px 20px; display:flex; justify-content:flex-end; gap:8px; border-top:1px solid var(--border-soft);">
+      <button class="btn-sm" onclick="_closeTtsImportModal()" style="font-size:12px;">취소</button>
+      <button class="btn-sm" id="ttsImportApplyBtn" onclick="_applyTtsImport()" disabled style="font-size:12px; background:var(--accent); color:var(--accent-text); font-weight:600; padding:6px 14px; border-color:var(--accent); opacity:0.5; cursor:not-allowed;">가져오기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 자동제작 최소화 chip — 우하단 floating, 모달이 최소화된 동안만 표시 -->
+<div id="autoProgressMini" onclick="_restoreAutoProgress()" title="클릭하면 진행 창이 다시 열립니다">
+  <div class="mini-header">
+    <span>▶ 자동제작</span>
+    <span class="mini-restore">↗ 열기</span>
+  </div>
+  <div id="autoProgressMiniPct" class="mini-pct">0%</div>
+  <div id="autoProgressMiniLabel" class="mini-label">대기 중</div>
+  <div id="autoProgressMiniElapsed" class="mini-elapsed">0초</div>
+  <div id="autoProgressMiniStuck" class="mini-stuck">⚠ 멈춤 감지</div>
 </div>
 
 <!-- 대본 입력/수정 모달 -->
@@ -1685,14 +1909,27 @@
         <h2 style="font-size:19px; color:var(--accent); margin:0;">✏️ 대본 직접 입력 / 수정</h2>
         <button class="btn-sm" onclick="closeScriptInputModal()" style="font-size:15px;">✕</button>
       </div>
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
         <div style="font-size:13px; color:var(--text-muted);">
           마크다운 헤더(#, ##)와 [섹션] 마커, 따옴표는 자동으로 제외됩니다.
         </div>
-        <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-soft); cursor:pointer; flex:none;">
-          <input type="checkbox" id="scriptShowSyntax" checked onchange="_toggleScriptSyntax()">
-          <span>문법 표시 (#, ##, [...])</span>
-        </label>
+        <div style="display:flex; align-items:center; gap:14px; flex:none;">
+          <!-- 찾기 — 사용자 요청 (Ctrl+F / Enter=다음 / Shift+Enter=이전) -->
+          <div style="display:flex; align-items:center; gap:4px; background:var(--bg-soft); border:1px solid var(--border-soft); border-radius:6px; padding:2px 4px;" title="Ctrl+F 로 빠르게 검색창에 포커스. Enter=다음, Shift+Enter=이전, Esc=닫기">
+            <input type="text" id="scriptSearchInput" placeholder="🔍 찾기..."
+              oninput="_scriptSearchUpdate()"
+              onkeydown="_scriptSearchKey(event)"
+              style="width:140px; background:transparent; border:none; outline:none; font-size:13px; color:var(--text-strong); padding:4px 6px;">
+            <span id="scriptSearchInfo" style="font-size:11px; color:var(--text-muted); min-width:48px; text-align:center;">—</span>
+            <button class="btn-sm" onclick="_scriptSearchPrev()" title="이전 (Shift+Enter)" style="font-size:11px; padding:2px 6px;">▲</button>
+            <button class="btn-sm" onclick="_scriptSearchNext()" title="다음 (Enter)" style="font-size:11px; padding:2px 6px;">▼</button>
+            <button class="btn-sm" onclick="_scriptSearchClear()" title="검색 초기화 (Esc)" style="font-size:11px; padding:2px 6px;">✕</button>
+          </div>
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-soft); cursor:pointer; flex:none;">
+            <input type="checkbox" id="scriptShowSyntax" checked onchange="_toggleScriptSyntax()">
+            <span>문법 표시 (#, ##, [...])</span>
+          </label>
+        </div>
       </div>
     </div>
 
@@ -2862,15 +3099,41 @@ function _createEmptyProject(overrides = {}) {
   };
 }
 
+// 탭 라벨 풀네임 — title (마우스 오버) 용. 파일명 우선, 다음 대본 첫 줄 추출, 다음 "새 대본 N".
 function _projectTabLabel(p) {
-  if (p.scriptFileName) return p.scriptFileName;
-  return `새 대본 ${p.tabCreatedOrder || '?'}`;
+  if (p && p.scriptFileName) return p.scriptFileName;
+  // 직접 입력으로만 시작한 경우 — 대본 첫 줄에서 자동 추출 (마크다운 헤더 #, 따옴표 제거)
+  try {
+    const firstSentence = (p && p.sentences && p.sentences[0] && p.sentences[0].text) || '';
+    if (firstSentence) {
+      const stripped = firstSentence.replace(/^#+\s*/, '').replace(/^[\["'""']/, '').replace(/[\]"'""']$/, '').trim();
+      if (stripped) return stripped;
+    }
+  } catch (_) {}
+  return `새 대본 ${p && p.tabCreatedOrder || '?'}`;
 }
 
+// 탭 표시용 짧은 라벨 — 한국어/영문 혼합 폭 기준으로 잘림 (한글 2 폭, 영문 1 폭).
+// 사용자 요청: 파일명 "앞부분의 일부" 만 보이도록.
 function _projectTabLabelShort(p) {
   const lbl = _projectTabLabel(p);
-  if (lbl.length <= 18) return lbl;
-  return lbl.slice(0, 16) + '…';
+  // 폭 기준 14 (한국어로 약 7자, 영문으로 14자)
+  const MAX_WIDTH = 14;
+  let width = 0;
+  let cut = lbl.length;
+  for (let i = 0; i < lbl.length; i++) {
+    const code = lbl.charCodeAt(i);
+    // 한국어/CJK/전각 → 폭 2, 그 외(영문/숫자/공백/구두점) → 폭 1
+    const w = (code > 0x1100 && (
+      (code >= 0xAC00 && code <= 0xD7A3) ||  // 한글 음절
+      (code >= 0x3000 && code <= 0x9FFF) ||  // CJK
+      (code >= 0xFF00 && code <= 0xFFEF)     // 전각
+    )) ? 2 : 1;
+    if (width + w > MAX_WIDTH) { cut = i; break; }
+    width += w;
+  }
+  if (cut >= lbl.length) return lbl;
+  return lbl.slice(0, cut) + '…';
 }
 
 function renderProjectTabs() {
@@ -3186,6 +3449,8 @@ async function openFile() {
           _cur.scriptFilePath = window._scriptFilePath;
         }
       }
+      // 탭 라벨 즉시 갱신 — "새 대본 N" 이 첨부 파일명 앞부분으로 바뀌도록
+      try { renderProjectTabs(); } catch (_) {}
       // 작업 목록 헤더에 파일명 표시
       const fnEl = document.getElementById('taskListFileName');
       if (fnEl) {
@@ -3291,6 +3556,12 @@ async function saveProjectFile() {
 
 // 자동 저장 (debounce) — 출력 폴더 없으면 조용히 skip, 실패해도 사용자 흐름 방해 X
 // (PR4) projectId 인자 — 큐 task 가 활성 탭이 아닌 자기 프로젝트를 명시 저장 가능
+// 자동제작 중 image-done IPC 빈번 호출 throttle — 단위 프로젝트별 마지막 저장 시점 기록
+window._autoSaveLastAt = window._autoSaveLastAt || {};
+const _AUTO_SAVE_THROTTLE_MS_DURING_AUTOGEN = 30000;  // 자동제작 중에는 30초당 최대 1회
+const _AUTO_SAVE_ERR_LOG_COOLDOWN_MS = 60000;          // addLog 알림은 60초당 1회 (스팸 방지)
+window._autoSaveLastErrLogAt = window._autoSaveLastErrLogAt || {};
+
 function _autoSaveProject(projectId) {
   if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
   // 활성 프로젝트만 인디케이터 갱신 (다른 탭 자동저장은 silent)
@@ -3308,15 +3579,34 @@ function _autoSaveProject(projectId) {
       if (isActive) _updateAutoSaveIndicator('');
       return;
     }
+    // 자동제작 진행 중에는 throttle — image-done IPC 가 30개/문장당 1번씩 호출 폭주 방지
+    const isAutoGenRunning = !!(window._autoPollActive || window._grokConvertActive || window._ttsConvertActive);
+    if (isAutoGenRunning) {
+      const lastAt = window._autoSaveLastAt[proj.id] || 0;
+      if (Date.now() - lastAt < _AUTO_SAVE_THROTTLE_MS_DURING_AUTOGEN) {
+        // throttle 적중 — UI 인디케이터는 'saved' 유지 (저장된 상태에서 추가 신호만 누적)
+        if (isActive) _updateAutoSaveIndicator('saved');
+        return;
+      }
+    }
     try {
       if (isActive) _updateAutoSaveIndicator('saving');
       const ProjectStore = require('../core/project-store');
       const r = ProjectStore.saveProject(proj, { filePath: proj.pflowPath });
       proj.pflowPath = r.path; // 안전망 — 이름 충돌 등으로 경로 바뀌었을 경우
+      window._autoSaveLastAt[proj.id] = Date.now();
       if (isActive) _updateAutoSaveIndicator('saved');
     } catch (e) {
       console.warn('[자동저장]', e.message);
       if (isActive) _updateAutoSaveIndicator('error', e.message);
+      // addLog 영구 알림 — 사용자가 console 없이도 인지. 60초 cooldown 으로 스팸 방지.
+      try {
+        const lastErrAt = window._autoSaveLastErrLogAt[proj.id] || 0;
+        if (Date.now() - lastErrAt > _AUTO_SAVE_ERR_LOG_COOLDOWN_MS) {
+          window._autoSaveLastErrLogAt[proj.id] = Date.now();
+          addLog(`⚠ 자동저장 실패 (${proj.name || proj.id}) — ${e.message}. [💾 프로젝트 저장] 으로 수동 저장하거나 디스크 공간/권한을 확인하세요.`, 'err');
+        }
+      } catch (_) {}
     }
   }, 500);
 }
@@ -3558,6 +3848,20 @@ ipcRenderer.on('done', (_, data) => {
   document.getElementById('progressText').textContent = `완료 (${data.success}/${data.total})`;
   // 폴더 자동 열기 제거 — saveVrew() 완료 시점에 vrew 폴더만 열기로 일원화
 });
+// flow-engine 의 rate-limit 신호 — 자동제작 모달의 stuck 박스에 쿨다운 표시 + chip 안내.
+// 페이로드: { waitSeconds, reason }. 정상 대기로 분류되어 stuck danger 미승격.
+ipcRenderer.on('rate-limit', (_, payload) => {
+  try {
+    const sec = Math.max(1, parseInt((payload && payload.waitSeconds), 10) || 30);
+    const reason = (payload && payload.reason) || 'rate-limit';
+    if (typeof _autoCooldownUntil !== 'undefined') {
+      _autoCooldownUntil = Date.now() + sec * 1000;
+    }
+    addLog(`⏸ rate-limit 감지 — ${sec}초 대기 (${reason})`, 'warn');
+  } catch (e) {
+    console.error('[rate-limit IPC]', e);
+  }
+});
 
 // 최대 글자수 슬라이더 값 실시간 반영
 document.getElementById('maxCharsSlider').addEventListener('input', (e) => {
@@ -3618,6 +3922,8 @@ function addLog(msg, type = '') {
   line.textContent = msg;
   el.appendChild(line);
   el.scrollTop = el.scrollHeight;
+  // 자동제작 모달 mini-log 동기화 (ring buffer O(1) + 모달 visible 일 때만 DOM 렌더)
+  try { if (typeof _appendAutoMiniLog === 'function') _appendAutoMiniLog(msg, type); } catch (_) {}
 }
 
 // ─── 프로젝트 출력 폴더 통합 헬퍼 ─────────────────────
@@ -4758,11 +5064,165 @@ function openScriptInputModal() {
     }
   };
   document.getElementById('scriptInputModal').style.display = 'flex';
-  setTimeout(() => ta.focus(), 50);
+  // 처음 진입 시 커서/스크롤을 대본 가장 첫 부분으로 이동 (사용자 요청 — 기본은 끝에 위치)
+  setTimeout(() => {
+    ta.focus();
+    try {
+      ta.setSelectionRange(0, 0);
+      ta.scrollTop = 0;
+    } catch (_) {}
+  }, 50);
+  // 찾기 상태 초기화 — 검색창 비우기, 매치 목록 클리어
+  try {
+    const searchInput = document.getElementById('scriptSearchInput');
+    if (searchInput) searchInput.value = '';
+    _scriptSearchMatches = [];
+    _scriptSearchIndex = -1;
+    _updateScriptSearchInfo();
+    _clearScriptSearchHighlight();
+  } catch (_) {}
 }
 function closeScriptInputModal() {
   document.getElementById('scriptInputModal').style.display = 'none';
+  try { _clearScriptSearchHighlight(); } catch (_) {}
 }
+
+// ─── 대본 입력 모달 — 찾기 기능 ──────────────────────────
+// 사용자 요청: 모달 안에서 Ctrl+F / 입력란으로 빠르게 검색.
+// 매치 위치를 textarea selection 으로 강조 (네이티브 selection 색상 그대로).
+let _scriptSearchMatches = [];   // [start, ...]  각 매치의 시작 인덱스
+let _scriptSearchIndex   = -1;
+let _scriptSearchTerm    = '';
+
+function _scriptSearchUpdate() {
+  const input = document.getElementById('scriptSearchInput');
+  const ta = document.getElementById('scriptInputModalArea');
+  if (!input || !ta) return;
+  const term = input.value || '';
+  _scriptSearchTerm = term;
+  _scriptSearchMatches = [];
+  _scriptSearchIndex = -1;
+  if (!term) {
+    _updateScriptSearchInfo();
+    return;
+  }
+  const text = ta.value || '';
+  const termLc = term.toLowerCase();
+  const textLc = text.toLowerCase();
+  let idx = 0;
+  while (idx < textLc.length) {
+    const found = textLc.indexOf(termLc, idx);
+    if (found < 0) break;
+    _scriptSearchMatches.push(found);
+    idx = found + Math.max(1, termLc.length);
+  }
+  // 첫 매치 자동 이동 — 사용자가 타이핑하는 동안 즉시 위치
+  if (_scriptSearchMatches.length > 0) {
+    // 현재 커서 위치 이후의 첫 매치로 점프 (없으면 0번째)
+    const caret = ta.selectionStart || 0;
+    let next = _scriptSearchMatches.findIndex(m => m >= caret);
+    if (next < 0) next = 0;
+    _scriptSearchIndex = next;
+    _scrollScriptSearchToMatch();
+  }
+  _updateScriptSearchInfo();
+}
+
+function _scriptSearchNext() {
+  if (_scriptSearchMatches.length === 0) return;
+  _scriptSearchIndex = (_scriptSearchIndex + 1) % _scriptSearchMatches.length;
+  _scrollScriptSearchToMatch();
+  _updateScriptSearchInfo();
+}
+
+function _scriptSearchPrev() {
+  if (_scriptSearchMatches.length === 0) return;
+  _scriptSearchIndex = (_scriptSearchIndex - 1 + _scriptSearchMatches.length) % _scriptSearchMatches.length;
+  _scrollScriptSearchToMatch();
+  _updateScriptSearchInfo();
+}
+
+function _scriptSearchClear() {
+  const input = document.getElementById('scriptSearchInput');
+  if (input) input.value = '';
+  _scriptSearchMatches = [];
+  _scriptSearchIndex = -1;
+  _scriptSearchTerm = '';
+  _updateScriptSearchInfo();
+  _clearScriptSearchHighlight();
+  const ta = document.getElementById('scriptInputModalArea');
+  if (ta) ta.focus();
+}
+
+function _clearScriptSearchHighlight() {
+  // 네이티브 selection 만 사용 — textarea 의 selection 을 풀어주면 끝
+  const ta = document.getElementById('scriptInputModalArea');
+  if (!ta) return;
+  // 의도적으로 selection 안 풀고 그대로 둠 (사용자가 매치 위치에서 편집 이어가기 좋음)
+  // 다만 모달 close 시에는 다음 진입을 위해 초기화 안 함 — openScriptInputModal 에서 0 으로 설정.
+}
+
+function _updateScriptSearchInfo() {
+  const info = document.getElementById('scriptSearchInfo');
+  if (!info) return;
+  if (!_scriptSearchTerm) {
+    info.textContent = '—';
+    info.style.color = 'var(--text-muted)';
+  } else if (_scriptSearchMatches.length === 0) {
+    info.textContent = '0';
+    info.style.color = 'var(--danger, #c4584a)';
+  } else {
+    info.textContent = `${_scriptSearchIndex + 1}/${_scriptSearchMatches.length}`;
+    info.style.color = 'var(--text-soft)';
+  }
+}
+
+function _scrollScriptSearchToMatch() {
+  const ta = document.getElementById('scriptInputModalArea');
+  if (!ta || _scriptSearchIndex < 0) return;
+  const pos = _scriptSearchMatches[_scriptSearchIndex];
+  const len = _scriptSearchTerm.length;
+  // textarea selection — 브라우저가 자동 스크롤
+  ta.focus();
+  try { ta.setSelectionRange(pos, pos + len); } catch (_) {}
+  // 브라우저별 자동 스크롤이 약할 수 있어 — 줄 단위 위치로 스크롤 강제
+  try {
+    // 매치 라인 번호 계산
+    const before = ta.value.substring(0, pos);
+    const lineNum = (before.match(/\n/g) || []).length;
+    // 한 줄당 line-height 25.5px (font-size 15 * 1.7) — 대략값
+    const lineH = 26;
+    const targetTop = Math.max(0, lineNum * lineH - ta.clientHeight / 2);
+    ta.scrollTop = targetTop;
+  } catch (_) {}
+}
+
+// Enter=다음, Shift+Enter=이전, Esc=닫기 — 검색 input 안에서 핸들러
+function _scriptSearchKey(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (e.shiftKey) _scriptSearchPrev();
+    else _scriptSearchNext();
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    _scriptSearchClear();
+  }
+}
+
+// Ctrl+F 단축키 — 대본 입력 모달이 열려있을 때 검색창에 포커스
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+    const modal = document.getElementById('scriptInputModal');
+    if (modal && modal.style.display !== 'none') {
+      e.preventDefault();
+      const input = document.getElementById('scriptSearchInput');
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    }
+  }
+});
 
 // ─── 스타일 관리 모달 ──────────────────────────────────
 let _styleManagerEditingId = null;
@@ -5045,6 +5505,8 @@ function confirmScriptInputModal() {
   window._scriptFilePath = '';
   closeScriptInputModal();
   splitScript();
+  // 탭 라벨 갱신 — 직접 입력 시에도 대본 첫 줄에서 자동 추출되도록
+  try { renderProjectTabs(); } catch (_) {}
 }
 
 // 대본 모달 내용을 .md 파일로 저장 — Blob 다운로드 (브라우저 기본 다운로드 폴더로)
@@ -5297,7 +5759,10 @@ function autoSplitDebounced() {
 // 분할 옵션 — 대본 → 문장 단위 작업 목록 변환
 function splitScript() {
   try {
-    return _splitScriptImpl();
+    const r = _splitScriptImpl();
+    // 분할 후 탭 라벨 갱신 — 직접 입력 케이스에서 sentences[0].text 로 자동 추출되도록
+    try { renderProjectTabs(); } catch (_) {}
+    return r;
   } catch (e) {
     console.error('[splitScript ERROR]', e.stack || e);
     addLog(`[splitScript 오류] ${e.message} — 콘솔(F12)에서 stack 확인`, 'err');
@@ -5619,7 +6084,7 @@ function renderTaskList(project) {
         `<div class="group-video-overlay" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.25); border-radius:6px; pointer-events:none; transition:opacity 0.2s;">` +
         `<span style="font-size:32px; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,0.7);">▶</span></div>` +
         `<button class="group-media-trash" type="button" title="비디오 제거" style="${TRASH_STYLE}">🗑</button>` +
-        `<div style="position:absolute; top:4px; right:4px; background:rgba(80,180,120,0.85); color:#fff; font-size:11px; padding:2px 6px; border-radius:4px; font-weight:600; pointer-events:none;">🎬 비디오</div>`;
+        `<div style="position:absolute; top:4px; right:4px; background:${g.videoDowngradedTo480p ? 'rgba(232,168,76,0.92)' : 'rgba(80,180,120,0.85)'}; color:#fff; font-size:11px; padding:2px 6px; border-radius:4px; font-weight:600; pointer-events:none;" title="${g.videoDowngradedTo480p ? '720p 한도 도달로 480p 자동 강등' : ''}">${g.videoDowngradedTo480p ? '🎬 480p' : '🎬 비디오'}</div>`;
       img.style.position = 'relative';
       img.style.cursor = 'pointer';
       img.classList.add('has-image');
@@ -9244,6 +9709,22 @@ async function _convertSentenceImpl(projectId, sid, preset, channel, _opts = {})
 // _closeAutoProgress() — 모달 닫기
 let _autoProgressStartedAt = 0;
 let _autoProgressTimer = null;
+// ─── 모달 개선(2026-05-20): 최소화 / 현재 처리 / mini-log / ETA / stuck 감지 ───
+let _autoProgressMinimized = false;
+let _autoStepRates = { img: [], tts: [], video: [], vrew: [] };       // 단계별 처리 간격 샘플(ms)
+let _autoLastProgressAt = { img: 0, tts: 0, video: 0, vrew: 0 };       // 단계별 마지막 진행 timestamp
+let _autoLastCount      = { img: 0, tts: 0, video: 0, vrew: 0 };
+let _autoStepTotals     = { img: 0, tts: 0, video: 0, vrew: 0 };
+let _autoMiniLogBuf     = [];                                          // {msg,type,t} ring buffer
+let _autoCurrentItem    = { step: null, label: '', sub: '', t: 0 };
+let _autoStuckActive    = false;
+let _autoStuckLevel     = '';                                          // '' | 'warn' | 'danger'
+let _autoCooldownUntil  = 0;
+const _AUTO_STUCK_THRESHOLDS_MS = { img: 90000, tts: 60000, video: 480000, vrew: 30000 };
+const _AUTO_RING_LIMIT       = 24;
+const _AUTO_MINI_DOM_LINES   = 8;
+const _AUTO_RATE_MIN_SAMPLES = 5;
+const _AUTO_RATE_MAX_SAMPLES = 12;
 
 function _showAutoProgress(title, steps) {
   const modal = document.getElementById('autoProgressModal');
@@ -9274,7 +9755,35 @@ function _showAutoProgress(title, steps) {
   }
   // 글로벌 cancel 신호 초기화 (이전 작업의 잔재 제거)
   window._autoCancelRequested = false;
+  // 자동제작 모달 개선(2026-05-20) — 신규 상태 reset
+  _autoProgressMinimized = false;
+  window._autoProgressMinimized = false;
+  _autoStepRates = { img: [], tts: [], video: [], vrew: [] };
+  _autoLastProgressAt = { img: 0, tts: 0, video: 0, vrew: 0 };
+  _autoLastCount = { img: 0, tts: 0, video: 0, vrew: 0 };
+  _autoStepTotals = { img: 0, tts: 0, video: 0, vrew: 0 };
+  _autoMiniLogBuf = [];
+  _autoCurrentItem = { step: null, label: '', sub: '', t: 0 };
+  _autoStuckActive = false;
+  _autoStuckLevel = '';
+  _autoCooldownUntil = 0;
+  // 새 박스들 초기 상태
+  const _curBox = document.getElementById('autoCurrentItemBox');
+  if (_curBox) _curBox.style.display = 'none';
+  const _etaBox = document.getElementById('autoEtaBox');
+  if (_etaBox) _etaBox.style.display = 'none';
+  const _stuckBox = document.getElementById('autoStuckBox');
+  if (_stuckBox) _stuckBox.style.display = 'none';
+  const _miniLogBox = document.getElementById('autoMiniLogBox');
+  if (_miniLogBox) _miniLogBox.style.display = 'none';
+  // chip 숨김 + 강조 클래스 제거
+  const _chip = document.getElementById('autoProgressMini');
+  if (_chip) {
+    _chip.style.display = 'none';
+    _chip.classList.remove('chip-done', 'chip-fail', 'chip-stuck');
+  }
   body.innerHTML = '';
+  const _stepIds = (steps || []).map(st => st.id);
   for (const step of (steps || [])) {
     const row = document.createElement('div');
     row.id = `autoProgressStep_${step.id}`;
@@ -9289,15 +9798,28 @@ function _showAutoProgress(title, steps) {
       `</div>`;
     body.appendChild(row);
   }
+  // ETA 박스 — 이번 작업에 video step 이 있으면 영상 줄 표시, 없으면 hide
+  if (_etaBox) _etaBox.style.display = 'block';
+  const _videoLine = document.getElementById('autoEtaLine_video');
+  if (_videoLine) _videoLine.style.display = _stepIds.indexOf('video') >= 0 ? 'flex' : 'none';
+  const _imgEta = document.getElementById('autoEta_img');
+  if (_imgEta) _imgEta.textContent = '계산 중…';
+  const _ttsEta = document.getElementById('autoEta_tts');
+  if (_ttsEta) _ttsEta.textContent = '계산 중…';
+  const _videoEta = document.getElementById('autoEta_video');
+  if (_videoEta) _videoEta.textContent = '계산 중…';
   modal.style.display = 'flex';
   _autoProgressStartedAt = Date.now();
   if (_autoProgressTimer) clearInterval(_autoProgressTimer);
   _autoProgressTimer = setInterval(() => {
+    // 경과 시간 갱신 (모달 + chip 둘 다)
     const el = document.getElementById('autoProgressElapsed');
-    if (!el) return;
     const sec = Math.floor((Date.now() - _autoProgressStartedAt) / 1000);
     const m = Math.floor(sec / 60), s = sec % 60;
-    el.textContent = m > 0 ? `경과: ${m}분 ${s}초` : `경과: ${s}초`;
+    if (el) el.textContent = m > 0 ? `경과: ${m}분 ${s}초` : `경과: ${s}초`;
+    // 1초마다 stuck 감지 + chip 동기화 (단일 진실 소스)
+    try { _detectStuck(Date.now()); } catch (_) {}
+    try { _syncMiniChip(); } catch (_) {}
   }, 1000);
 }
 
@@ -9326,6 +9848,16 @@ function _updateAutoStep(id, patch) {
   if (patch.fail && barEl) {
     barEl.style.background = 'var(--danger, #c4584a)';
   }
+  // 자동제작 모달 개선(2026-05-20): 단계 진행 기록 + ETA 텍스트 갱신
+  try {
+    if (typeof patch.current === 'number' && typeof patch.total === 'number') {
+      _recordStepProgress(id, patch.current, patch.total);
+    }
+    if (id === 'img' || id === 'tts' || id === 'video') {
+      const etaEl = document.getElementById('autoEta_' + id);
+      if (etaEl) etaEl.textContent = _calculateETA(id);
+    }
+  } catch (_) {}
 }
 
 function _finishAutoProgress(summary) {
@@ -9349,6 +9881,26 @@ function _finishAutoProgress(summary) {
   }
   if (sumEl && summary) sumEl.textContent = summary;
   if (_autoProgressTimer) { clearInterval(_autoProgressTimer); _autoProgressTimer = null; }
+  // 자동제작 모달 개선(2026-05-20) — 종료 시점에 chip 강조 + stuck 표시 클리어
+  try {
+    _autoStuckActive = false;
+    _autoStuckLevel = '';
+    _autoCooldownUntil = 0;
+    const stuckBox = document.getElementById('autoStuckBox');
+    if (stuckBox) stuckBox.style.display = 'none';
+    const chip = document.getElementById('autoProgressMini');
+    if (chip) {
+      chip.classList.remove('chip-stuck');
+      // summary 텍스트가 "중지" / "실패" / "오류" 면 fail 강조, 아니면 done 강조
+      const isFail = /중지|실패|오류|취소|error|fail/i.test(String(summary || ''));
+      chip.classList.remove(isFail ? 'chip-done' : 'chip-fail');
+      chip.classList.add(isFail ? 'chip-fail' : 'chip-done');
+      // 최소화 상태였다면 chip 라벨/% 한 번 동기화 — 사용자에게 종료 알림
+      try { _syncMiniChip(); } catch (_) {}
+      const lbl = document.getElementById('autoProgressMiniLabel');
+      if (lbl) lbl.textContent = isFail ? '❌ ' + (summary || '중지/실패') : '✅ 완료';
+    }
+  } catch (_) {}
 }
 
 function _closeAutoProgress() {
@@ -9358,8 +9910,322 @@ function _closeAutoProgress() {
   const closeBtn = document.getElementById('autoProgressCloseBtn');
   if (closeBtn && closeBtn.disabled) return;
   modal.style.display = 'none';
+  // 최소화 chip 도 함께 숨김
+  const chip = document.getElementById('autoProgressMini');
+  if (chip) {
+    chip.style.display = 'none';
+    chip.classList.remove('chip-done', 'chip-fail', 'chip-stuck');
+  }
+  _autoProgressMinimized = false;
+  window._autoProgressMinimized = false;
   if (_autoProgressTimer) { clearInterval(_autoProgressTimer); _autoProgressTimer = null; }
 }
+
+// 자동제작 모달 최소화 — 작업은 계속 진행, 우하단 chip 으로 축소
+function _minimizeAutoProgress() {
+  const modal = document.getElementById('autoProgressModal');
+  const chip = document.getElementById('autoProgressMini');
+  if (!modal || !chip) return;
+  modal.style.display = 'none';
+  chip.style.display = 'block';
+  _autoProgressMinimized = true;
+  window._autoProgressMinimized = true;
+  try { _syncMiniChip(); } catch (_) {}
+}
+
+// 최소화 chip 클릭 — 모달 복귀. mini-log/현재 처리/ETA 모두 그대로 유지됨.
+function _restoreAutoProgress() {
+  const modal = document.getElementById('autoProgressModal');
+  const chip = document.getElementById('autoProgressMini');
+  if (!modal || !chip) return;
+  chip.style.display = 'none';
+  // 완료/실패 강조 클래스는 복귀 시 제거 (모달에서 직접 확인 가능)
+  chip.classList.remove('chip-done', 'chip-fail', 'chip-stuck');
+  modal.style.display = 'flex';
+  _autoProgressMinimized = false;
+  window._autoProgressMinimized = false;
+  try { _renderAutoMiniLog(); } catch (_) {}
+}
+
+// 현재 처리 중인 항목 갱신 — 모달 + chip 양쪽 텍스트 동기. opts.sub 는 보조 텍스트.
+function _updateAutoCurrentItem(step, label, opts) {
+  opts = opts || {};
+  // step 이 바뀌면 이전 단계의 stuck 의심 자동 해소(폴링이 다시 평가)
+  if (_autoCurrentItem.step && _autoCurrentItem.step !== step) {
+    const stuckBox = document.getElementById('autoStuckBox');
+    if (stuckBox) stuckBox.style.display = 'none';
+    _autoStuckActive = false;
+    _autoStuckLevel = '';
+  }
+  _autoCurrentItem.step = step;
+  _autoCurrentItem.label = String(label || '');
+  _autoCurrentItem.sub = String(opts.sub || '');
+  _autoCurrentItem.t = Date.now();
+  // 모달이 열려 있으면 텍스트 갱신
+  const box = document.getElementById('autoCurrentItemBox');
+  const txt = document.getElementById('autoCurrentItemText');
+  const sub = document.getElementById('autoCurrentItemSub');
+  if (box) box.style.display = 'block';
+  if (txt) txt.textContent = _autoCurrentItem.label || '준비 중…';
+  if (sub) sub.textContent = _autoCurrentItem.sub || '';
+  // chip 동기화 (최소화 상태 여부 무관 — 비용 미미)
+  try { _syncMiniChip(); } catch (_) {}
+}
+
+// 최소화 chip 텍스트 동기화 — 전체 진행률 % + 현재 라벨 + 경과 시간 + 쿨다운/stuck 표시
+function _syncMiniChip() {
+  const chip = document.getElementById('autoProgressMini');
+  if (!chip) return;
+  // 전체 % = 단계별 step current/total 가중 평균. _autoLastCount / _autoStepTotals 사용.
+  let curSum = 0, totSum = 0;
+  for (const k of ['img', 'tts', 'video', 'vrew']) {
+    if (_autoStepTotals[k] > 0) {
+      curSum += Math.min(_autoLastCount[k], _autoStepTotals[k]);
+      totSum += _autoStepTotals[k];
+    }
+  }
+  const pct = totSum > 0 ? Math.min(100, Math.round((curSum / totSum) * 100)) : 0;
+  const pctEl = document.getElementById('autoProgressMiniPct');
+  if (pctEl) pctEl.textContent = pct + '%';
+  // 라벨 — 쿨다운 중이면 우선
+  const lblEl = document.getElementById('autoProgressMiniLabel');
+  if (lblEl) {
+    const now = Date.now();
+    if (_autoCooldownUntil && now < _autoCooldownUntil) {
+      const sec = Math.ceil((_autoCooldownUntil - now) / 1000);
+      lblEl.textContent = '⏸ 쿨다운 대기 ' + sec + 's';
+    } else {
+      lblEl.textContent = _autoCurrentItem.label || '진행 중…';
+    }
+  }
+  // 경과 시간 — _autoProgressStartedAt 기반
+  const elEl = document.getElementById('autoProgressMiniElapsed');
+  if (elEl && _autoProgressStartedAt > 0) {
+    const sec = Math.floor((Date.now() - _autoProgressStartedAt) / 1000);
+    const m = Math.floor(sec / 60), s = sec % 60;
+    elEl.textContent = m > 0 ? (m + '분 ' + s + '초') : (s + '초');
+  }
+  // stuck 표시
+  const stuckEl = document.getElementById('autoProgressMiniStuck');
+  if (stuckEl) {
+    if (_autoStuckActive) {
+      stuckEl.style.display = 'block';
+      chip.classList.add('chip-stuck');
+    } else {
+      stuckEl.style.display = 'none';
+      chip.classList.remove('chip-stuck');
+    }
+  }
+}
+
+// 단계별 진행 기록 — current 가 증가하면 처리 간격(ms) 샘플을 누적, 마지막 진행 시각 갱신.
+function _recordStepProgress(stepId, current, total) {
+  if (!stepId || !(stepId in _autoLastProgressAt)) return;
+  _autoStepTotals[stepId] = total | 0;
+  const now = Date.now();
+  if (current > _autoLastCount[stepId]) {
+    // 첫 진행이 아닐 때만 간격 샘플 누적 (0→처음 진행은 시작 지연 포함되어 부정확)
+    if (_autoLastProgressAt[stepId] > 0) {
+      const inc = current - _autoLastCount[stepId];
+      const dt = now - _autoLastProgressAt[stepId];
+      // 항목당 ms 로 정규화 (한 번에 여러 개 진행하는 경우 대비)
+      const perItem = dt / Math.max(1, inc);
+      const arr = _autoStepRates[stepId];
+      for (let i = 0; i < inc; i++) arr.push(perItem);
+      while (arr.length > _AUTO_RATE_MAX_SAMPLES) arr.shift();
+    }
+    _autoLastProgressAt[stepId] = now;
+    _autoLastCount[stepId] = current;
+    // 진행이 일어났으니 같은 step 의 stuck 의심 해소
+    if (_autoStuckActive && _autoCurrentItem.step === stepId) {
+      _autoStuckActive = false;
+      _autoStuckLevel = '';
+      const sb = document.getElementById('autoStuckBox');
+      if (sb) sb.style.display = 'none';
+    }
+  } else if (_autoLastProgressAt[stepId] === 0) {
+    // 첫 호출 시 시작 시각만 기록 (간격 샘플 X)
+    _autoLastProgressAt[stepId] = now;
+    _autoLastCount[stepId] = current;
+  }
+}
+
+// 단계별 ETA 계산 — 표본 부족 시 "계산 중", 0 나눗셈 가드 + 평균 ms × 남은 개수
+function _calculateETA(stepId) {
+  const total = _autoStepTotals[stepId] | 0;
+  const cur = _autoLastCount[stepId] | 0;
+  if (total <= 0) return '—';
+  if (cur >= total) return '완료';
+  const rates = _autoStepRates[stepId] || [];
+  if (rates.length < _AUTO_RATE_MIN_SAMPLES) return `계산 중… (${cur}/${total})`;
+  let sum = 0;
+  for (const r of rates) sum += r;
+  const avgMs = sum / rates.length;
+  if (!isFinite(avgMs) || avgMs <= 0) return `계산 중… (${cur}/${total})`;
+  const remainMs = avgMs * (total - cur);
+  const remainSec = Math.max(0, Math.round(remainMs / 1000));
+  const m = Math.floor(remainSec / 60), s = remainSec % 60;
+  const timeText = m > 0 ? `${m}분 ${s}초` : `${s}초`;
+  return `남은 약 ${timeText} (${cur}/${total})`;
+}
+
+// 멈춤(stuck) 감지 — 단계별 마지막 진행 후 임계값 초과 시 경고. 쿨다운 우선 처리.
+function _detectStuck(now) {
+  const stuckBox = document.getElementById('autoStuckBox');
+  const stuckTitle = document.getElementById('autoStuckTitle');
+  const stuckReason = document.getElementById('autoStuckReason');
+  if (!stuckBox) return;
+
+  // 1) 쿨다운 중이면 stuck 박스를 정상 대기로 표시 (warn 등급, danger 미승격)
+  if (_autoCooldownUntil && now < _autoCooldownUntil) {
+    const sec = Math.ceil((_autoCooldownUntil - now) / 1000);
+    stuckBox.style.display = 'block';
+    stuckBox.classList.remove('danger');
+    stuckBox.classList.add('warn');
+    if (stuckTitle) stuckTitle.textContent = `⏸ 쿨다운 대기 중 (${sec}초)`;
+    if (stuckReason) stuckReason.textContent = '정상적인 anti-detect / rate-limit 대기 — 멈춘 것이 아닙니다.';
+    _autoStuckActive = false;  // chip 깜빡임은 안 함 (정상 대기)
+    _autoStuckLevel = 'warn';
+    return;
+  }
+
+  // 2) 현재 active step 의 무진행 시간 검사
+  const step = _autoCurrentItem.step;
+  if (!step || !(step in _AUTO_STUCK_THRESHOLDS_MS)) {
+    stuckBox.style.display = 'none';
+    _autoStuckActive = false;
+    _autoStuckLevel = '';
+    return;
+  }
+  const total = _autoStepTotals[step] | 0;
+  const cur = _autoLastCount[step] | 0;
+  // 작업이 시작 안 됐거나 이미 완료된 step 은 stuck 검사 제외
+  if (total <= 0 || cur >= total) {
+    stuckBox.style.display = 'none';
+    _autoStuckActive = false;
+    _autoStuckLevel = '';
+    return;
+  }
+  // 진행 기록이 한 번도 없으면 _autoCurrentItem.t (currentItem 갱신 시각) 을 기준으로 사용
+  const lastT = _autoLastProgressAt[step] || _autoCurrentItem.t || _autoProgressStartedAt;
+  if (!lastT) return;
+  const delta = now - lastT;
+  const threshold = _AUTO_STUCK_THRESHOLDS_MS[step];
+  if (delta < threshold) {
+    // 정상 진행 중
+    stuckBox.style.display = 'none';
+    _autoStuckActive = false;
+    _autoStuckLevel = '';
+    return;
+  }
+  // 멈춘 듯 — 등급 결정 (임계값 2배 이상이면 danger)
+  const level = delta >= threshold * 2 ? 'danger' : 'warn';
+  // 원인 추정 — 최근 ring buffer 의 err/warn 로그에서 키워드 매칭
+  let reason = '최근 ' + Math.round(delta / 1000) + '초 동안 진행 신호가 없습니다.';
+  try {
+    const recent = _autoMiniLogBuf.slice(-12).filter(L => L.type === 'err' || L.type === 'warn');
+    if (recent.length > 0) {
+      const last = recent[recent.length - 1].msg || '';
+      const lc = last.toLowerCase();
+      if (/rate|429|쿨다운|한도|limit|throttl/i.test(lc)) {
+        reason = '🚦 Flow/Grok rate-limit 의심 — 잠시 대기 후 자동 재시도 가능. 최근 로그: ' + last.slice(0, 90);
+      } else if (/timeout|타임아웃|hang|응답/i.test(lc)) {
+        reason = '⏱ 응답 없음 — 브라우저 자동화 hang 가능성. 최근 로그: ' + last.slice(0, 90);
+      } else if (/login|로그인|sign\s*in|auth/i.test(lc)) {
+        reason = '🔑 세션 만료 의심 — Flow/Grok 재로그인 필요. 최근 로그: ' + last.slice(0, 90);
+      } else if (/selector|element|not\s*found|찾을\s*수/i.test(lc)) {
+        reason = '🧩 사이트 UI 변경 의심 — Flow/Grok selector 점검 필요. 최근 로그: ' + last.slice(0, 90);
+      } else if (/network|연결|disconnect|econn/i.test(lc)) {
+        reason = '🌐 네트워크 오류 의심. 최근 로그: ' + last.slice(0, 90);
+      } else {
+        reason += ' 최근 경고: ' + last.slice(0, 90);
+      }
+    }
+  } catch (_) {}
+  const stepLabel = step === 'img' ? '🖼 이미지 생성' : step === 'tts' ? '🎙 TTS 변환' : step === 'video' ? '🎬 영상 변환' : step;
+  stuckBox.style.display = 'block';
+  stuckBox.classList.remove('warn', 'danger');
+  stuckBox.classList.add(level);
+  if (stuckTitle) stuckTitle.textContent = (level === 'danger' ? '🛑 ' : '⚠ ') + stepLabel + ' 진행이 멈춘 것 같습니다';
+  if (stuckReason) stuckReason.textContent = reason;
+  _autoStuckActive = true;
+  _autoStuckLevel = level;
+}
+
+// addLog 가 호출될 때마다 ring buffer 에 푸시 + 모달이 열려 있으면 mini-log DOM 갱신.
+function _appendAutoMiniLog(msg, type) {
+  // ring push (O(1))
+  _autoMiniLogBuf.push({ msg: String(msg == null ? '' : msg), type: String(type || ''), t: Date.now() });
+  if (_autoMiniLogBuf.length > _AUTO_RING_LIMIT) _autoMiniLogBuf.shift();
+  // 모달이 visible 일 때만 DOM 렌더 (최소화 chip 만 보일 때는 스킵 — 비용 절약)
+  const modal = document.getElementById('autoProgressModal');
+  if (modal && modal.style.display !== 'none') {
+    try { _renderAutoMiniLog(); } catch (_) {}
+  }
+}
+
+// 최근 _AUTO_MINI_DOM_LINES 줄을 DOM 에 렌더 (innerHTML 통째 교체 — 8줄이라 비용 무시)
+function _renderAutoMiniLog() {
+  const el = document.getElementById('autoMiniLog');
+  const box = document.getElementById('autoMiniLogBox');
+  if (!el) return;
+  // 버퍼가 비어있으면 박스 자체를 숨김
+  if (_autoMiniLogBuf.length === 0) {
+    if (box) box.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+  if (box) box.style.display = 'block';
+  const lines = _autoMiniLogBuf.slice(-_AUTO_MINI_DOM_LINES);
+  el.innerHTML = lines.map(L => {
+    const cls = 'ring-line' + (L.type ? ' ' + L.type : ' info');
+    // XSS 방지 — textContent 와 동일하게 innerHTML 회피. document.createElement 패턴 사용.
+    return '';  // placeholder — 아래에서 안전하게 채움
+  }).join('');
+  // 안전한 텍스트 삽입: 일단 비우고 createElement 로 추가
+  el.innerHTML = '';
+  for (const L of lines) {
+    const div = document.createElement('div');
+    div.className = 'ring-line' + (L.type ? ' ' + L.type : ' info');
+    div.textContent = L.msg;
+    el.appendChild(div);
+  }
+  el.scrollTop = el.scrollHeight;
+}
+
+// "▸ 풀로그 열기" 링크 — 자동제작 모달은 그대로 두고 로그 탭으로 스크롤·활성화
+function _openFullLogPanel() {
+  try {
+    // aux-tabs 의 '로그' 탭 클릭 시뮬레이션
+    const logTab = document.querySelector('.aux-tab[data-tab="log"]');
+    if (logTab && typeof logTab.click === 'function') logTab.click();
+    const logArea = document.getElementById('logArea');
+    if (logArea) logArea.scrollTop = logArea.scrollHeight;
+  } catch (_) {}
+}
+
+// 우측 작업시작 패널(#actionPanel) 안의 어떤 버튼이든 클릭하면 보조 패널을 로그 탭으로 자동 전환.
+// 사용자 요청: 자동제작/그록 로그인/모든 탭 순차/빈 그룹 이미지/이미지·영상 첨부/범위 영상/선택 그룹 이미지/
+// 선택 영상/TTS 변환/다른 탭 TTS/Vrew/프리미어 XML 저장/일시정지/중지/실패 영상 재시도 등 모든 액션.
+// 자동 흐름(IPC 등)에서 호출되는 함수는 click 이벤트가 아니라 영향 없음.
+(function _setupActionPanelLogSwitch() {
+  // _openFullLogPanel 이 정의된 직후 등록 — DOM 이 이미 파싱된 시점이면 즉시, 아니면 DOMContentLoaded 대기
+  const attach = () => {
+    const panel = document.getElementById('actionPanel');
+    if (!panel) return;
+    panel.addEventListener('click', (e) => {
+      const btn = e.target && e.target.closest && e.target.closest('button');
+      if (!btn) return;
+      // disabled / display:none 버튼은 어차피 click 안 들어옴
+      try { _openFullLogPanel(); } catch (_) {}
+    });
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', attach);
+  } else {
+    attach();
+  }
+})();
 
 // 자동제작 중지 — 진행 중인 모든 자원별 작업에 중단 신호.
 // 사용자가 자동제작 모달의 ⏹ 중지 버튼 또는 ESC 로 호출.
@@ -9593,6 +10459,158 @@ function openImageBatchAttach() {
 }
 
 // 그룹 카드 [📎 이미지 첨부] — 기존 jpg/png 파일을 그룹 imagePath 로 설정
+/**
+// ─── 다른 탭에서 TTS 음성 가져오기 ─────────────────────────────────
+// 같은 대본을 두 탭에 띄워두고 한쪽에서 TTS 변환 완료 → 다른 탭의 같은 문장에 음성 경로 참조.
+// 파일은 복사하지 않음 (사용자 결정: 경로만 참조). sentence.id 가 같으면 즉시 매칭,
+// 다르면 sentence.text 정규화 매칭으로 폴백.
+let _ttsImportPreview = null;  // { sourceProj, mapping:[{tgtSid, srcSentence}], matched, total }
+
+function openTtsImportFromTab() {
+  const proj = window._currentProject;
+  if (!proj || !proj.sentences || proj.sentences.length === 0) {
+    alert('먼저 현재 탭에 대본을 불러오세요.');
+    return;
+  }
+  // 다른 탭 목록 — 자기 자신 제외 + sentences 있는 것만
+  const others = (window._projects || []).filter(p =>
+    p.id !== proj.id && p.sentences && p.sentences.length > 0
+  );
+  const listEl = document.getElementById('ttsImportTabList');
+  const previewEl = document.getElementById('ttsImportPreview');
+  const applyBtn = document.getElementById('ttsImportApplyBtn');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+  if (previewEl) { previewEl.style.display = 'none'; previewEl.innerHTML = ''; }
+  if (applyBtn) {
+    applyBtn.disabled = true;
+    applyBtn.style.opacity = '0.5';
+    applyBtn.style.cursor = 'not-allowed';
+  }
+  _ttsImportPreview = null;
+  if (others.length === 0) {
+    listEl.innerHTML = '<div style="padding:12px; color:var(--text-muted); text-align:center;">다른 탭이 없습니다. 같은 대본을 또 다른 탭으로 열어 TTS 를 변환한 뒤 다시 시도하세요.</div>';
+  } else {
+    for (const p of others) {
+      const fs2 = require('fs');
+      const ttsCount = p.sentences.filter(s => s.ttsAudioPath && s.ttsStatus === 'done' && fs2.existsSync(s.ttsAudioPath)).length;
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:var(--bg-soft); border:1px solid var(--border-soft); border-radius:8px; cursor:' + (ttsCount > 0 ? 'pointer' : 'not-allowed') + ';';
+      const label = (p.name || p.scriptFileName || p.id) + (p.scriptFileName && p.name !== p.scriptFileName ? ` (${p.scriptFileName})` : '');
+      row.innerHTML =
+        `<div style="flex:1; min-width:0;">` +
+          `<div style="font-weight:600; color:var(--text); margin-bottom:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${label}</div>` +
+          `<div style="font-size:11px; color:var(--text-muted);">문장 ${p.sentences.length}개 · TTS 완료 ${ttsCount}개</div>` +
+        `</div>` +
+        `<div style="font-size:11px; color:${ttsCount > 0 ? 'var(--accent)' : 'var(--text-muted)'}; font-weight:600;">${ttsCount > 0 ? '선택' : '음성 없음'}</div>`;
+      if (ttsCount > 0) {
+        row.onclick = () => _previewTtsImport(p.id);
+        row.onmouseenter = () => { row.style.borderColor = 'var(--accent)'; };
+        row.onmouseleave = () => { row.style.borderColor = 'var(--border-soft)'; };
+      } else {
+        row.style.opacity = '0.55';
+      }
+      listEl.appendChild(row);
+    }
+  }
+  document.getElementById('ttsImportModal').style.display = 'flex';
+}
+
+function _closeTtsImportModal() {
+  const modal = document.getElementById('ttsImportModal');
+  if (modal) modal.style.display = 'none';
+  _ttsImportPreview = null;
+}
+
+// 선택된 탭의 문장과 현재 탭 문장을 매칭 → 미리보기 표시
+function _previewTtsImport(sourceProjId) {
+  const fs2 = require('fs');
+  const target = window._currentProject;
+  const source = (window._projects || []).find(p => p.id === sourceProjId);
+  if (!target || !source) return;
+  // 정규화 — 공백/구두점 차이 무시
+  const norm = (t) => String(t || '').replace(/\s+/g, '').replace(/[.,!?…"'""'']/g, '').trim();
+  // 1) sentence.id 매칭 우선, 실패 시 정규화된 text 매칭
+  const sourceById = new Map();
+  const sourceByText = new Map();
+  for (const s of source.sentences) {
+    if (s.ttsAudioPath && s.ttsStatus === 'done' && fs2.existsSync(s.ttsAudioPath)) {
+      sourceById.set(s.id, s);
+      const key = norm(s.text);
+      if (key) sourceByText.set(key, s);
+    }
+  }
+  const mapping = [];
+  let matchedById = 0, matchedByText = 0;
+  for (const tgt of target.sentences) {
+    // 이미 TTS 가 정상이면 건너뜀 (사용자 데이터 보호 — 옵션으로 덮어쓰기 가능하게 할지 추후)
+    if (tgt.ttsAudioPath && tgt.ttsStatus === 'done' && fs2.existsSync(tgt.ttsAudioPath)) continue;
+    let src = sourceById.get(tgt.id);
+    let how = 'id';
+    if (!src) {
+      const key = norm(tgt.text);
+      if (key) {
+        src = sourceByText.get(key);
+        how = 'text';
+      }
+    }
+    if (src) {
+      mapping.push({ tgtSid: tgt.id, srcSentence: src, how });
+      if (how === 'id') matchedById++; else matchedByText++;
+    }
+  }
+  _ttsImportPreview = { sourceProj: source, mapping, total: target.sentences.length };
+  const previewEl = document.getElementById('ttsImportPreview');
+  const applyBtn = document.getElementById('ttsImportApplyBtn');
+  if (previewEl) {
+    previewEl.style.display = 'block';
+    const matched = mapping.length;
+    const undone = target.sentences.filter(s => !(s.ttsAudioPath && s.ttsStatus === 'done')).length;
+    previewEl.innerHTML =
+      `<div style="background:${matched > 0 ? 'rgba(95,167,119,0.15)' : 'rgba(232,168,76,0.15)'}; border-left:3px solid ${matched > 0 ? 'var(--success, #5fa777)' : 'var(--warning, #e8a84c)'}; padding:8px 12px; border-radius:6px;">` +
+      `<div style="font-weight:700; color:var(--text); margin-bottom:4px;">미리보기 — ${matched}개 매칭 / 미변환 ${undone}개 중</div>` +
+      (matched > 0
+        ? `<div>· ID 매칭 ${matchedById}개${matchedByText > 0 ? `, 텍스트 매칭 ${matchedByText}개` : ''}</div>` +
+          `<div style="margin-top:4px; opacity:0.85;">이미 TTS 가 있는 문장은 건너뜁니다. 원본 탭 (${source.name || source.id}) 의 음성 파일 경로만 참조하므로 파일이 사라지면 음성도 같이 사라집니다.</div>`
+        : `<div>매칭되는 문장이 없습니다. 두 탭의 대본이 정말 동일한지 확인하세요.</div>`) +
+      `</div>`;
+  }
+  if (applyBtn) {
+    const ok = mapping.length > 0;
+    applyBtn.disabled = !ok;
+    applyBtn.style.opacity = ok ? '1' : '0.5';
+    applyBtn.style.cursor = ok ? 'pointer' : 'not-allowed';
+  }
+}
+
+function _applyTtsImport() {
+  if (!_ttsImportPreview || !_ttsImportPreview.mapping || _ttsImportPreview.mapping.length === 0) return;
+  const target = window._currentProject;
+  if (!target) return;
+  const source = _ttsImportPreview.sourceProj;
+  let applied = 0;
+  for (const m of _ttsImportPreview.mapping) {
+    const tgt = target.sentences.find(s => s.id === m.tgtSid);
+    if (!tgt) continue;
+    // 경로만 참조 — 사용자 결정. 파일 복사 X.
+    tgt.ttsAudioPath = m.srcSentence.ttsAudioPath;
+    tgt.ttsStatus = 'done';
+    // 메타데이터 보존 — 어떤 음성을 가져왔는지 추적 가능
+    tgt.ttsImportedFrom = {
+      projectId: source.id,
+      projectName: source.name || source.scriptFileName || source.id,
+      sourceSid: m.srcSentence.id,
+      method: m.how,
+      at: Date.now(),
+    };
+    applied++;
+  }
+  addLog(`🔗 TTS 가져오기 완료 — ${applied}개 문장에 음성 연결 (출처: ${source.name || source.id})`, 'ok');
+  try { renderTaskList(target); } catch (_) {}
+  try { if (typeof _autoSaveProject === 'function') _autoSaveProject(target.id); } catch (_) {}
+  _closeTtsImportModal();
+}
+
 /**
  * 그룹에 이미지 또는 동영상 파일 첨부.
  * - 이미지(jpg/png/webp)면 g.imagePath 에 등록
@@ -9894,6 +10912,14 @@ async function _convertGroupVideoBody(projectId, groupId, opts = {}) {
     if (result.success) {
       g.videoPath = result.videoPath;
       g.videoStatus = 'done';
+      // 720p → 480p 자동 강등 감지 — grok-engine.js 가 토스트 알림으로 판정
+      if (result.downgradedTo === '480p') {
+        g.videoDowngradedTo480p = true;
+        addLog(`[Grok] ⚠ 그룹 ${g.num} 비디오 — 720p 한도 도달로 480p 강등 (grok.com 자동 처리)`, 'warn');
+      } else {
+        // 명시적 해제 — 재변환 시 옛 플래그 안 남게
+        if (g.videoDowngradedTo480p) g.videoDowngradedTo480p = false;
+      }
       addLog(`[Grok] ✅ 그룹 ${g.num} 비디오 완성: ${path.basename(result.videoPath)}`, 'ok');
       if (_selfManaged) window._grokConvertActive = false;
       if (window._activeProjectId === projectId) renderTaskList(proj);
@@ -9927,6 +10953,13 @@ async function _convertGroupListToVideo(groupIds, label) {
     for (let i = 0; i < groupIds.length; i++) {
       if (!window._grokConvertActive) { stopped = true; break; }
       const gid = groupIds[i];
+      // 그룹 번호 표시 (라벨용) — 활성 프로젝트의 group.num 조회
+      let _gNum = '';
+      try {
+        const _g = _projForNotify && _projForNotify.groups.find(x => x.id === gid);
+        _gNum = (_g && _g.num) ? String(_g.num) : String(i + 1);
+      } catch (_) { _gNum = String(i + 1); }
+      try { _updateAutoCurrentItem('video', `🎬 ${label} — 그룹 ${_gNum} 영상 변환 중`, { sub: `${i + 1}/${groupIds.length}` }); } catch (_) {}
       const ok = await convertGroupVideo(gid, { silent: true });
       if (ok) success++; else fail++;
 
@@ -9935,6 +10968,9 @@ async function _convertGroupListToVideo(groupIds, label) {
         // 20000~40000ms 랜덤 (균등 분포)
         const waitMs = 20000 + Math.floor(Math.random() * 20001);
         addLog(`[Grok] 다음 영상 전 ${(waitMs / 1000).toFixed(1)}초 대기 (휴먼타이밍)`, 'info');
+        // stuck 오판 방지 — 정상 anti-detect 대기 구간을 쿨다운으로 표시
+        try { _autoCooldownUntil = Date.now() + waitMs; } catch (_) {}
+        try { _updateAutoCurrentItem('video', `⏸ 다음 영상 전 대기 중`, { sub: `${Math.round(waitMs / 1000)}초` }); } catch (_) {}
         // 1초 단위로 쪼개서 대기 — 사용자가 중지 누르면 빠르게 빠져나가도록
         const startWait = Date.now();
         while (Date.now() - startWait < waitMs) {
@@ -10009,6 +11045,7 @@ async function _convertIntroGroupsProgressively(proj, introGroups) {
       const g = introGroups[i];
 
       // 이 그룹의 imagePath 가 준비될 때까지 대기 (이미지 task 가 채워줌)
+      try { _updateAutoCurrentItem('video', `🎬 도입부 그룹 ${g.num} — 이미지 대기`, { sub: `${i + 1}/${introGroups.length}` }); } catch (_) {}
       const waitStart = Date.now();
       while (Date.now() - waitStart < PER_GROUP_TIMEOUT) {
         if (!window._grokConvertActive) return { success, fail, skipped };
@@ -10030,6 +11067,7 @@ async function _convertIntroGroupsProgressively(proj, introGroups) {
       }
 
       // 변환 (motion 미지정 → grok-engine 기본값 사용)
+      try { _updateAutoCurrentItem('video', `🎬 도입부 그룹 ${g.num} 영상 변환 중`, { sub: `${i + 1}/${introGroups.length}` }); } catch (_) {}
       const ok = await convertGroupVideo(g.id, { silent: true });
       if (ok) success++; else fail++;
 
@@ -10037,6 +11075,9 @@ async function _convertIntroGroupsProgressively(proj, introGroups) {
       if (i < introGroups.length - 1 && window._grokConvertActive) {
         const waitMs = 20000 + Math.floor(Math.random() * 20001);
         addLog(`[Grok] 다음 도입부 영상 전 ${(waitMs / 1000).toFixed(1)}초 대기 (휴먼타이밍)`, 'info');
+        // stuck 오판 방지 — 정상 anti-detect 대기 구간을 쿨다운으로 표시
+        try { _autoCooldownUntil = Date.now() + waitMs; } catch (_) {}
+        try { _updateAutoCurrentItem('video', `⏸ 다음 도입부 영상 전 대기 중`, { sub: `${Math.round(waitMs / 1000)}초` }); } catch (_) {}
         const startWait = Date.now();
         while (Date.now() - startWait < waitMs) {
           if (!window._grokConvertActive) return { success, fail, skipped };
@@ -10377,6 +11418,12 @@ async function convertAllSentences(opts = {}) {
       progressEl.textContent = `변환 중 ${initialDone + i + 1} / ${total}`;
       progressEl.style.color = 'var(--info)';
     }
+    // 자동제작 모달 — 현재 처리 중인 문장 표시
+    try {
+      const _sNum = (s && s.num) ? s.num : (i + 1);
+      const _sPreview = (s && s.text) ? s.text.trim().slice(0, 32) + (s.text.length > 32 ? '…' : '') : '';
+      _updateAutoCurrentItem('tts', `🎙 문장 ${_sNum} TTS 변환 중`, { sub: _sPreview || `${i + 1}/${remaining.length}` });
+    } catch (_) {}
     const ok = await convertSentence(s.id, { silent: true });
     if (ok) success++; else fail++;
 
@@ -10625,6 +11672,22 @@ async function generateAll() {
   if (!_ensureActivePreset()) return;
   // 모션 프롬프트 입력란이 onchange 발화 전이라도 자동제작 시작 시 강제 sync
   try { onGrokMotionPromptChange(); } catch (_) {}
+  // 자동저장 활성화 — 사용자가 한 번도 [💾 프로젝트 저장] 누른 적 없으면 보관 폴더에 자동 첫 저장.
+  // 이후 자동저장이 정상 동작하도록 pflowPath 를 한 번 세팅. 진행 중 데이터 손실 방지.
+  if (!proj.pflowPath) {
+    try {
+      const ProjectStore = require('../core/project-store');
+      const r = ProjectStore.saveProject(proj);  // opts 없음 → 보관 폴더에 자동 이름 생성
+      proj.pflowPath = r.path;
+      addLog(`💾 자동저장 활성화 — 보관 폴더에 첫 저장: ${require('path').basename(r.path)}`, 'info');
+      try { _updateAutoSaveIndicator('saved'); } catch (_) {}
+      window._autoSaveLastAt = window._autoSaveLastAt || {};
+      window._autoSaveLastAt[proj.id] = Date.now();
+    } catch (e) {
+      addLog(`⚠ 자동저장 첫 저장 실패 — ${e.message}. 자동제작은 그대로 진행하지만 중간 데이터가 자동저장되지 않습니다.`, 'warn');
+      console.warn('[generateAll: auto-first-save]', e);
+    }
+  }
   const groupCount = proj.groups.length;
   const sentenceCount = proj.sentences.length;
   const fsCheck = require('fs');
@@ -10878,6 +11941,12 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
     .map(id => proj.groups.find(g => g.id === id))
     .filter(Boolean);
   if (targetGroups.length === 0) return false;
+
+  // 자동제작 모달 — 이미지 task 진입 시 라벨 표시. image-done IPC 마다 상세 갱신.
+  try {
+    const _firstNum = targetGroups[0] && targetGroups[0].num;
+    _updateAutoCurrentItem('img', `🖼 ${label} — 그룹 ${_firstNum} 부터 이미지 생성`, { sub: `${targetGroups.length}개 그룹 대기` });
+  } catch (_) {}
 
   const paragraphs = targetGroups.map(g => _buildGroupParagraph(g, proj));
   const emptyIdx = paragraphs.findIndex(p => !p || p.length === 0);
@@ -11558,6 +12627,12 @@ ipcRenderer.on('image-done', (_, payload) => {
       _setGroupImageThumbnail(groupId, renamedPath);
       _setGroupImageStatus(groupId, 'done');
       if (typeof _autoSaveProject === 'function') _autoSaveProject(ownerProjectId);
+      // 자동제작 모달 — 현재 처리 그룹 갱신 (owner 가 활성 프로젝트일 때만 — 다중 탭 안전)
+      try {
+        if (owner && owner === window._currentProject) {
+          _updateAutoCurrentItem('img', `🖼 그룹 ${groupNum} 이미지 완료`, { sub: `${idx + 1}/${order.length}` });
+        }
+      } catch (_) {}
     } else {
       // flow-engine 이 "이미 존재, 스킵" 한 경우 — 이미 그룹 NN_ 형태 파일이 있을 수 있음
       try {
