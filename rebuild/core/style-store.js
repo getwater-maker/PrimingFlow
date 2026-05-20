@@ -45,6 +45,7 @@ const BUILT_IN_STYLES = [
   { id: 'infographic-3d',    name: '인포그래픽 3D',       prompt: '아래 내용의 대표이미지 한컷을 3D인포그래픽 작성, 한글로 작성, 어른들이 보기 편하게 작성' },
   { id: 'infographic-2d',    name: '인포그래픽 2D',       prompt: '아래 내용의 대표이미지 한컷을 2D인포그래픽 작성, 한글로 작성, 어른들이 보기 편하게 작성' },
   { id: 'biblical-chibi',    name: '치비 (성경시대)',     prompt: 'chibi anime style, cute super-deformed characters with big sparkling eyes and small bodies, kawaii, soft pastel earth tones (ochre, sand, olive, terracotta), ancient biblical era setting, characters wearing flowing robes and tunics, simple head coverings, leather sandals, bearded elders, Holy Land scenery with olive trees and stone buildings, gentle reverent atmosphere, hand-drawn anime illustration, NOT modern clothing, NOT Korean historical drama, NOT photorealistic' },
+  { id: 'three-kingdoms',    name: '삼국지',              prompt: 'classical East Asian ink portrait style, historical Chinese Three Kingdoms epic illustration, digital painting, smooth grayscale shading, black and white, realistic human face without any markings, detailed armor and clothing, realistic idealized portrait, upper body close-up shot, character positioned on right third of frame, rule of thirds composition, strong contrast, cinematic lighting, 4K' },
 ];
 
 function _loadUserStyles() {
