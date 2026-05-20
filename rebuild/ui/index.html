@@ -3261,7 +3261,7 @@ function _updateAutoSaveIndicator(state, msg) {
 
 function _projectOutputDir(proj) {
   if (!proj) return '';
-  return proj.outputDir || proj.imageOutputDir || _getProjectOutputDir() || '';
+  return proj.outputDir || proj.imageOutputDir || _getProjectOutputDir(proj) || '';
 }
 
 // 사용자가 명시적으로 클릭 — alert/log 로 결과 안내
@@ -3626,20 +3626,35 @@ function addLog(msg, type = '') {
 //
 // 폴더명 우선순위 — 대본 파일명(가장 식별 명확) > 프리셋 이름 > 'project'.
 // 옛 'vrew' fallback 제거 (다른 대본의 결과와 폴더가 섞이지 않게).
-function _getProjectOutputDir() {
-  const proj = window._currentProject;
+// 다중 탭 격리 — projOrId 명시 전달 시 그 프로젝트의 outputDir 만 결정.
+// 인자 미지정 시에만 window._currentProject 폴백 (backward-compat).
+// saveVrew 의 opts.proj 격리 패턴과 동일 (커밋 4738481 참고).
+function _getProjectOutputDir(projOrId) {
+  let proj;
+  if (projOrId && typeof projOrId === 'object') {
+    proj = projOrId;
+  } else if (typeof projOrId === 'string' && projOrId) {
+    proj = Array.isArray(window._projects)
+      ? window._projects.find(p => p.id === projOrId)
+      : null;
+  } else {
+    proj = window._currentProject;
+  }
   if (proj && proj.outputDir) return proj.outputDir;
 
   const PresetStore = require('../tts/preset-store');
-  const activePreset = (typeof _activePresetId !== 'undefined' && _activePresetId)
-    ? PresetStore.getById(_activePresetId) : null;
+  // 명시 proj 의 activePresetId 우선, 없으면 전역 _activePresetId 폴백
+  const projPresetId = proj && proj.activePresetId;
+  const presetId = projPresetId || (typeof _activePresetId !== 'undefined' ? _activePresetId : null);
+  const activePreset = presetId ? PresetStore.getById(presetId) : null;
   const baseOutDir = (activePreset && activePreset.outputFolder) || outputDir;
   if (!baseOutDir) return null;
 
   const safe = (s) => String(s || '').replace(/[\\/:*?"<>|]/g, '').trim();
   // 대본 파일명 > 프리셋 이름 > 'project' 순으로 라벨 결정
-  const nameLabel = safe(window._scriptFileName)
-    || safe(proj && proj.scriptFileName)
+  // 명시 proj 가 있으면 그 proj 의 scriptFileName 을 전역보다 우선 (격리 보장)
+  const nameLabel = (proj && safe(proj.scriptFileName))
+    || safe(window._scriptFileName)
     || safe(activePreset && activePreset.name)
     || 'project';
   const today = new Date();
@@ -9167,7 +9182,7 @@ async function _convertSentenceImpl(projectId, sid, preset, channel, _opts = {})
     const ext = result.format === 'wav' ? 'wav' : 'mp3';
     let ttsDir = proj.ttsOutputDir;
     if (!ttsDir) {
-      const projectDir = _getProjectOutputDir();
+      const projectDir = _getProjectOutputDir(proj);
       if (projectDir) {
         ttsDir = path.join(projectDir, 'tts');
         proj.ttsOutputDir = ttsDir;
@@ -9841,7 +9856,7 @@ async function _convertGroupVideoBody(projectId, groupId, opts = {}) {
     // 비디오도 통합 폴더의 videos/ 하위 (이미지·TTS·.vrew 와 같은 부모 폴더)
     const path = require('path');
     const os = require('os');
-    const projectDir = _getProjectOutputDir();
+    const projectDir = _getProjectOutputDir(proj);
     const baseDir = projectDir
       ? path.join(projectDir, 'videos')
       : path.join(os.tmpdir(), 'primingflow_videos');
@@ -10602,7 +10617,7 @@ async function generateAll() {
   const fs = require('fs');
   const PresetStore = require('../tts/preset-store');
   // 통합 출력 폴더 헬퍼 사용 (이미지/TTS/.vrew 모두 같은 "프리셋이름_MMDD" 폴더 하위)
-  const vrewDir = _getProjectOutputDir();
+  const vrewDir = _getProjectOutputDir(proj);
   if (!vrewDir) {
     alert('출력 폴더를 먼저 선택하세요 (좌측 프리셋 ⚙ 또는 화면의 출력 폴더)');
     return;
@@ -10906,7 +10921,7 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
     finalDir = proj.imageOutputDir;
     addLog(`이미지 ${label} — ${targetGroups.length}개 그룹 → 기존 폴더 재사용: ${finalDir}`, 'info');
   } else {
-    const projectDir = _getProjectOutputDir();
+    const projectDir = _getProjectOutputDir(proj);
     if (!projectDir) {
       alert('출력 폴더를 먼저 선택하세요 (좌측 프리셋 ⚙ 또는 화면의 출력 폴더)');
       return;
@@ -10925,7 +10940,7 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
   try {
     const fs = require('fs');
     const path = require('path');
-    const projectDir = proj.outputDir || _getProjectOutputDir() || '';
+    const projectDir = proj.outputDir || _getProjectOutputDir(proj) || '';
     const projectDirNorm = projectDir ? path.normalize(projectDir) : '';
     let removedImg = 0, removedVideo = 0, removedExtra = 0;
     for (const g of targetGroups) {
@@ -11073,7 +11088,7 @@ async function savePremiereXml() {
   const safe = (s) => String(s || '').replace(/[\\/:*?"<>|]/g, '').trim();
 
   // 1. 출력 폴더 확인 (saveVrew 와 동일 패턴)
-  let finalDir = _getProjectOutputDir();
+  let finalDir = _getProjectOutputDir(proj);
   if (!finalDir) {
     addLog('[프리미어 XML] 출력 폴더 미설정 — 폴더 선택 대화상자 오픈', 'info');
     const picked = await ipcRenderer.invoke('select-folder').catch(() => null);
@@ -11082,7 +11097,7 @@ async function savePremiereXml() {
       return;
     }
     outputDir = picked;
-    finalDir = _getProjectOutputDir();
+    finalDir = _getProjectOutputDir(proj);
     if (!finalDir) {
       alert('출력 폴더를 먼저 선택하세요');
       return;
@@ -11164,7 +11179,7 @@ async function saveVrew(opts = {}) {
   };
 
   // ① 출력 폴더 확인 — 가장 먼저 (이미지/TTS 체크 전)
-  let finalDir = opts.outDir || _getProjectOutputDir();
+  let finalDir = opts.outDir || _getProjectOutputDir(proj);
   if (!finalDir) {
     if (opts.silent) {
       if (showOwnModal) { setVrewStep({ status: '스킵 (출력 폴더 없음)', fail: true }); _finishAutoProgress('출력 폴더 없음'); }
@@ -11177,7 +11192,7 @@ async function saveVrew(opts = {}) {
       return { cancelled: true };
     }
     outputDir = picked;
-    finalDir = _getProjectOutputDir();
+    finalDir = _getProjectOutputDir(proj);
     if (!finalDir) {
       alert('출력 폴더를 먼저 선택하세요');
       if (showOwnModal) { setVrewStep({ status: '실패 (출력 폴더 없음)', fail: true }); _finishAutoProgress('실패'); }
@@ -11418,12 +11433,15 @@ ipcRenderer.on('image-done', (_, payload) => {
   const groupId = order[idx];
   const groupNum = nums[idx];
   if (!groupId) return;
-  const outDir = window._lastGenOutputDir;
+  // (다중 탭 격리 fix v1.13.12) groupId 로 owner project 를 먼저 찾고, 그 outputDir 만 사용.
+  // 옛 코드는 window._pendingProjectId (단일 전역) 를 우선 신뢰해서, 다른 탭이 그 사이
+  // 자기 task 를 시작하면 _pendingProjectId 가 덮어씌워져 owner 식별이 뒤집힘 →
+  // 잘못된 폴더 스캔 → 다른 탭 파일을 imagePath 로 매핑. _findProjectByGroupId 는 groupId 가
+  // unique 라 신뢰성 100%. _lastGenOutputDir / _pendingProjectId 는 폴백으로만 유지.
+  const owner = _findProjectByGroupId(groupId);
+  const ownerProjectId = owner ? owner.id : (window._pendingProjectId || null);
+  const outDir = (owner && _getProjectOutputDir(owner)) || window._lastGenOutputDir;
   if (!outDir) return;
-  // (PR5) 이 task 가 어느 프로젝트 소속인지 — 활성 탭이 바뀌었을 수 있어 명시적으로 lookup
-  const ownerProjectId = (window._pendingProjectId
-    || (_findProjectByGroupId(groupId) && _findProjectByGroupId(groupId).id)
-    || null);
   try {
     const fs = require('fs');
     const path = require('path');
@@ -11499,12 +11517,14 @@ ipcRenderer.on('done', () => {
   setTimeout(() => {
     const order = window._pendingGroupOrder || [];
     const nums = window._pendingGroupNums || [];
-    const outDir = window._lastGenOutputDir;
-    if (!order.length || !outDir) return;
-    // (PR5) 이 task 가 어느 프로젝트 소속인지 — image task wrapper 가 set 한 값 우선
-    const ownerProjectId = (window._pendingProjectId
-      || (order[0] && _findProjectByGroupId(order[0]) && _findProjectByGroupId(order[0]).id)
-      || null);
+    if (!order.length) return;
+    // (다중 탭 격리 fix v1.13.12) — image-done 핸들러와 같은 패턴.
+    // owner project 를 order[0] (이 task 의 첫 그룹) 으로 찾아내고 그 outputDir 만 스캔.
+    // 단일 image task 안의 모든 그룹은 같은 owner 라서 order[0] 만으로 충분.
+    const owner = _findProjectByGroupId(order[0]);
+    const ownerProjectId = owner ? owner.id : (window._pendingProjectId || null);
+    const outDir = (owner && _getProjectOutputDir(owner)) || window._lastGenOutputDir;
+    if (!outDir) return;
     try {
       const fs = require('fs');
       const path = require('path');
