@@ -11011,8 +11011,24 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
         g.videoSourceImage = null;
       }
     }
-    if (removedImg + removedVideo + removedExtra > 0) {
-      addLog(`[cleanup] imagePath ${removedImg} + prefix 매칭 ${removedExtra} + 비디오 ${removedVideo} 삭제`, 'info');
+    // (v1.13.14 매핑 fix) 모든 그룹 cleanup 끝난 후, flow-engine 진입 직전 —
+    // 인덱스 prefix 잔재 일괄 청소. flow-engine 이 paragraphs idx + 1 로 파일명을 만들기
+    // 때문에 (01_, 02_, ...), 이전 미완 작업의 인덱스 prefix 파일이 잔존하면
+    // (1) _shouldSkip 발동 → 새 생성 안 됨, (2) _renameToGroupPrefix 가 옛 파일 매칭
+    // 둘 다 imagePath 미첨부의 원인. '그룹 NN_' 으로 정상 rename 완료된 파일은 보존.
+    let cleanedIdx = 0;
+    try {
+      if (fs.existsSync(finalDir)) {
+        for (const f of fs.readdirSync(finalDir)) {
+          if (!/\.(jpe?g|png|webp)$/i.test(f)) continue;
+          if (/^\d+_/.test(f) && !/^그룹/.test(f)) {
+            try { fs.unlinkSync(path.join(finalDir, f)); cleanedIdx++; } catch {}
+          }
+        }
+      }
+    } catch {}
+    if (removedImg + removedVideo + removedExtra + cleanedIdx > 0) {
+      addLog(`[cleanup] imagePath ${removedImg} + prefix 매칭 ${removedExtra} + 인덱스 잔재 ${cleanedIdx} + 비디오 ${removedVideo} 삭제`, 'info');
     }
   } catch (e) {
     addLog(`[cleanup] 예외: ${e.message} — 계속 진행`, 'info');
@@ -11429,8 +11445,24 @@ function _renameToGroupPrefix(imgDir, sourcePaddedNum, groupNum) {
   const path = require('path');
   if (!fs.existsSync(imgDir)) return null;
   const files = fs.readdirSync(imgDir);
-  const match = files.find(f => f.startsWith(sourcePaddedNum + '_') && /\.(png|jpg|jpeg|webp)$/i.test(f));
-  if (!match) return null;
+  const candidates = files.filter(f =>
+    f.startsWith(sourcePaddedNum + '_') && /\.(png|jpg|jpeg|webp)$/i.test(f)
+  );
+  if (candidates.length === 0) return null;
+
+  // (v1.13.14 매핑 fix) 같은 인덱스 prefix 후보가 여러 개면 mtime 최신 선택.
+  // 재생성 시 옛 잔재 파일을 잘못 매칭하는 결함 회피.
+  let match = candidates[0];
+  if (candidates.length > 1) {
+    let latestMtime = 0;
+    for (const f of candidates) {
+      try {
+        const st = fs.statSync(path.join(imgDir, f));
+        if (st.mtimeMs > latestMtime) { latestMtime = st.mtimeMs; match = f; }
+      } catch {}
+    }
+  }
+
   const newName = match.replace(/^\d+_/, `그룹 ${String(groupNum).padStart(2, '0')}_`);
   const oldPath = path.join(imgDir, match);
   const newPath = path.join(imgDir, newName);
@@ -11522,6 +11554,8 @@ window.forceReloadGroupImages = function (projectArg) {
     }
     const files = fs.readdirSync(imgDir).filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f));
     let matched = 0;
+
+    // 1단계 — 기존: '그룹 NN_' prefix 매칭
     for (const g of proj.groups) {
       const groupPrefix = `그룹 ${String(g.num).padStart(2, '0')}_`;
       const file = files.find(f => f.startsWith(groupPrefix));
@@ -11532,6 +11566,52 @@ window.forceReloadGroupImages = function (projectArg) {
         g.imageStatus = 'done';
       }
     }
+
+    // (v1.13.14 매핑 fix) 2단계 — 신규: 위에서 매칭 못 한 그룹들을
+    // _pendingGroupOrder / _pendingGroupNums 로 폴백 매핑.
+    // flow-engine 이 인덱스 prefix 로 저장한 파일 (01_, 02_, ...) 을 _pendingGroupNums[i]
+    // 그룹 번호에 매핑 + 자동 rename ('그룹 NN_') 으로 정규화. image-done IPC 핸들러의
+    // _renameToGroupPrefix 가 어떤 이유로든 실패한 케이스를 최후 안전망에서 복구.
+    const order = window._pendingGroupOrder || [];
+    const nums = window._pendingGroupNums || [];
+    if (order.length > 0 && order.length === nums.length) {
+      // 1단계 후 파일 목록 다시 읽기 (rename 반영)
+      const currentFiles = fs.readdirSync(imgDir).filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f));
+      for (let i = 0; i < order.length; i++) {
+        const gid = order[i];
+        const g = proj.groups.find(x => x.id === gid);
+        if (!g || g.imagePath) continue;   // 이미 set 됐으면 skip
+        const padded = String(i + 1).padStart(2, '0');
+        // 인덱스 prefix 후보 중 mtime 최신 선택
+        const candidates = currentFiles.filter(f => f.startsWith(padded + '_'));
+        if (candidates.length === 0) continue;
+        let chosen = candidates[0];
+        if (candidates.length > 1) {
+          let latest = 0;
+          for (const f of candidates) {
+            try {
+              const st = fs.statSync(path.join(imgDir, f));
+              if (st.mtimeMs > latest) { latest = st.mtimeMs; chosen = f; }
+            } catch {}
+          }
+        }
+        const newName = `그룹 ${String(g.num).padStart(2, '0')}_${chosen.replace(/^\d+_/, '')}`;
+        const oldPath = path.join(imgDir, chosen);
+        const newPath = path.join(imgDir, newName);
+        try {
+          if (oldPath !== newPath) {
+            if (fs.existsSync(newPath)) fs.unlinkSync(newPath);
+            fs.renameSync(oldPath, newPath);
+          }
+          g.imagePath = newPath;
+          g.imageStatus = 'done';
+          matched++;
+        } catch (e) {
+          console.error('[forceReload-fallback]', e);
+        }
+      }
+    }
+
     if (typeof renderTaskList === 'function') renderTaskList(proj);
     if (typeof addLog === 'function') addLog(`[forceReload] ${matched}/${proj.groups.length} 그룹 이미지 강제 갱신`, 'ok');
     return matched;
