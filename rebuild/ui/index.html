@@ -5593,7 +5593,7 @@ function renderTaskList(project) {
       : `<span class="group-duration-badge" data-group-id="${g.id}" style="display:none;"></span>`;
     header.innerHTML =
       `<label style="display:flex; align-items:center; gap:6px; cursor:pointer;">` +
-      `<input type="checkbox" class="group-select" data-group-id="${g.id}" style="cursor:pointer;">` +
+      `<input type="checkbox" class="group-select" data-group-id="${g.id}" ${g._uiChecked ? 'checked' : ''} onchange="_toggleGroupCheck('${g.id}', this.checked)" style="cursor:pointer;">` +
       `<span>${groupLabel} ` +
       `<span style="color:var(--text-muted); font-weight:400; font-size:12px;">` +
       `(${g.sentenceIds.length} 문장${clipBadge})</span></span></label>` +
@@ -9977,6 +9977,23 @@ async function _convertGroupListToVideo(groupIds, label) {
  *  generateAll() 의 imageTask/ttsTask 와 병렬로 동작하며, 도입부 이미지 1개가 완성되는 즉시
  *  Grok 변환을 시작하므로 본론 이미지 생성과 도입부 비디오 변환이 자연스럽게 겹친다.
  *  영상 간 20~40초 anti-detect 대기는 _convertGroupListToVideo 패턴 그대로. */
+// 그룹이 "이미 동영상 완성" 상태인지. 범위영상 skip 판단 + 도입부 progressive 변환 시 중복 방지에 공용.
+function _hasCompletedVideo(g) {
+  if (!g || !g.videoPath || g.videoStatus !== 'done') return false;
+  try { return require('fs').existsSync(g.videoPath); }
+  catch { return false; }
+}
+
+// 그룹 체크박스 토글 핸들러 — DOM 의 checked 상태를 그룹 객체의 _uiChecked 로 백업.
+// renderTaskList 가 전체 DOM 을 다시 그릴 때 (비디오/이미지/TTS 완료 핸들러에서 빈번히 호출)
+// 옛 체크 상태가 사라지는 결함 fix. _findProjectByGroupId 가 multi-tab 격리 자동 처리.
+function _toggleGroupCheck(groupId, checked) {
+  const proj = _findProjectByGroupId(groupId);
+  if (!proj) return;
+  const g = proj.groups.find(x => x.id === groupId);
+  if (g) g._uiChecked = !!checked;
+}
+
 async function _convertIntroGroupsProgressively(proj, introGroups) {
   const fs = require('fs');
   if (!introGroups || introGroups.length === 0) return { success: 0, fail: 0, skipped: 0 };
@@ -10006,7 +10023,7 @@ async function _convertIntroGroupsProgressively(proj, introGroups) {
       }
 
       // 이미 비디오 있으면 스킵 (중복 변환 방지 — 사용자가 사전에 만들었거나 재실행 케이스)
-      if (g.videoPath && fs.existsSync(g.videoPath) && g.videoStatus === 'done') {
+      if (_hasCompletedVideo(g)) {
         skipped++;
         addLog(`[Grok] 그룹 ${g.num} 이미 비디오 있음 — 스킵`, 'info');
         continue;
@@ -10147,9 +10164,20 @@ async function convertGroupRangeVideo() {
       return;
     }
 
-    const targets = proj.groups.filter(g => g.num >= from && g.num <= to && g.imagePath);
-    if (targets.length === 0) {
+    const inRange = proj.groups.filter(g => g.num >= from && g.num <= to && g.imagePath);
+    if (inRange.length === 0) {
       alert(`그룹 ${from}~${to} 중 이미지가 등록된 그룹이 없습니다.`);
+      return;
+    }
+    // skip-existing — 이미 동영상 완성된 그룹은 건너뛰고 비어있는 그룹만 변환.
+    // (사용자 정책: 범위영상 = 빈 자리만 채우기, 선택영상 = 무조건 재변환)
+    const targets = inRange.filter(g => !_hasCompletedVideo(g));
+    const skipped = inRange.length - targets.length;
+    if (skipped > 0) {
+      addLog(`[Grok] 범위 ${from}~${to} — ${inRange.length}개 중 ${skipped}개는 이미 동영상 있음 (skip), ${targets.length}개 진행`, 'info');
+    }
+    if (targets.length === 0) {
+      alert(`범위 ${from}~${to} 안의 모든 그룹이 이미 동영상을 가지고 있습니다.\n다시 만들고 싶다면 🎬 선택 영상 버튼으로 진행하세요.`);
       return;
     }
     await _convertGroupListToVideo(targets.map(g => g.id), `범위 [${from}~${to}]`);
