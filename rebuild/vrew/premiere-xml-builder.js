@@ -221,6 +221,38 @@ function _audioClipitem(id, name, absPath, fileId, startFrames, endFrames, durat
         </clipitem>`;
 }
 
+// (v1.13.17) FCP7 XMEML title generator — Premiere 가 자막 트랙으로 import.
+// V2 트랙에 sentence/vrewClip 단위로 배치. Text 파라미터에 자막 텍스트.
+function _titleClipitem(id, text, startFrames, endFrames, durationFrames) {
+  const safeText = xmlEscape(text);
+  return `
+        <clipitem id="${id}">
+          <name>${safeText}</name>
+          <enabled>TRUE</enabled>
+          <duration>${durationFrames}</duration>
+          <rate>
+            <timebase>${FRAME_RATE}</timebase>
+            <ntsc>${NTSC}</ntsc>
+          </rate>
+          <in>0</in>
+          <out>${durationFrames}</out>
+          <start>${startFrames}</start>
+          <end>${endFrames}</end>
+          <effect>
+            <name>Text</name>
+            <effectid>Text</effectid>
+            <effectcategory>Text</effectcategory>
+            <effecttype>generator</effecttype>
+            <mediatype>video</mediatype>
+            <parameter authoringApp="PremierePro">
+              <parameterid>str</parameterid>
+              <name>Text</name>
+              <value>${safeText}</value>
+            </parameter>
+          </effect>
+        </clipitem>`;
+}
+
 // === 메인 빌더 ===
 
 /**
@@ -253,6 +285,8 @@ async function buildPremiereXml({ sentences, groups, xmlPath, opts = {} }) {
   log(`[PremiereXml] 총 길이: ${totalSec.toFixed(2)}초 (${totalFrames} frames @ ${FRAME_RATE}fps)`);
 
   // 2. 비디오 트랙 — 그룹 단위 이미지/영상 배치
+  // (v1.13.17) 이미지 없는 그룹은 직전 그룹 이미지 재사용 → V1 트랙 gap 제거.
+  // 옛 코드는 skip 했지만, 그러면 시퀀스 후반부가 검정 화면이 되어 영상이 끊긴 듯한 결함.
   const sentIdToIdx = new Map();
   sentences.forEach((s, i) => sentIdToIdx.set(s.id, i));
 
@@ -260,6 +294,8 @@ async function buildPremiereXml({ sentences, groups, xmlPath, opts = {} }) {
   let videoCursor = 0;
   let imgIdx = 0;
   let videoSkipCount = 0;
+  let videoReuseCount = 0;
+  let lastMediaPath = null;
   for (const g of groups) {
     const sids = Array.isArray(g.sentenceIds) ? g.sentenceIds : [];
     const groupDurSec = sids.reduce((sum, sid) => {
@@ -269,26 +305,31 @@ async function buildPremiereXml({ sentences, groups, xmlPath, opts = {} }) {
     if (groupDurSec <= 0) continue;
 
     // 비디오 > 이미지 우선순위 (Vrew 와 동일)
-    const mediaPath = (g.videoPath && fs.existsSync(g.videoPath))
+    const ownMediaPath = (g.videoPath && fs.existsSync(g.videoPath))
       ? g.videoPath
       : (g.imagePath && fs.existsSync(g.imagePath) ? g.imagePath : null);
 
+    // 자기 미디어 없으면 직전 이미지 재사용 (gap 채우기)
+    const mediaPath = ownMediaPath || lastMediaPath;
     if (!mediaPath) {
       videoSkipCount++;
-      videoCursor += groupDurSec;   // 시간은 흘러감 (오디오와 sync 보장)
+      videoCursor += groupDurSec;   // 첫 그룹부터 이미지 없으면 어쩔 수 없이 skip
       continue;
     }
+    if (ownMediaPath) lastMediaPath = ownMediaPath;
+    else videoReuseCount++;
 
     const durFrames = secToFrames(groupDurSec);
     const startFr   = secToFrames(videoCursor);
     const endFr     = startFr + durFrames;
     const fileId    = `file-img-${++imgIdx}`;
     const clipId    = `clip-img-${imgIdx}`;
-    const name      = `그룹 ${g.num} ${path.basename(mediaPath)}`;
+    const reuseTag  = ownMediaPath ? '' : ' (재사용)';
+    const name      = `그룹 ${g.num} ${path.basename(mediaPath)}${reuseTag}`;
     videoClipitems.push(_videoClipitem(clipId, name, mediaPath, fileId, startFr, endFr, durFrames));
     videoCursor += groupDurSec;
   }
-  log(`[PremiereXml] 비디오 클립 ${videoClipitems.length}개 (그룹 ${groups.length}개 중 ${videoSkipCount}개는 이미지/영상 없어 건너뜀)`);
+  log(`[PremiereXml] 비디오 클립 ${videoClipitems.length}개 (그룹 ${groups.length}, skip ${videoSkipCount}, 재사용 ${videoReuseCount})`);
 
   // 3. 오디오 트랙 — sentence 단위 mp3 배치
   const audioClipitems = [];
@@ -313,6 +354,54 @@ async function buildPremiereXml({ sentences, groups, xmlPath, opts = {} }) {
     audioCursor += dur;
   }
   log(`[PremiereXml] 오디오 클립 ${audioClipitems.length}개 (sentence ${sentences.length}개 중 ${audioSkipCount}개는 TTS 없어 건너뜀)`);
+
+  // (v1.13.17) 4. 자막 트랙 (V2) — sentence/vrewClip 단위 title generator clipitem.
+  // Premiere 가 import 시 자막 트랙으로 인식. SRT 별도 import 안 해도 됨.
+  // sourceIn/sourceOut(ms) 우선, 없으면 글자수 비율 균등 분배 (SRT 와 동일 timing).
+  const titleClipitems = [];
+  let titleCursor = 0;
+  let titleIdx = 0;
+  for (let i = 0; i < sentences.length; i++) {
+    const s = sentences[i];
+    const dur = audioDurations[i] || 1;
+    const clips = (s.vrewClips && s.vrewClips.length > 0) ? s.vrewClips : null;
+
+    if (clips && clips.length > 0) {
+      const totalChars = clips.reduce((a, c) => a + (c.text ? c.text.length : 0), 0);
+      let subCursor = 0;
+      for (const sub of clips) {
+        const subText = (sub.text || '').trim();
+        if (!subText) continue;
+
+        let subDur;
+        if (sub.sourceIn != null && sub.sourceOut != null && sub.sourceOut > sub.sourceIn) {
+          subDur = (sub.sourceOut - sub.sourceIn) / 1000;
+        } else if (totalChars > 0) {
+          subDur = (dur * subText.length) / totalChars;
+        } else {
+          subDur = dur / clips.length;
+        }
+
+        const start = titleCursor + subCursor;
+        const end = start + subDur;
+        const startFr = secToFrames(start);
+        const endFr   = secToFrames(end);
+        const durFr   = Math.max(1, endFr - startFr);
+        titleClipitems.push(_titleClipitem(`clip-title-${++titleIdx}`, subText, startFr, endFr, durFr));
+        subCursor += subDur;
+      }
+    } else {
+      const text = String(s.text || '').trim();
+      if (text) {
+        const startFr = secToFrames(titleCursor);
+        const endFr   = secToFrames(titleCursor + dur);
+        const durFr   = Math.max(1, endFr - startFr);
+        titleClipitems.push(_titleClipitem(`clip-title-${++titleIdx}`, text, startFr, endFr, durFr));
+      }
+    }
+    titleCursor += dur;
+  }
+  log(`[PremiereXml] 자막 클립 ${titleClipitems.length}개 (V2 트랙)`);
 
   // 4. XML 조립
   const seqName = xmlEscape(opts.sequenceName || 'PrimingFlow Sequence');
@@ -344,6 +433,10 @@ async function buildPremiereXml({ sentences, groups, xmlPath, opts = {} }) {
         <track>
           <enabled>TRUE</enabled>
           <locked>FALSE</locked>${videoClipitems.join('')}
+        </track>
+        <track>
+          <enabled>TRUE</enabled>
+          <locked>FALSE</locked>${titleClipitems.join('')}
         </track>
       </video>
       <audio>
@@ -393,6 +486,7 @@ async function buildPremiereXml({ sentences, groups, xmlPath, opts = {} }) {
     totalFrames,
     videoClipCount: videoClipitems.length,
     audioClipCount: audioClipitems.length,
+    titleClipCount: titleClipitems.length,
   };
 }
 

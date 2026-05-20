@@ -11204,12 +11204,12 @@ async function savePremiereXml() {
 
     addLog(
       `[프리미어 XML] ✅ 저장 완료 — 총 ${result.totalSeconds.toFixed(1)}초, ` +
-      `이미지 ${result.videoClipCount}개, 오디오 ${result.audioClipCount}개`,
+      `이미지 ${result.videoClipCount}개, 오디오 ${result.audioClipCount}개, 자막 ${result.titleClipCount || 0}개`,
       'ok'
     );
     addLog(`[프리미어 XML] 자막 SRT 동봉: ${result.srtPath}`, 'info');
     setPxmlStep({
-      status: `✅ 완료 — ${result.videoClipCount} 비디오 + ${result.audioClipCount} 오디오, ${result.totalSeconds.toFixed(1)}초`,
+      status: `✅ 완료 — ${result.videoClipCount} 비디오 + ${result.audioClipCount} 오디오 + ${result.titleClipCount || 0} 자막, ${result.totalSeconds.toFixed(1)}초`,
       done: true,
     });
     _finishAutoProgress('프리미어 XML 저장 완료');

@@ -284,11 +284,20 @@ function addAiNoticeTrack(pj, opt, clipDurations, log) {
     ...(opt.italic ? { italic: true } : {}),
   };
 
-  // customAttributes — bgNone 이면 --textbox-color 항목 자체를 빼서 Vrew 가 투명 처리
+  // customAttributes — bgNone 처리.
+  // (v1.13.17) 옛 코드는 attribute 자체를 빼서 투명 처리 시도했지만 Vrew 4.0.1 의 CSS
+  // default 가 흰색 fallback 이라 흰색 배경이 그대로 나오는 결함. 명시적으로 투명 RGBA 값
+  // 전달 + alpha=0 opacity attribute 도 함께 부여해서 어떤 Vrew render 경로에서도
+  // 배경이 투명하게 보장.
   const customAttributes = [
     { attributeName: '--textbox-align', type: 'textbox-align', value: 'start' },
   ];
-  if (!bgNone) {
+  if (bgNone) {
+    customAttributes.unshift(
+      { attributeName: '--textbox-color', type: 'color-rgba', value: 'rgba(0, 0, 0, 0)' },
+      { attributeName: '--textbox-bg-opacity', type: 'number', value: '0' }
+    );
+  } else {
     customAttributes.unshift({ attributeName: '--textbox-color', type: 'color-hex', value: bgRaw });
   }
 
