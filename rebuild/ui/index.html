@@ -11128,6 +11128,15 @@ async function savePremiereXml() {
     return;
   }
 
+  // (v1.13.16) 진행 모달 — saveVrew 와 동일 패턴. 큰 시퀀스 export 시 단계 표시.
+  _showAutoProgress('프리미어 XML 생성 중', [
+    { id: 'pxml', label: '🎬 Premiere XML 빌드' },
+  ]);
+  _updateAutoStep('pxml', { status: '준비 중' });
+  // modal 이 화면에 paint 되도록 한 프레임 양보
+  await new Promise(resolve => requestAnimationFrame(() => resolve()));
+  const setPxmlStep = (patch) => { try { _updateAutoStep('pxml', patch); } catch {} };
+
   const path = require('path');
   const safe = (s) => String(s || '').replace(/[\\/:*?"<>|]/g, '').trim();
 
@@ -11135,15 +11144,20 @@ async function savePremiereXml() {
   let finalDir = _getProjectOutputDir(proj);
   if (!finalDir) {
     addLog('[프리미어 XML] 출력 폴더 미설정 — 폴더 선택 대화상자 오픈', 'info');
+    setPxmlStep({ status: '출력 폴더 선택 대기' });
     const picked = await ipcRenderer.invoke('select-folder').catch(() => null);
     if (!picked) {
       addLog('[프리미어 XML] 사용자 취소', 'info');
+      setPxmlStep({ status: '취소됨', fail: true });
+      _finishAutoProgress('사용자 취소');
       return;
     }
     outputDir = picked;
     finalDir = _getProjectOutputDir(proj);
     if (!finalDir) {
       alert('출력 폴더를 먼저 선택하세요');
+      setPxmlStep({ status: '실패 (출력 폴더 없음)', fail: true });
+      _finishAutoProgress('실패');
       return;
     }
   }
@@ -11156,7 +11170,11 @@ async function savePremiereXml() {
       `[확인] = 음성 없이 XML 저장 (이미지 트랙만, 그 자리는 무음 공백)\n` +
       `[취소] = 먼저 🎙 TTS 변환 실행 후 다시 시도`
     );
-    if (!ok) return;
+    if (!ok) {
+      setPxmlStep({ status: '취소됨', fail: true });
+      _finishAutoProgress('사용자 취소');
+      return;
+    }
   }
 
   // 3. 빌드 + 저장
@@ -11166,12 +11184,20 @@ async function savePremiereXml() {
     const xmlPath = path.join(finalDir, baseName + '.xml');
 
     addLog(`[프리미어 XML] 빌드 시작 — ${xmlPath}`, 'info');
+    setPxmlStep({ status: `빌드 중 (그룹 ${proj.groups.length}, 문장 ${proj.sentences.length})` });
+
     const result = await buildPremiereXml({
       sentences: proj.sentences,
       groups: proj.groups,
       xmlPath,
       opts: {
-        logger: (m) => addLog(m, 'info'),
+        // (v1.13.16) buildPremiereXml 내부 진행 로그를 modal step 메시지로 반영.
+        logger: (m) => {
+          addLog(m, 'info');
+          const s = String(m || '').replace(/^\[PremiereXml\]\s*/, '');
+          const short = s.length > 80 ? s.slice(0, 80) + '…' : s;
+          try { setPxmlStep({ status: short }); } catch {}
+        },
         sequenceName: baseName,
       },
     });
@@ -11182,6 +11208,11 @@ async function savePremiereXml() {
       'ok'
     );
     addLog(`[프리미어 XML] 자막 SRT 동봉: ${result.srtPath}`, 'info');
+    setPxmlStep({
+      status: `✅ 완료 — ${result.videoClipCount} 비디오 + ${result.audioClipCount} 오디오, ${result.totalSeconds.toFixed(1)}초`,
+      done: true,
+    });
+    _finishAutoProgress('프리미어 XML 저장 완료');
 
     // 4. 출력 폴더 자동 열기 (saveVrew 와 동일)
     try {
@@ -11191,6 +11222,8 @@ async function savePremiereXml() {
     }
   } catch (e) {
     addLog(`[프리미어 XML] 실패: ${e.message}`, 'err');
+    setPxmlStep({ status: `실패: ${e.message}`, fail: true });
+    _finishAutoProgress('실패');
     alert('프리미어 XML 생성 실패:\n' + e.message);
   }
 }
@@ -11217,6 +11250,10 @@ async function saveVrew(opts = {}) {
       { id: 'vrew', label: '💾 Vrew 빌드' },
     ]);
     _updateAutoStep('vrew', { status: '준비 중' });
+    // (v1.13.16) modal 이 화면에 paint 되도록 한 프레임 양보. requestAnimationFrame 이 호출되면
+    // 브라우저가 layout/paint cycle 을 완료한 뒤 다음 코드가 실행됨. 옛 버전은 buildVrew 같은
+    // 무거운 동기 작업이 cycle 을 막아 modal 이 끝날 때까지 안 보이는 결함.
+    await new Promise(resolve => requestAnimationFrame(() => resolve()));
   }
   const setVrewStep = (patch) => {
     try { _updateAutoStep('vrew', patch); } catch {}
@@ -11318,7 +11355,16 @@ async function saveVrew(opts = {}) {
         logo: collectLogoOpts(),
         captionStyle: collectCaptionStyleOpts(),
         disableLongSplit: _disableLongSplitFlag,
-        logger: (msg) => addLog(msg, 'info'),
+        // (v1.13.16) buildVrew 내부 진행 로그를 modal step 메시지로도 반영. 큰 프로젝트
+        // (1000+ clips) 에서 빌드가 수십 초 걸릴 때 사용자가 단계 진행을 시각적으로 확인.
+        logger: (msg) => {
+          addLog(msg, 'info');
+          if (showOwnModal) {
+            const m = String(msg || '').replace(/^\[Vrew\]\s*/, '');
+            const short = m.length > 80 ? m.slice(0, 80) + '…' : m;
+            try { setVrewStep({ status: short }); } catch {}
+          }
+        },
       },
     });
     addLog(`.vrew 저장 완료: ${vrewPath}`, 'ok');
