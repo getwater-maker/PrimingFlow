@@ -796,18 +796,15 @@ class FlowAutomator {
     await this.page.waitForTimeout(1500);
 
     // popup 열림 검증 — 비율 텍스트가 button/div/span 어디든 있으면 OK
+    // (v1.13.15 Flow selector fix) 새 Flow UI 의 비율 button 이 svg+span 다층 구조라
+    // 옛 leaf 검색 (children.length === 0) 이 매칭 실패하던 결함. 5개 비율 텍스트가
+    // body.innerText 에 모두 노출되면 popup 열림으로 확신.
     let popupOpened = false;
     for (let r = 0; r < 5; r++) {
       popupOpened = await this.page.evaluate(() => {
-        // 모든 element 의 leaf text 검색 (button 외에 div/span 도)
-        const all = document.querySelectorAll('*');
-        for (const el of all) {
-          if (!el.offsetParent) continue;
-          if (el.children.length > 0) continue;  // leaf 만
-          const t = (el.textContent || '').trim();
-          if (/^(16:9|4:3|1:1|3:4|9:16)$/.test(t)) return true;
-        }
-        return false;
+        const bodyText = (document.body.innerText || '').trim();
+        const ratios = ['16:9', '4:3', '1:1', '3:4', '9:16'];
+        return ratios.every(r => bodyText.includes(r));
       });
       if (popupOpened) break;
       await this._openSettingsPopup();
@@ -1539,16 +1536,21 @@ class FlowAutomator {
     }
   }
 
-  // 공통 헬퍼: leaf element 의 정확한 text 매칭 → 클릭 가능한 부모 (button/role) 클릭
+  // 공통 헬퍼: text 매칭 → 클릭 가능한 부모 (button/role) 클릭
+  // (v1.13.15 Flow selector fix) 2-tier 매칭:
+  //   1차: leaf (children.length === 0) + 정확 매칭 — 기존 로직
+  //   2차: leaf 조건 제거 + 정확 매칭 — 새 Flow UI 의 svg+text 다층 구조 대응
   async _clickLeafText(targetTexts) {
     return await this.page.evaluate((targets) => {
+      const lowerTargets = targets.map(t => t.toLowerCase());
       const all = document.querySelectorAll('*');
+
+      // 1차 — leaf + 정확 매칭 (옛 로직)
       for (const el of all) {
         if (!el.offsetParent) continue;
-        if (el.children.length > 0) continue; // leaf 만
+        if (el.children.length > 0) continue;
         const t = (el.textContent || '').trim().toLowerCase();
-        if (!targets.some(tt => t === tt.toLowerCase())) continue;
-        // 가장 가까운 클릭 가능한 부모로 올라가기
+        if (!lowerTargets.includes(t)) continue;
         let p = el;
         for (let i = 0; i < 6 && p && p !== document.body; i++) {
           const role = p.getAttribute && p.getAttribute('role');
@@ -1558,10 +1560,22 @@ class FlowAutomator {
           }
           p = p.parentElement;
         }
-        // 클릭 가능 부모 못 찾으면 leaf 자체 클릭 (last resort)
         el.click();
         return { ok: true, text: el.textContent.trim(), via: `${el.tagName}/self` };
       }
+
+      // 2차 — leaf 조건 제거 + 정확 매칭 (button/radio/option 등 element 자체 text 가 target)
+      for (const el of all) {
+        if (!el.offsetParent) continue;
+        const t = (el.innerText || el.textContent || '').trim().toLowerCase();
+        if (!lowerTargets.includes(t)) continue;
+        const role = el.getAttribute && el.getAttribute('role');
+        if (el.tagName === 'BUTTON' || role === 'radio' || role === 'option' || role === 'tab' || role === 'menuitem') {
+          el.click();
+          return { ok: true, text: (el.innerText || el.textContent).trim(), via: `${el.tagName}/${role || '-'}-relaxed` };
+        }
+      }
+
       return { ok: false };
     }, targetTexts);
   }
