@@ -3883,8 +3883,12 @@ ipcRenderer.on('rate-limit', (_, payload) => {
 // 페이로드: {profileId, completedNums, remainingNums, sessionRateLimitCount}
 // 이 핸들러는 사용자에게 상황을 알려주는 안내만 담당. 실제 폴백 트리거는 _runGroupImageGenerationBody
 // 의 while 루프가 start-generation 의 result.rateExhausted 를 보고 처리.
+// v1.13.27: main.js (obfuscated) 의 start-generation 핸들러가 결과를 {success:true/false} 로 wrap 하면서
+// flow-engine 의 rateExhausted/remainingNums 필드를 잘라버림. 폴백 동작이 main.js wrap 으로 깨지는 결함.
+// 우회: 이 IPC 페이로드를 글로벌에 저장 → _runGroupImageGenerationBody 의 while 루프가 IPC 페이로드 기준으로 폴백 트리거.
 ipcRenderer.on('flow-rate-exhausted', (_, payload) => {
   try {
+    window._flowRateExhaustedPayload = payload || null;  // 폴백 우회용 저장
     const profileId = (payload && payload.profileId) || 'default';
     const completed = (payload && payload.completedNums) ? payload.completedNums.length : 0;
     const remaining = (payload && payload.remainingNums) ? payload.remainingNums.length : 0;
@@ -3892,7 +3896,6 @@ ipcRenderer.on('flow-rate-exhausted', (_, payload) => {
     if (reason === 'proactive-switch') {
       addLog(`🔄 프로필 ${profileId} — 예정된 ${completed}개 완료, 적극적 순차 전환으로 다음 프로필로 교대 (남은 ${remaining}개)`, 'info');
     } else if (reason === 'suspicious-activity') {
-      // v1.13.26: 봇 의심 차단 — rate-limit 보다 심각, 강한 경고
       addLog(`🚨 프로필 ${profileId} 비정상 활동 감지 — 계정 차단 의심. ${completed}개 완료, ${remaining}개 남음. 다음 프로필로 즉시 폴백`, 'err');
     } else {
       addLog(`🚦 프로필 ${profileId} rate-limit 도달 — 이번 프로필에서 ${completed}개 완료, ${remaining}개 남음. 다음 프로필로 폴백 시도`, 'warn');
@@ -3982,13 +3985,28 @@ function clearLogs() {
 function addLog(msg, type = '') {
   const el = document.getElementById('logArea');
   if (!el) return;
+  // v1.13.27: 로그 라인 앞에 시간 prefix 자동 추가 (HH:MM:SS).
+  // 빈 줄(\n 만), 구분선(━), 이미 [HH:MM:SS] 로 시작하는 메시지는 prefix 안 붙임.
+  let stamped = String(msg == null ? '' : msg);
+  const trimmed = stamped.trim();
+  const needsStamp = trimmed.length > 0
+    && !/^[━─=]/.test(trimmed)
+    && !/^\[\d{2}:\d{2}:\d{2}\]/.test(trimmed);
+  if (needsStamp) {
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    // 멀티라인 메시지는 첫 줄 앞에만 stamp (가독성)
+    stamped = `[${hh}:${mm}:${ss}] ${stamped}`;
+  }
   const line = document.createElement('div');
   line.className = 'log-line' + (type ? ' ' + type : '');
-  line.textContent = msg;
+  line.textContent = stamped;
   el.appendChild(line);
   el.scrollTop = el.scrollHeight;
-  // 자동제작 모달 mini-log 동기화 (ring buffer O(1) + 모달 visible 일 때만 DOM 렌더)
-  try { if (typeof _appendAutoMiniLog === 'function') _appendAutoMiniLog(msg, type); } catch (_) {}
+  // 자동제작 모달 mini-log 동기화 (stamped 메시지로 표시 — 시간 prefix 포함)
+  try { if (typeof _appendAutoMiniLog === 'function') _appendAutoMiniLog(stamped, type); } catch (_) {}
 }
 
 // ─── 프로젝트 출력 폴더 통합 헬퍼 ─────────────────────
@@ -12268,6 +12286,9 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
   let aggregateSuccess = 0;
   let triedProfileCount = 0;
 
+  // v1.13.27: main.js wrap 우회를 위해 이전 iteration 의 IPC 페이로드 기록 (메시지 차별화용)
+  let prevExhaustReason = null;
+
   while (profileQueue.length > 0 && activeParagraphs.length > 0) {
     const currentProfileId = profileQueue.shift();
     triedProfileCount++;
@@ -12279,14 +12300,18 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
     window._pendingGroupNums = activeNums;
 
     if (triedProfileCount > 1) {
-      // 직전 result.reason 으로 메시지 차별화 (proactive 면 info, rate-limit 이면 warn)
-      const prevReason = (result && result.reason) || 'rate-limit';
-      if (prevReason === 'proactive-switch') {
+      // 직전 IPC 페이로드 reason 으로 메시지 차별화
+      if (prevExhaustReason === 'proactive-switch') {
         addLog(`▶ 프로필 ${currentProfileId} 시작 — ${activeParagraphs.length}개 그룹 담당`, 'info');
+      } else if (prevExhaustReason === 'suspicious-activity') {
+        addLog(`🔁 프로필 ${currentProfileId} 로 전환 (비정상 활동 폴백) — 남은 ${activeParagraphs.length}개 그룹 시도`, 'err');
       } else {
         addLog(`🔁 프로필 ${currentProfileId} 로 전환 (rate-limit 폴백) — 남은 ${activeParagraphs.length}개 그룹 시도`, 'warn');
       }
     }
+
+    // v1.13.27: IPC 페이로드 리셋 — 이번 run 중 발화되면 글로벌에 셋됨
+    window._flowRateExhaustedPayload = null;
 
     result = await ipcRenderer.invoke('start-generation', config);
     if (!result || !result.success) {
@@ -12295,9 +12320,16 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
     }
     aggregateSuccess += (result.success || 0);
 
-    if (result.rateExhausted) {
-      // 남은 그룹만 추출해서 다음 프로필로 폴백
-      const remainNums = new Set(result.remainingNums || []);
+    // v1.13.27: main.js wrap 으로 result.rateExhausted 가 사라질 수 있어 IPC 페이로드를 우선 신뢰.
+    // 둘 중 하나라도 발화하면 폴백 트리거.
+    const ipcPayload = window._flowRateExhaustedPayload;
+    const isExhausted = !!result.rateExhausted || !!ipcPayload;
+
+    if (isExhausted) {
+      prevExhaustReason = (ipcPayload && ipcPayload.reason) || result.reason || 'rate-limit';
+      // remainingNums: IPC 페이로드 우선, 없으면 result.remainingNums
+      const remainNumsArr = (ipcPayload && ipcPayload.remainingNums) || result.remainingNums || [];
+      const remainNums = new Set(remainNumsArr);
       const filteredP = [], filteredC = [], filteredO = [], filteredN = [];
       for (let k = 0; k < activeParagraphs.length; k++) {
         const numStr = String(k + 1).padStart(2, '0');
