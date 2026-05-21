@@ -3862,9 +3862,12 @@ ipcRenderer.on('rate-limit', (_, payload) => {
     if (typeof _autoCooldownUntil !== 'undefined') {
       _autoCooldownUntil = Date.now() + sec * 1000;
     }
-    // v1.13.21: reason 별 메시지 차별화
+    // v1.13.21~v1.13.26: reason 별 메시지 차별화
     const occText = occurrence > 0 ? ` (${occurrence}회차)` : '';
-    if (reason === 'flow-toast') {
+    if (reason === 'suspicious-activity') {
+      // 봇 의심 차단 — 대기 없이 즉시 폴백 (sec=0). flow-rate-exhausted 핸들러가 상세 안내.
+      addLog(`🚨 Flow 비정상 활동 감지 — 60초 대기 건너뛰고 즉시 다음 프로필로 폴백 시도`, 'err');
+    } else if (reason === 'flow-toast') {
       addLog(`🚦 Flow rate-limit 토스트 감지 — ${sec}초 대기 후 원본 프롬프트 자동 재시도${occText}`, 'warn');
     } else if (reason === 'cooldown') {
       addLog(`⏸ anti-detect 쿨다운 — ${sec}초 대기${occText}`, 'info');
@@ -3888,6 +3891,9 @@ ipcRenderer.on('flow-rate-exhausted', (_, payload) => {
     const reason = (payload && payload.reason) || 'rate-limit';
     if (reason === 'proactive-switch') {
       addLog(`🔄 프로필 ${profileId} — 예정된 ${completed}개 완료, 적극적 순차 전환으로 다음 프로필로 교대 (남은 ${remaining}개)`, 'info');
+    } else if (reason === 'suspicious-activity') {
+      // v1.13.26: 봇 의심 차단 — rate-limit 보다 심각, 강한 경고
+      addLog(`🚨 프로필 ${profileId} 비정상 활동 감지 — 계정 차단 의심. ${completed}개 완료, ${remaining}개 남음. 다음 프로필로 즉시 폴백`, 'err');
     } else {
       addLog(`🚦 프로필 ${profileId} rate-limit 도달 — 이번 프로필에서 ${completed}개 완료, ${remaining}개 남음. 다음 프로필로 폴백 시도`, 'warn');
     }

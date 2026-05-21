@@ -40,6 +40,7 @@ class FlowAutomator {
     // v1.13.21: Flow toast 형태의 rate-limit 감지 (HTTP 403 외에 "너무 빨리..." UI 메시지)
     this._rateLimitDetected = false;          // _waitForImage 폴에서 매칭되면 true
     this._rateLimitDetectedText = '';         // 마지막 매칭 텍스트 (로그용)
+    this._rateLimitDetectedType = '';         // 'rate-limit' | 'suspicious-activity' (v1.13.26)
     this._groupRateLimitCount = 0;            // 현재 그룹 내 rate-limit 발생 횟수 (점진 대기 계산)
     this._sessionRateLimitCount = 0;          // 세션 전체 누적 (통계/로그용)
     this._lastRateLimitAt = 0;                // 마지막 발생 timestamp (단순화 가드용)
@@ -50,15 +51,21 @@ class FlowAutomator {
     this._rateExhaustedFlag = false;          // run() 종료 시 renderer 가 폴백 트리거할지 판단
   }
 
-  // v1.13.21: Flow toast 메시지에서 rate-limit 키워드 감지 (HTTP 403 와 별개의 UI 신호)
+  // v1.13.21~v1.13.26: Flow toast 메시지에서 차단 키워드 감지 (HTTP 403 와 별개의 UI 신호)
   // 작은 toast/alert 박스(폭 < 600, 텍스트 < 200자)에서만 매칭하여 오판 방지.
-  // page.evaluate 1회로 처리 — 매 폴 호출 시에도 비용 최소화.
+  // 반환값에 type 포함:
+  //   - 'suspicious-activity': "비정상적인 활동 감지" / "abnormal activity" — 60초 대기 의미 없음 → 즉시 폴백
+  //   - 'rate-limit': "너무 빨리 요청" / "rate limit" — 60초 대기 후 1회 재시도
   async _detectRateLimitText() {
     try {
       if (!this.page || this.page.isClosed()) return null;
       return await this.page.evaluate(() => {
-        const KO = /너무\s*빨리|잠시\s*후에?\s*다시|요청이\s*너무|속도\s*제한|일일\s*한도/;
-        const EN = /too\s*quickly|rate[\s-]?limit|try\s*again\s*later|too\s*many\s*request|quota\s*exceeded/i;
+        // 비정상 활동(봇 의심 차단) — 일반 rate-limit 보다 심각, 60초 기다려도 회복 X
+        const KO_SUS = /비정상적?\s*(?:인|활동)|이상\s*활동|차단|의심.*감지|봇.*감지/;
+        const EN_SUS = /abnormal\s*activity|unusual\s*activity|suspicious\s*activity|automated\s*behavior/i;
+        // 일반 rate-limit (일시적 — 1회 재시도 안전망 가치 있음)
+        const KO_RATE = /너무\s*빨리|잠시\s*후에?\s*다시|요청이\s*너무|속도\s*제한|일일\s*한도/;
+        const EN_RATE = /too\s*quickly|rate[\s-]?limit|try\s*again\s*later|too\s*many\s*request|quota\s*exceeded/i;
         const sels = '[role="alert"],[role="status"],div[class*="toast"],div[class*="error"],div[class*="alert"],div[class*="snackbar"]';
         const candidates = Array.from(document.querySelectorAll(sels));
         for (const el of candidates) {
@@ -67,9 +74,13 @@ class FlowAutomator {
           if (rect.height === 0 || rect.height > 300) continue;
           const text = (el.innerText || el.textContent || '').trim();
           if (!text || text.length > 200) continue;
-          const koHit = KO.test(text);
-          const enHit = EN.test(text);
-          if (koHit || enHit) return { text: text.slice(0, 150), ko: koHit, en: enHit };
+          // 비정상 활동 우선 검사 (더 심각한 카테고리)
+          if (KO_SUS.test(text) || EN_SUS.test(text)) {
+            return { text: text.slice(0, 150), type: 'suspicious-activity' };
+          }
+          if (KO_RATE.test(text) || EN_RATE.test(text)) {
+            return { text: text.slice(0, 150), type: 'rate-limit' };
+          }
         }
         return null;
       });
@@ -655,25 +666,39 @@ class FlowAutomator {
           if (this._completedNums) this._completedNums.push(num);
         this.send('image-done', { index: i, num });
         } else if (this._rateLimitDetected) {
-          // v1.13.22: Flow rate-limit 토스트는 계정 일일 한도 도달 신호 → 같은 프로필로 더 시도해도 회복 X.
-          // 정책: 60초 대기 후 원본 프롬프트 1회 재시도(일시 케이스 안전망) → 또 실패면 즉시 run 종료 +
-          // flow-rate-exhausted IPC 발화 → renderer 가 다음 프로필로 폴백.
+          // v1.13.22~v1.13.26: Flow 차단 토스트 분기 — type 별 다르게 처리.
+          // 'suspicious-activity' (비정상 활동 감지): 계정 봇 의심 차단 — 대기 의미 없음, 즉시 폴백.
+          // 'rate-limit' (너무 빠른 요청): 일시 토스트 가능성 — 60초 대기 + 원본 1회 재시도 안전망.
           this._sessionRateLimitCount++;
           this._consecutiveSuccessForRateReset = 0;
-          const WAIT_MS = 60000;
-          const waitSec = Math.round(WAIT_MS / 1000);
-          this.log(`⏸ Flow rate-limit 감지 (그룹 ${num}, 프로필 ${this._currentProfileId || 'default'}) — ${waitSec}초 대기 후 원본 프롬프트 1회 재시도`);
-          this.send('rate-limit', { waitSeconds: waitSec, reason: 'flow-toast', occurrence: 1 });
-
-          // 1초 단위 대기 (pause/stop 즉시 반응)
-          for (let waited = 0; waited < WAIT_MS && !this._stopped; waited += 1000) {
-            await this._waitIfPaused();
-            if (this._stopped) break;
-            await this.page.waitForTimeout(1000);
-          }
+          const detectedType = this._rateLimitDetectedType || 'rate-limit';
+          const isSuspicious = detectedType === 'suspicious-activity';
 
           let rateLimitResolved = false;
-          if (!this._stopped) {
+
+          if (isSuspicious) {
+            // v1.13.26: 비정상 활동 감지 — 60초 대기 없이 즉시 폴백.
+            this.log(`🚨 프로필 ${this._currentProfileId || 'default'} 비정상 활동 감지 (그룹 ${num}) — 계정 차단 의심, 60초 대기 건너뛰고 즉시 다음 프로필로 폴백`);
+            this.send('rate-limit', { waitSeconds: 0, reason: 'suspicious-activity', occurrence: 1 });
+            // 토스트 정리만 시도
+            try { await this._dismissFailure(); } catch {}
+            // rateLimitResolved = false 유지 → 아래 폴백 로직 진입
+          } else {
+            // 기존 rate-limit 흐름: 60초 대기 + 1회 재시도
+            const WAIT_MS = 60000;
+            const waitSec = Math.round(WAIT_MS / 1000);
+            this.log(`⏸ Flow rate-limit 감지 (그룹 ${num}, 프로필 ${this._currentProfileId || 'default'}) — ${waitSec}초 대기 후 원본 프롬프트 1회 재시도`);
+            this.send('rate-limit', { waitSeconds: waitSec, reason: 'flow-toast', occurrence: 1 });
+
+            // 1초 단위 대기 (pause/stop 즉시 반응)
+            for (let waited = 0; waited < WAIT_MS && !this._stopped; waited += 1000) {
+              await this._waitIfPaused();
+              if (this._stopped) break;
+              await this.page.waitForTimeout(1000);
+            }
+          }
+
+          if (!isSuspicious && !this._stopped) {
             // 토스트 정리 + textbox 복구
             try { await this._dismissFailure(); } catch {}
             try { await this._waitForTextboxReady(); } catch {}
@@ -714,12 +739,16 @@ class FlowAutomator {
               // 실제 그룹 num 은 renderer 의 _pendingGroupNums 로 매핑됨
               remainingNums.push(j + 1);
             }
-            this.log(`🛑 프로필 ${this._currentProfileId || 'default'} rate-limit 도달 — run 종료, 남은 ${remainingNums.length}개 그룹은 다른 프로필로 폴백 시도`);
+            const exhaustReason = isSuspicious ? 'suspicious-activity' : 'rate-limit';
+            const headerEmoji = isSuspicious ? '🚨' : '🛑';
+            const headerLabel = isSuspicious ? '비정상 활동 감지로 즉시 차단' : 'rate-limit 도달';
+            this.log(`${headerEmoji} 프로필 ${this._currentProfileId || 'default'} ${headerLabel} — run 종료, 남은 ${remainingNums.length}개 그룹은 다른 프로필로 폴백 시도`);
             this.send('flow-rate-exhausted', {
               profileId: this._currentProfileId || 'default',
               completedNums: this._completedNums ? this._completedNums.slice() : [],
               remainingNums,
               sessionRateLimitCount: this._sessionRateLimitCount,
+              reason: exhaustReason,
             });
             this._rateExhaustedFlag = true;
             this._resetGroupRateLimitCounter();
@@ -1889,15 +1918,21 @@ class FlowAutomator {
       }
 
       // 실패 감지
-      // v1.13.21: rate-limit toast 우선 감지 — 키워드 매칭 시 플래그만 셋하고 null 리턴.
-      // 호출자가 _rateLimitDetected 플래그를 보고 분기 (단순화 재시도 X, 점진 대기 후 원본 재시도).
+      // v1.13.21~v1.13.26: 차단 토스트 우선 감지 — type 별 분기.
+      // 'suspicious-activity' (비정상 활동 감지): 60초 대기 의미 없음 → 즉시 폴백.
+      // 'rate-limit' (너무 빠른 요청): 60초 대기 후 원본 1회 재시도.
       try {
         const rl = await this._detectRateLimitText();
         if (rl) {
           this._rateLimitDetected = true;
           this._rateLimitDetectedText = rl.text;
+          this._rateLimitDetectedType = rl.type || 'rate-limit';
           this._lastRateLimitAt = Date.now();
-          this.log(`⚠ Flow rate-limit 토스트 감지 — "${rl.text.slice(0, 80)}"`);
+          if (this._rateLimitDetectedType === 'suspicious-activity') {
+            this.log(`🚨 Flow 비정상 활동 감지 — "${rl.text.slice(0, 80)}" (계정 차단 의심, 즉시 다음 프로필로 폴백)`);
+          } else {
+            this.log(`⚠ Flow rate-limit 토스트 감지 — "${rl.text.slice(0, 80)}"`);
+          }
           // 토스트 정리 (실패 카드 dismiss 와 동일 동작)
           try { await this._dismissFailure(); } catch {}
           return null;
