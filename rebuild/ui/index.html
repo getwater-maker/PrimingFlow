@@ -104,7 +104,8 @@
     color: var(--text-soft);
     font-size: 12px;
     cursor: pointer;
-    max-width: 240px;
+    max-width: 480px;
+    min-width: 200px;
     position: relative;
     margin-bottom: -1px;
   }
@@ -3121,8 +3122,8 @@ function _projectTabLabel(p) {
 // 사용자 요청: 파일명 "앞부분의 일부" 만 보이도록.
 function _projectTabLabelShort(p) {
   const lbl = _projectTabLabel(p);
-  // 폭 기준 14 (한국어로 약 7자, 영문으로 14자)
-  const MAX_WIDTH = 14;
+  // v1.13.32: 탭 max-width 240→480px 와 맞춤 — 폭 기준 28 (한국어 약 14자, 영문 28자)
+  const MAX_WIDTH = 28;
   let width = 0;
   let cut = lbl.length;
   for (let i = 0; i < lbl.length; i++) {
