@@ -12314,16 +12314,24 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
     window._flowRateExhaustedPayload = null;
 
     result = await ipcRenderer.invoke('start-generation', config);
+    // v1.13.28: invoke 반환 후 IPC 이벤트 큐 처리 보장 — flow-rate-exhausted 핸들러가
+    // _flowRateExhaustedPayload 셋할 시간 확보. Electron ipcRenderer.on 은 invoke 반환과
+    // 별도 큐라 timing 보장 X. 200ms yield 면 충분히 처리됨.
+    await new Promise(r => setTimeout(r, 200));
     if (!result || !result.success) {
       addLog(`이미지 ${label} 오류: ${result && result.error}`, 'err');
       break;
     }
     aggregateSuccess += (result.success || 0);
 
-    // v1.13.27: main.js wrap 으로 result.rateExhausted 가 사라질 수 있어 IPC 페이로드를 우선 신뢰.
+    // v1.13.27/28: main.js wrap 으로 result.rateExhausted 가 사라질 수 있어 IPC 페이로드를 우선 신뢰.
     // 둘 중 하나라도 발화하면 폴백 트리거.
     const ipcPayload = window._flowRateExhaustedPayload;
     const isExhausted = !!result.rateExhausted || !!ipcPayload;
+    // v1.13.28: 디버그 로그 — 다음에도 폴백 안 되면 무엇이 false 인지 명확히
+    try {
+      addLog(`[fallback-check] profile=${currentProfileId} result.rateExhausted=${!!result.rateExhausted} ipcPayload=${!!ipcPayload} → isExhausted=${isExhausted}, profileQueue 남음=${profileQueue.length}`, 'info');
+    } catch (_) {}
 
     if (isExhausted) {
       prevExhaustReason = (ipcPayload && ipcPayload.reason) || result.reason || 'rate-limit';
