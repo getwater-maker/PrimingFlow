@@ -329,9 +329,11 @@ class FlowAutomator {
     } catch {}
 
     // v1.13.30: profileId 변경 감지 — 폴백으로 다른 프로필 들어오면 기존 context 종료 후 새 profileDir 로 재시작
+    // v1.13.31: 공백(\s) 변환 제거 — 로그인 검증(flow-login IPC)이 공백 그대로 폴더 만들기 때문에
+    // 변환하면 빈 새 폴더로 들어가서 로그인 정보 손실 → textbox 못 찾고 timeout. 공백 그대로 유지.
     {
       const desiredProfileId = (config && config.profileId) || 'default';
-      const desiredProfileDir = path.join(os.homedir(), '.flow-app', 'profiles', desiredProfileId.replace(/[\s\\\/:*?"<>|]/g, '_'));
+      const desiredProfileDir = path.join(os.homedir(), '.flow-app', 'profiles', desiredProfileId.replace(/[\\\/:*?"<>|]/g, '_'));
       if (this.profileDir !== desiredProfileDir) {
         if (this.context) {
           this.log(`[Flow] 프로필 변경 감지: ${this.profileDir} → ${desiredProfileDir} — 기존 컨텍스트 종료 후 재시작`);

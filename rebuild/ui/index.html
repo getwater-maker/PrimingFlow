@@ -12275,13 +12275,19 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
   // v1.13.22: rate-limit 시 다른 프로필로 폴백. 등록된 모든 프로필을 순서대로 시도.
   const initialProfileId = config.profileId;
   const profileQueue = await _getFallbackProfileQueue(initialProfileId);
-  // v1.13.23: 적극적 순차 전환 — 등록 프로필 수 ≥ 2 일 때 그룹을 자동 분배.
-  // 각 프로필이 ceil(총그룹수 / 프로필수) 개씩 담당 → rate-limit 발생 전에 자동 교대.
-  // 프로필 1개면 0 (비활성 = 기존 동작 유지).
+  // v1.13.23/31: 적극적 순차 전환 — 등록 프로필 수 ≥ 2 + 각 프로필이 최소 2개 이상 담당할 때만 활성.
+  // 그룹/프로필 비율 < 2 면 분배 의미 없음 (브라우저 재시작 30~50초 오버헤드가 더 큼) → 비활성.
+  // 예: 7 그룹 / 8 프로필 = 0.875 → 비활성 (단일 프로필로 처리).
+  // 예: 100 그룹 / 8 프로필 = 12.5 → 활성 (각 13개씩).
   const totalProfiles = profileQueue.length;
-  const proactiveN = totalProfiles >= 2 ? Math.ceil(paragraphs.length / totalProfiles) : 0;
+  const groupsPerProfile = totalProfiles > 0 ? (paragraphs.length / totalProfiles) : 0;
+  const proactiveN = (totalProfiles >= 2 && groupsPerProfile >= 2)
+    ? Math.ceil(paragraphs.length / totalProfiles)
+    : 0;
   if (proactiveN > 0) {
     addLog(`🔄 적극적 순차 전환 활성 — 프로필 ${totalProfiles}개로 분배 (각 약 ${proactiveN}개씩, rate-limit 회피)`, 'info');
+  } else if (totalProfiles >= 2) {
+    addLog(`ℹ 프로필 ${totalProfiles}개 등록되어 있지만 그룹 ${paragraphs.length}개는 한 프로필로 충분 — 분배 비활성 (브라우저 재시작 오버헤드 회피). rate-limit 발생 시에만 폴백`, 'info');
   }
   config.proactiveSwitchEveryN = proactiveN;
 
