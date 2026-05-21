@@ -3876,7 +3876,23 @@ ipcRenderer.on('rate-limit', (_, payload) => {
   }
 });
 
-// v1.13.21: Flow rate-limit 으로 그룹 skip 시 — 해당 그룹 상태 표시 + 자동제작 폴링이 더 기다리지 않게.
+// v1.13.22: Flow 현재 프로필 rate-limit 도달 → renderer 의 폴백 루프가 다음 프로필로 전환.
+// 페이로드: {profileId, completedNums, remainingNums, sessionRateLimitCount}
+// 이 핸들러는 사용자에게 상황을 알려주는 안내만 담당. 실제 폴백 트리거는 _runGroupImageGenerationBody
+// 의 while 루프가 start-generation 의 result.rateExhausted 를 보고 처리.
+ipcRenderer.on('flow-rate-exhausted', (_, payload) => {
+  try {
+    const profileId = (payload && payload.profileId) || 'default';
+    const completed = (payload && payload.completedNums) ? payload.completedNums.length : 0;
+    const remaining = (payload && payload.remainingNums) ? payload.remainingNums.length : 0;
+    addLog(`🚦 프로필 ${profileId} rate-limit 도달 — 이번 프로필에서 ${completed}개 완료, ${remaining}개 남음. 다음 프로필로 폴백 시도`, 'warn');
+  } catch (e) {
+    console.error('[flow-rate-exhausted IPC]', e);
+  }
+});
+
+// v1.13.21 → v1.13.22: 더 이상 flow-engine 이 직접 발화하지 않음.
+// 호환성 유지를 위해 핸들러는 남겨두지만 호출되지 않을 예정.
 // 페이로드: {index, num, reason, attempts}
 ipcRenderer.on('flow-skip-group', (_, payload) => {
   try {
@@ -12204,7 +12220,84 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
   // 출력 폴더를 파이프라인 종료 후 카드 썸네일 폴백 스캔에 사용
   window._lastGenOutputDir = finalDir;
 
-  const result = await ipcRenderer.invoke('start-generation', config);
+  // v1.13.22: rate-limit 시 다른 프로필로 폴백. 등록된 모든 프로필을 순서대로 시도.
+  const initialProfileId = config.profileId;
+  const profileQueue = await _getFallbackProfileQueue(initialProfileId);
+  let activeParagraphs = paragraphs;
+  let activeCustomPrompts = customPrompts;
+  let activeOrder = window._pendingGroupOrder ? window._pendingGroupOrder.slice() : null;
+  let activeNums = window._pendingGroupNums ? window._pendingGroupNums.slice() : null;
+  let result = null;
+  let aggregateSuccess = 0;
+  let triedProfileCount = 0;
+
+  while (profileQueue.length > 0 && activeParagraphs.length > 0) {
+    const currentProfileId = profileQueue.shift();
+    triedProfileCount++;
+    config.profileId = currentProfileId;
+    config.paragraphs = activeParagraphs;
+    config.customPrompts = activeCustomPrompts;
+    // image-done IPC 매핑을 위해 _pendingGroupOrder/Nums 도 활성 배열로 갱신
+    window._pendingGroupOrder = activeOrder;
+    window._pendingGroupNums = activeNums;
+
+    if (triedProfileCount > 1) {
+      addLog(`🔁 프로필 ${currentProfileId} 로 전환 — 남은 ${activeParagraphs.length}개 그룹 시도`, 'warn');
+    }
+
+    result = await ipcRenderer.invoke('start-generation', config);
+    if (!result || !result.success) {
+      addLog(`이미지 ${label} 오류: ${result && result.error}`, 'err');
+      break;
+    }
+    aggregateSuccess += (result.success || 0);
+
+    if (result.rateExhausted) {
+      // 남은 그룹만 추출해서 다음 프로필로 폴백
+      const remainNums = new Set(result.remainingNums || []);
+      const filteredP = [], filteredC = [], filteredO = [], filteredN = [];
+      for (let k = 0; k < activeParagraphs.length; k++) {
+        const numStr = String(k + 1).padStart(2, '0');
+        if (remainNums.has(numStr)) {
+          filteredP.push(activeParagraphs[k]);
+          if (activeCustomPrompts) filteredC.push(activeCustomPrompts[k]);
+          if (activeOrder) filteredO.push(activeOrder[k]);
+          if (activeNums) filteredN.push(activeNums[k]);
+        }
+      }
+      activeParagraphs = filteredP;
+      activeCustomPrompts = activeCustomPrompts ? filteredC : null;
+      activeOrder = activeOrder ? filteredO : null;
+      activeNums = activeNums ? filteredN : null;
+
+      if (profileQueue.length === 0 || activeParagraphs.length === 0) {
+        // 모든 프로필 소진 또는 남은 그룹 0 — 종료
+        if (activeParagraphs.length > 0) {
+          addLog(`⚠ 모든 프로필 rate-limit 도달 — 남은 ${activeParagraphs.length}개 그룹은 ⏭ 보류. 내일 또는 새 계정 추가 후 [선택 그룹 이미지] 로 재시도`, 'warn');
+          // 남은 그룹들 imageStatus = 'rate-skipped' 마킹 + 카드 배지
+          if (activeOrder) {
+            for (const gid of activeOrder) {
+              try {
+                const owner = (typeof _findProjectByGroupId === 'function') ? _findProjectByGroupId(gid) : null;
+                const proj2 = owner || window._currentProject;
+                if (proj2 && proj2.groups) {
+                  const g = proj2.groups.find(x => x.id === gid);
+                  if (g) g.imageStatus = 'rate-skipped';
+                }
+                if (typeof _setGroupImageStatus === 'function') _setGroupImageStatus(gid, 'rate-skipped');
+              } catch (_) {}
+            }
+          }
+        }
+        break;
+      }
+      // 다음 프로필로 계속
+      continue;
+    }
+    // 정상 종료
+    break;
+  }
+
   document.getElementById('startBtn').disabled = false;
   document.getElementById('stopBtn').style.display = 'none';
   const pbDone = document.getElementById('pauseBtn');
@@ -12214,12 +12307,27 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
   isPaused = false;
 
   if (!result || !result.success) {
-    addLog(`이미지 ${label} 오류: ${result && result.error}`, 'err');
     return false;
   }
   // (PR6) 비활성 탭이면 toast + 깜박임
   try { _notifyTabIfInactive(projectId, '이미지 생성'); } catch {}
   return true;
+}
+
+// v1.13.22: 폴백 프로필 큐 생성 — 첫 번째 = 시작 프로필, 나머지 = 등록된 다른 프로필들.
+// 사용자가 미리 여러 Google 계정으로 등록해두면 자동 순환.
+async function _getFallbackProfileQueue(firstProfileId) {
+  try {
+    const profiles = await ipcRenderer.invoke('get-profiles');
+    const list = Array.isArray(profiles) ? profiles : [];
+    // 프로필 형태: 문자열 ID 또는 { id, name } 객체 — 둘 다 대응
+    const ids = list.map(p => (typeof p === 'string') ? p : (p && p.id)).filter(Boolean);
+    const others = ids.filter(id => id !== firstProfileId);
+    return [firstProfileId, ...others];
+  } catch (e) {
+    console.warn('[fallback-queue] get-profiles 실패:', e.message);
+    return [firstProfileId];
+  }
 }
 
 // ─── 8-D: .vrew 저장 (TTS ≠ 자막 분리) ──────────────────────────────

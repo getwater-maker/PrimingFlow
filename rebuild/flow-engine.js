@@ -44,6 +44,10 @@ class FlowAutomator {
     this._sessionRateLimitCount = 0;          // 세션 전체 누적 (통계/로그용)
     this._lastRateLimitAt = 0;                // 마지막 발생 timestamp (단순화 가드용)
     this._consecutiveSuccessForRateReset = 0; // 연속 성공 시 _sessionRateLimitCount 리셋
+    // v1.13.22: 다중 프로필 폴백을 위한 추적 변수
+    this._currentProfileId = '';              // run() 시작 시 셋, 로그/IPC 페이로드에 사용
+    this._completedNums = [];                 // 이번 run 에서 성공한 num 들 (renderer 가 남은 그룹 계산용)
+    this._rateExhaustedFlag = false;          // run() 종료 시 renderer 가 폴백 트리거할지 판단
   }
 
   // v1.13.21: Flow toast 메시지에서 rate-limit 키워드 감지 (HTTP 403 와 별개의 UI 신호)
@@ -301,6 +305,10 @@ class FlowAutomator {
     // 로그 파일 초기화 (이 시점부터 log() 호출은 파일에도 기록됨)
     this._logFilePath = path.join(outputDir, 'log.txt');
     this._failedNums = [];
+    // v1.13.22: 다중 프로필 폴백을 위한 run 별 추적 초기화
+    this._currentProfileId = (config && config.profileId) || 'default';
+    this._completedNums = [];
+    this._rateExhaustedFlag = false;
     try {
       const ts = new Date().toISOString().replace('T', ' ').slice(0, 19);
       fs.writeFileSync(this._logFilePath, `=== 생성 시작 ${ts} ===\n출력: ${outputDir}\n단락 수: ${paragraphs.length}\n\n`, 'utf-8');
@@ -473,10 +481,28 @@ class FlowAutomator {
 
     // 브라우저 유지 (다음 생성에 재사용)
     this.log(`\n완료! 성공: ${successCount}/${paragraphs.length}`);
-    this.send('done', { success: successCount, total: paragraphs.length, outputDir });
+    // v1.13.22: rateExhausted 플래그 + completedNums/remainingNums 함께 전달 (renderer 폴백용)
+    const completedNums = (this._completedNums || []).slice();
+    const remainingNums = [];
+    for (let j = 0; j < paragraphs.length; j++) {
+      const n = String(j + 1).padStart(2, '0');
+      if (!completedNums.includes(n)) remainingNums.push(n);
+    }
+    const result = {
+      success: successCount,
+      total: paragraphs.length,
+      outputDir,
+      rateExhausted: !!this._rateExhaustedFlag,
+      completedNums,
+      remainingNums,
+      profileId: this._currentProfileId || 'default',
+    };
+    this.send('done', result);
     // 로그 파일 경로 초기화 (다음 실행 때 새 파일로)
     this._logFilePath = null;
     this._failedNums = null;
+    this._completedNums = null;
+    return result;
   }
 
   // ─── 순차 모드 (기존 방식 + v2.0 개선) ───
@@ -511,6 +537,7 @@ class FlowAutomator {
       if (this._shouldSkip(num, imgDir)) {
         this.log(`[${num}] 이미 존재, 스킵`);
         successCount++;
+        if (this._completedNums) this._completedNums.push(num);
         this.send('image-done', { index: i, num });
         continue;
       }
@@ -621,34 +648,33 @@ class FlowAutomator {
             this._consecutiveSuccessForRateReset = 0;
           }
           this._resetGroupRateLimitCounter();
-          this.send('image-done', { index: i, num });
+          if (this._completedNums) this._completedNums.push(num);
+        this.send('image-done', { index: i, num });
         } else if (this._rateLimitDetected) {
-          // v1.13.21: Flow rate-limit toast 분기 — 점진 대기 후 원본 프롬프트로 재시도 (단순화 X).
-          // 같은 그룹에서 최대 3회 cap → 도달 시 skip + 다음 그룹 계속 진행.
-          // consecutiveFails 증가 안 함 — rate-limit 으로 인한 실패는 연쇄 fail 카운팅 제외.
-          let rateLimitResolved = false;
-          while (this._groupRateLimitCount < 3 && !this._stopped) {
-            this._groupRateLimitCount++;
-            this._sessionRateLimitCount++;
-            this._consecutiveSuccessForRateReset = 0;
-            const waitMs = this._getProgressiveWaitMs();
-            const waitSec = Math.round(waitMs / 1000);
-            this.log(`⏸ Flow rate-limit #${this._groupRateLimitCount} (그룹 ${num}) — ${waitSec}초 대기 후 원본 프롬프트 재시도`);
-            this.send('rate-limit', { waitSeconds: waitSec, reason: 'flow-toast', occurrence: this._groupRateLimitCount });
+          // v1.13.22: Flow rate-limit 토스트는 계정 일일 한도 도달 신호 → 같은 프로필로 더 시도해도 회복 X.
+          // 정책: 60초 대기 후 원본 프롬프트 1회 재시도(일시 케이스 안전망) → 또 실패면 즉시 run 종료 +
+          // flow-rate-exhausted IPC 발화 → renderer 가 다음 프로필로 폴백.
+          this._sessionRateLimitCount++;
+          this._consecutiveSuccessForRateReset = 0;
+          const WAIT_MS = 60000;
+          const waitSec = Math.round(WAIT_MS / 1000);
+          this.log(`⏸ Flow rate-limit 감지 (그룹 ${num}, 프로필 ${this._currentProfileId || 'default'}) — ${waitSec}초 대기 후 원본 프롬프트 1회 재시도`);
+          this.send('rate-limit', { waitSeconds: waitSec, reason: 'flow-toast', occurrence: 1 });
 
-            // 1초 단위 대기 (pause/stop 즉시 반응)
-            for (let waited = 0; waited < waitMs && !this._stopped; waited += 1000) {
-              await this._waitIfPaused();
-              if (this._stopped) break;
-              await this.page.waitForTimeout(1000);
-            }
+          // 1초 단위 대기 (pause/stop 즉시 반응)
+          for (let waited = 0; waited < WAIT_MS && !this._stopped; waited += 1000) {
+            await this._waitIfPaused();
             if (this._stopped) break;
+            await this.page.waitForTimeout(1000);
+          }
 
+          let rateLimitResolved = false;
+          if (!this._stopped) {
             // 토스트 정리 + textbox 복구
             try { await this._dismissFailure(); } catch {}
             try { await this._waitForTextboxReady(); } catch {}
 
-            // 원본 프롬프트 그대로 재시도 (단순화 안 함)
+            // 원본 프롬프트 1회 재시도 (단순화 X)
             this._rateLimitDetected = false;
             try {
               await this._typePrompt(prompt);
@@ -658,7 +684,7 @@ class FlowAutomator {
               const retryBuffer = await this._waitForImage(retryTimeout, opts.mediaType === 'video');
               if (retryBuffer) {
                 await this._saveImage(retryBuffer, num, shortText, imgDir, opts);
-                this.log(`[${num}] rate-limit 후 재시도 ${this._groupRateLimitCount} 성공!`);
+                this.log(`[${num}] rate-limit 후 재시도 성공!`);
                 successCount++;
                 consecutiveFails = 0;
                 this._consecutiveSuccessForRateReset++;
@@ -666,31 +692,36 @@ class FlowAutomator {
                   this._sessionRateLimitCount = 0;
                   this._consecutiveSuccessForRateReset = 0;
                 }
-                this.send('image-done', { index: i, num });
+                if (this._completedNums) this._completedNums.push(num);
+        this.send('image-done', { index: i, num });
+                this._resetGroupRateLimitCounter();
                 rateLimitResolved = true;
-                break;
               }
-              // retryBuffer 가 null 인데 _rateLimitDetected 가 false 면 다른 사유 — while 탈출
-              if (!this._rateLimitDetected) break;
-              // _rateLimitDetected = true 인 채로 while 계속 (다음 iteration 에서 점진 대기 증가)
             } catch (retryErr) {
               this.debug(`  [rate-limit retry] ${retryErr.message}`);
-              break;
             }
-          } // while
-
-          if (!rateLimitResolved && !this._stopped) {
-            if (this._groupRateLimitCount >= 3) {
-              this.log(`⏭ 그룹 ${num} — rate-limit 3회 재시도 모두 실패, skip. 다음 그룹 계속`);
-              this.send('flow-skip-group', { index: i, num, reason: 'rate-limit', attempts: this._groupRateLimitCount });
-            } else {
-              this.log(`[${num}] rate-limit 후 다른 사유로 실패 — skip (연쇄 fail 카운팅 제외)`);
-              this.send('flow-skip-group', { index: i, num, reason: 'rate-limit-fallback', attempts: this._groupRateLimitCount });
-            }
-            if (this._failedNums) this._failedNums.push({ num, text: paragraphs[i].substring(0, 80), reason: 'rate-skipped' });
           }
-          this._resetGroupRateLimitCounter();
-          // 다음 단락으로 자연 진행 (단순화 재시도 분기로 fall-through 안 함 — else if 라서 안전)
+
+          if (!rateLimitResolved) {
+            // 재시도 실패 또는 stop — 현재 프로필 포기, run 종료. renderer 가 다음 프로필로 폴백.
+            const remainingNums = [];
+            for (let j = i; j < paragraphs.length; j++) {
+              // paragraphs index j 에 대응하는 num 은 caller 에서 매핑하지만, 여기서는 단순히 paragraph idx (1-based)
+              // 실제 그룹 num 은 renderer 의 _pendingGroupNums 로 매핑됨
+              remainingNums.push(j + 1);
+            }
+            this.log(`🛑 프로필 ${this._currentProfileId || 'default'} rate-limit 도달 — run 종료, 남은 ${remainingNums.length}개 그룹은 다른 프로필로 폴백 시도`);
+            this.send('flow-rate-exhausted', {
+              profileId: this._currentProfileId || 'default',
+              completedNums: this._completedNums ? this._completedNums.slice() : [],
+              remainingNums,
+              sessionRateLimitCount: this._sessionRateLimitCount,
+            });
+            this._rateExhaustedFlag = true;
+            this._resetGroupRateLimitCounter();
+            break; // for (i) 종료
+          }
+          // rateLimitResolved=true → for 루프 다음 iteration 자연 진행
         } else {
           // 재시도 전략: 최대 5회
           // 1~2회: 빠른 단순화 재시도
@@ -735,7 +766,8 @@ class FlowAutomator {
                 this.log(`[${num}] 재시도 ${retryN} 성공!`);
                 successCount++;
                 consecutiveFails = 0;
-                this.send('image-done', { index: i, num });
+                if (this._completedNums) this._completedNums.push(num);
+        this.send('image-done', { index: i, num });
                 retrySuccess = true;
                 break;
               }
@@ -879,6 +911,7 @@ class FlowAutomator {
       if (buf && buf.length > 10000) {
         await this._saveImage(buf, num, shortText, imgDir, opts);
         successCount++;
+        if (this._completedNums) this._completedNums.push(num);
         this.send('image-done', { index: idx, num });
       } else {
         this.log(`[${num}] 다운로드 실패`);
