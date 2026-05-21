@@ -9785,6 +9785,20 @@ const _AUTO_MINI_DOM_LINES   = 8;
 const _AUTO_RATE_MIN_SAMPLES = 5;
 const _AUTO_RATE_MAX_SAMPLES = 12;
 
+// v1.13.25: 모달 등 DOM 변경 직후 호출 — 브라우저가 paint cycle 을 완료한 뒤 다음 macrotask 에서 resolve.
+// 단순 requestAnimationFrame 한 번은 callback 안에서 즉시 다음 코드가 실행되어 paint commit 전에
+// 메인 스레드 재점유 가능 → 2 RAF + setTimeout 0 으로 paint 가 visible 하게 commit 되도록 강제.
+// 비용: 약 30~50ms (60fps 2 프레임 + setTimeout 0). 사용자 인지 안 됨.
+async function _yieldToPaint() {
+  return new Promise(resolve => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setTimeout(resolve, 0);
+      });
+    });
+  });
+}
+
 function _showAutoProgress(title, steps) {
   const modal = document.getElementById('autoProgressModal');
   const titleEl = document.getElementById('autoProgressTitle');
@@ -11799,6 +11813,8 @@ async function generateAll() {
   }
   progressSteps.push({ id: 'vrew', label: '💾 Vrew 파일' });
   _showAutoProgress('자동제작 진행 중', progressSteps);
+  // v1.13.25: 모달이 화면에 paint 된 후 무거운 작업 시작 — 사용자가 클릭 즉시 모달 확인 가능
+  await _yieldToPaint();
 
   // 백그라운드 폴링 — 1초 간격으로 현재 진행 상태 모달에 반영
   // window 글로벌화 — cancelAutoGeneration() 에서 외부 중단 가능
@@ -12497,7 +12513,7 @@ async function saveVrew(opts = {}) {
     // (v1.13.16) modal 이 화면에 paint 되도록 한 프레임 양보. requestAnimationFrame 이 호출되면
     // 브라우저가 layout/paint cycle 을 완료한 뒤 다음 코드가 실행됨. 옛 버전은 buildVrew 같은
     // 무거운 동기 작업이 cycle 을 막아 modal 이 끝날 때까지 안 보이는 결함.
-    await new Promise(resolve => requestAnimationFrame(() => resolve()));
+    await _yieldToPaint();
   }
   const setVrewStep = (patch) => {
     try { _updateAutoStep('vrew', patch); } catch {}

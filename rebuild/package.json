@@ -1,7 +1,7 @@
 {
   "name": "PrimingFlow",
   "productName": "PrimingFlow",
-  "version": "1.13.24",
+  "version": "1.13.25",
   "description": "PrimingFlow - Google Flow 자동화 + Vrew 후처리",
   "main": "bootstrap.js",
   "scripts": {
