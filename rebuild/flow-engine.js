@@ -70,10 +70,11 @@ class FlowAutomator {
         const candidates = Array.from(document.querySelectorAll(sels));
         for (const el of candidates) {
           const rect = el.getBoundingClientRect();
-          if (rect.width === 0 || rect.width > 600) continue;
-          if (rect.height === 0 || rect.height > 300) continue;
+          // v1.13.33: size 필터 완화 — 사용자가 본 큰 차단 토스트 (캔버스 전체 덮음) 도 잡히도록
+          if (rect.width === 0 || rect.width > 1200) continue;
+          if (rect.height === 0 || rect.height > 800) continue;
           const text = (el.innerText || el.textContent || '').trim();
-          if (!text || text.length > 200) continue;
+          if (!text || text.length > 400) continue;
           // 비정상 활동 우선 검사 (더 심각한 카테고리)
           if (KO_SUS.test(text) || EN_SUS.test(text)) {
             return { text: text.slice(0, 150), type: 'suspicious-activity' };
@@ -2018,12 +2019,20 @@ class FlowAutomator {
 
       try {
         const failureText = await this.page.evaluate(() => {
+          // v1.13.33: 비정상 활동 / 봇 의심 차단 키워드 — 매칭 시 {__suspicious:true} 객체 반환.
+          // _detectRateLimitText 가 size 필터로 못 잡은 큰 차단 토스트의 이중 안전망.
+          const SUSPICIOUS = /비정상적|이상\s*활동|봇.*감지|의심.*활동|abnormal\s*activity|unusual\s*activity|suspicious\s*activity|automated\s*behavior/i;
           const candidates = document.querySelectorAll('div, span, p, h1, h2, h3');
           for (const el of candidates) {
             if (el.children.length > 3) continue;
             const rect = el.getBoundingClientRect();
             if (rect.y > 800 || rect.width < 50) continue;
             const text = (el.textContent || '').trim();
+            if (text.length > 400) continue;
+            // 비정상 활동 우선 검사
+            if (SUSPICIOUS.test(text)) {
+              return { __suspicious: true, text: text.substring(0, 150) };
+            }
             if (text.length > 200) continue;
             if ((text.startsWith('실패') && text.length < 150) ||
                 text.includes('정책을 위반') || text.includes('위반할 수') ||
@@ -2034,6 +2043,16 @@ class FlowAutomator {
           }
           return null;
         });
+        // v1.13.33: 비정상 활동 매칭 → rate-limit 플래그 셋 + suspicious-activity 타입 → 호출자가 즉시 폴백 트리거
+        if (failureText && typeof failureText === 'object' && failureText.__suspicious) {
+          this.log(`🚨 Flow 비정상 활동 감지 (failureText 영역) — "${failureText.text.slice(0, 80)}"`);
+          this._rateLimitDetected = true;
+          this._rateLimitDetectedType = 'suspicious-activity';
+          this._rateLimitDetectedText = failureText.text;
+          this._lastRateLimitAt = Date.now();
+          try { await this._dismissFailure(); } catch {}
+          return null;
+        }
         if (failureText) {
           this.debug(`  [!] 생성 실패 감지: ${failureText}`);
           // 실패 메시지 제거 (다음 프롬프트에 영향 안 주도록)
