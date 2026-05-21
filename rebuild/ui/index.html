@@ -3885,7 +3885,12 @@ ipcRenderer.on('flow-rate-exhausted', (_, payload) => {
     const profileId = (payload && payload.profileId) || 'default';
     const completed = (payload && payload.completedNums) ? payload.completedNums.length : 0;
     const remaining = (payload && payload.remainingNums) ? payload.remainingNums.length : 0;
-    addLog(`🚦 프로필 ${profileId} rate-limit 도달 — 이번 프로필에서 ${completed}개 완료, ${remaining}개 남음. 다음 프로필로 폴백 시도`, 'warn');
+    const reason = (payload && payload.reason) || 'rate-limit';
+    if (reason === 'proactive-switch') {
+      addLog(`🔄 프로필 ${profileId} — 예정된 ${completed}개 완료, 적극적 순차 전환으로 다음 프로필로 교대 (남은 ${remaining}개)`, 'info');
+    } else {
+      addLog(`🚦 프로필 ${profileId} rate-limit 도달 — 이번 프로필에서 ${completed}개 완료, ${remaining}개 남음. 다음 프로필로 폴백 시도`, 'warn');
+    }
   } catch (e) {
     console.error('[flow-rate-exhausted IPC]', e);
   }
@@ -12223,6 +12228,16 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
   // v1.13.22: rate-limit 시 다른 프로필로 폴백. 등록된 모든 프로필을 순서대로 시도.
   const initialProfileId = config.profileId;
   const profileQueue = await _getFallbackProfileQueue(initialProfileId);
+  // v1.13.23: 적극적 순차 전환 — 등록 프로필 수 ≥ 2 일 때 그룹을 자동 분배.
+  // 각 프로필이 ceil(총그룹수 / 프로필수) 개씩 담당 → rate-limit 발생 전에 자동 교대.
+  // 프로필 1개면 0 (비활성 = 기존 동작 유지).
+  const totalProfiles = profileQueue.length;
+  const proactiveN = totalProfiles >= 2 ? Math.ceil(paragraphs.length / totalProfiles) : 0;
+  if (proactiveN > 0) {
+    addLog(`🔄 적극적 순차 전환 활성 — 프로필 ${totalProfiles}개로 분배 (각 약 ${proactiveN}개씩, rate-limit 회피)`, 'info');
+  }
+  config.proactiveSwitchEveryN = proactiveN;
+
   let activeParagraphs = paragraphs;
   let activeCustomPrompts = customPrompts;
   let activeOrder = window._pendingGroupOrder ? window._pendingGroupOrder.slice() : null;
@@ -12242,7 +12257,13 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
     window._pendingGroupNums = activeNums;
 
     if (triedProfileCount > 1) {
-      addLog(`🔁 프로필 ${currentProfileId} 로 전환 — 남은 ${activeParagraphs.length}개 그룹 시도`, 'warn');
+      // 직전 result.reason 으로 메시지 차별화 (proactive 면 info, rate-limit 이면 warn)
+      const prevReason = (result && result.reason) || 'rate-limit';
+      if (prevReason === 'proactive-switch') {
+        addLog(`▶ 프로필 ${currentProfileId} 시작 — ${activeParagraphs.length}개 그룹 담당`, 'info');
+      } else {
+        addLog(`🔁 프로필 ${currentProfileId} 로 전환 (rate-limit 폴백) — 남은 ${activeParagraphs.length}개 그룹 시도`, 'warn');
+      }
     }
 
     result = await ipcRenderer.invoke('start-generation', config);

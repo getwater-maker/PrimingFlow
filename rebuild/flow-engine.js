@@ -309,6 +309,9 @@ class FlowAutomator {
     this._currentProfileId = (config && config.profileId) || 'default';
     this._completedNums = [];
     this._rateExhaustedFlag = false;
+    // v1.13.23: 적극적 순차 전환 — N개 그룹 성공 시 rate-limit 전에 자동 break + 폴백 트리거
+    this._proactiveSwitchEveryN = (config && config.proactiveSwitchEveryN) | 0;
+    this._proactiveSwitchTriggered = false;
     try {
       const ts = new Date().toISOString().replace('T', ' ').slice(0, 19);
       fs.writeFileSync(this._logFilePath, `=== 생성 시작 ${ts} ===\n출력: ${outputDir}\n단락 수: ${paragraphs.length}\n\n`, 'utf-8');
@@ -493,6 +496,7 @@ class FlowAutomator {
       total: paragraphs.length,
       outputDir,
       rateExhausted: !!this._rateExhaustedFlag,
+      reason: this._proactiveSwitchTriggered ? 'proactive-switch' : (this._rateExhaustedFlag ? 'rate-limit' : 'completed'),
       completedNums,
       remainingNums,
       profileId: this._currentProfileId || 'default',
@@ -804,6 +808,29 @@ class FlowAutomator {
         }
       } catch (err) {
         this.log(`[${num}] 오류: ${err.message}`);
+      }
+
+      // v1.13.23: 적극적 순차 전환 — N개 그룹 성공 시 rate-limit 발생 전에 자동 교대
+      // (renderer 가 proactiveSwitchEveryN 으로 등록 프로필 수 기반 자동 계산해서 전달)
+      if (this._proactiveSwitchEveryN > 0 &&
+          successCount >= this._proactiveSwitchEveryN &&
+          i < paragraphs.length - 1 &&
+          !this._stopped) {
+        this.log(`🔄 프로필 ${this._currentProfileId} 에서 ${successCount}개 성공 — 적극적 순차 전환 정책에 따라 다음 프로필로 교대 (rate-limit 발생 전 회피)`);
+        this._rateExhaustedFlag = true;
+        this._proactiveSwitchTriggered = true;
+        const remainingNumsArr = [];
+        for (let j = i + 1; j < paragraphs.length; j++) {
+          remainingNumsArr.push(String(j + 1).padStart(2, '0'));
+        }
+        this.send('flow-rate-exhausted', {
+          profileId: this._currentProfileId || 'default',
+          completedNums: this._completedNums ? this._completedNums.slice() : [],
+          remainingNums: remainingNumsArr,
+          sessionRateLimitCount: this._sessionRateLimitCount,
+          reason: 'proactive-switch',
+        });
+        break;
       }
 
       // 다음 단락 준비
