@@ -1865,9 +1865,13 @@
       </div>
       <div id="autoMiniLog" class="auto-mini-log"></div>
     </div>
-    <div id="autoProgressFooter" style="padding:10px 20px 14px 20px; font-size:12px; color:var(--text-muted); border-top:1px solid var(--border-soft); display:flex; justify-content:space-between; align-items:center;">
-      <span id="autoProgressElapsed">경과: 0초</span>
-      <span id="autoProgressSummary"></span>
+    <div id="autoProgressFooter" style="padding:10px 20px 14px 20px; font-size:12px; color:var(--text-muted); border-top:1px solid var(--border-soft); display:flex; flex-direction:column; gap:4px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span id="autoProgressElapsed">경과: 0초</span>
+        <span id="autoProgressSummary"></span>
+      </div>
+      <!-- v1.13.35: 자동제작 대상 탭 이름 표시 — multi-tab 혼동 해소 -->
+      <div id="autoProgressTabLabel" style="font-size:11px; color:var(--text-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:none;" title=""></div>
     </div>
   </div>
 </div>
@@ -9858,6 +9862,23 @@ function _showAutoProgress(title, steps) {
   if (!modal) return;
   titleEl.textContent = title || '작업 진행 중';
   summary.textContent = '';
+  // v1.13.35: 모달 footer 에 작업 대상 탭 이름 표시 (multi-tab 혼동 해소)
+  try {
+    const _tabLabelEl = document.getElementById('autoProgressTabLabel');
+    if (_tabLabelEl) {
+      const _curProj = window._currentProject;
+      const _tabName = (typeof _projectTabLabel === 'function' && _curProj)
+        ? _projectTabLabel(_curProj)
+        : ((_curProj && (_curProj.scriptFileName || _curProj.name)) || '');
+      if (_tabName) {
+        _tabLabelEl.textContent = '📂 작업 탭: ' + _tabName;
+        _tabLabelEl.title = _tabName;
+        _tabLabelEl.style.display = '';
+      } else {
+        _tabLabelEl.style.display = 'none';
+      }
+    }
+  } catch (_) {}
   closeBtn.disabled = true;
   closeBtn.style.opacity = '0.5';
   closeBtn.style.cursor = 'not-allowed';
