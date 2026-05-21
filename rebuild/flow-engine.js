@@ -37,6 +37,56 @@ class FlowAutomator {
     this._403Count = 0;
     this._cooldownMs = 60000;
     this._maxRetries = 3;
+    // v1.13.21: Flow toast 형태의 rate-limit 감지 (HTTP 403 외에 "너무 빨리..." UI 메시지)
+    this._rateLimitDetected = false;          // _waitForImage 폴에서 매칭되면 true
+    this._rateLimitDetectedText = '';         // 마지막 매칭 텍스트 (로그용)
+    this._groupRateLimitCount = 0;            // 현재 그룹 내 rate-limit 발생 횟수 (점진 대기 계산)
+    this._sessionRateLimitCount = 0;          // 세션 전체 누적 (통계/로그용)
+    this._lastRateLimitAt = 0;                // 마지막 발생 timestamp (단순화 가드용)
+    this._consecutiveSuccessForRateReset = 0; // 연속 성공 시 _sessionRateLimitCount 리셋
+  }
+
+  // v1.13.21: Flow toast 메시지에서 rate-limit 키워드 감지 (HTTP 403 와 별개의 UI 신호)
+  // 작은 toast/alert 박스(폭 < 600, 텍스트 < 200자)에서만 매칭하여 오판 방지.
+  // page.evaluate 1회로 처리 — 매 폴 호출 시에도 비용 최소화.
+  async _detectRateLimitText() {
+    try {
+      if (!this.page || this.page.isClosed()) return null;
+      return await this.page.evaluate(() => {
+        const KO = /너무\s*빨리|잠시\s*후에?\s*다시|요청이\s*너무|속도\s*제한|일일\s*한도/;
+        const EN = /too\s*quickly|rate[\s-]?limit|try\s*again\s*later|too\s*many\s*request|quota\s*exceeded/i;
+        const sels = '[role="alert"],[role="status"],div[class*="toast"],div[class*="error"],div[class*="alert"],div[class*="snackbar"]';
+        const candidates = Array.from(document.querySelectorAll(sels));
+        for (const el of candidates) {
+          const rect = el.getBoundingClientRect();
+          if (rect.width === 0 || rect.width > 600) continue;
+          if (rect.height === 0 || rect.height > 300) continue;
+          const text = (el.innerText || el.textContent || '').trim();
+          if (!text || text.length > 200) continue;
+          const koHit = KO.test(text);
+          const enHit = EN.test(text);
+          if (koHit || enHit) return { text: text.slice(0, 150), ko: koHit, en: enHit };
+        }
+        return null;
+      });
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // v1.13.21: 그룹 내 rate-limit 발생 횟수에 따른 점진 대기 시간 (ms)
+  // 1회=60s, 2회=120s, 3회=180s, 4회+=240s (단, 3회 cap 후 skip 이라 4회 도달 X)
+  _getProgressiveWaitMs() {
+    const n = Math.max(1, this._groupRateLimitCount | 0);
+    const sec = Math.min(300, 60 * n);
+    return sec * 1000;
+  }
+
+  // v1.13.21: rate-limit 카운터 리셋 (그룹 성공/skip 시 호출)
+  _resetGroupRateLimitCounter() {
+    this._groupRateLimitCount = 0;
+    this._rateLimitDetected = false;
+    this._rateLimitDetectedText = '';
   }
 
   send(channel, data) {
@@ -563,7 +613,84 @@ class FlowAutomator {
           }
           successCount++;
           consecutiveFails = 0;
+          // v1.13.21: 성공 시 rate-limit 카운터 리셋 + 세션 누적 카운터 점진 리셋
+          this._consecutiveSuccessForRateReset++;
+          if (this._consecutiveSuccessForRateReset >= 3 && this._sessionRateLimitCount > 0) {
+            this.debug(`[rate-limit] 3회 연속 성공 — 세션 카운터 리셋 (${this._sessionRateLimitCount}→0)`);
+            this._sessionRateLimitCount = 0;
+            this._consecutiveSuccessForRateReset = 0;
+          }
+          this._resetGroupRateLimitCounter();
           this.send('image-done', { index: i, num });
+        } else if (this._rateLimitDetected) {
+          // v1.13.21: Flow rate-limit toast 분기 — 점진 대기 후 원본 프롬프트로 재시도 (단순화 X).
+          // 같은 그룹에서 최대 3회 cap → 도달 시 skip + 다음 그룹 계속 진행.
+          // consecutiveFails 증가 안 함 — rate-limit 으로 인한 실패는 연쇄 fail 카운팅 제외.
+          let rateLimitResolved = false;
+          while (this._groupRateLimitCount < 3 && !this._stopped) {
+            this._groupRateLimitCount++;
+            this._sessionRateLimitCount++;
+            this._consecutiveSuccessForRateReset = 0;
+            const waitMs = this._getProgressiveWaitMs();
+            const waitSec = Math.round(waitMs / 1000);
+            this.log(`⏸ Flow rate-limit #${this._groupRateLimitCount} (그룹 ${num}) — ${waitSec}초 대기 후 원본 프롬프트 재시도`);
+            this.send('rate-limit', { waitSeconds: waitSec, reason: 'flow-toast', occurrence: this._groupRateLimitCount });
+
+            // 1초 단위 대기 (pause/stop 즉시 반응)
+            for (let waited = 0; waited < waitMs && !this._stopped; waited += 1000) {
+              await this._waitIfPaused();
+              if (this._stopped) break;
+              await this.page.waitForTimeout(1000);
+            }
+            if (this._stopped) break;
+
+            // 토스트 정리 + textbox 복구
+            try { await this._dismissFailure(); } catch {}
+            try { await this._waitForTextboxReady(); } catch {}
+
+            // 원본 프롬프트 그대로 재시도 (단순화 안 함)
+            this._rateLimitDetected = false;
+            try {
+              await this._typePrompt(prompt);
+              await this.page.waitForTimeout(500);
+              await this._clickFinalCreateV2();
+              const retryTimeout = opts.mediaType === 'video' ? 180000 : 120000;
+              const retryBuffer = await this._waitForImage(retryTimeout, opts.mediaType === 'video');
+              if (retryBuffer) {
+                await this._saveImage(retryBuffer, num, shortText, imgDir, opts);
+                this.log(`[${num}] rate-limit 후 재시도 ${this._groupRateLimitCount} 성공!`);
+                successCount++;
+                consecutiveFails = 0;
+                this._consecutiveSuccessForRateReset++;
+                if (this._consecutiveSuccessForRateReset >= 3 && this._sessionRateLimitCount > 0) {
+                  this._sessionRateLimitCount = 0;
+                  this._consecutiveSuccessForRateReset = 0;
+                }
+                this.send('image-done', { index: i, num });
+                rateLimitResolved = true;
+                break;
+              }
+              // retryBuffer 가 null 인데 _rateLimitDetected 가 false 면 다른 사유 — while 탈출
+              if (!this._rateLimitDetected) break;
+              // _rateLimitDetected = true 인 채로 while 계속 (다음 iteration 에서 점진 대기 증가)
+            } catch (retryErr) {
+              this.debug(`  [rate-limit retry] ${retryErr.message}`);
+              break;
+            }
+          } // while
+
+          if (!rateLimitResolved && !this._stopped) {
+            if (this._groupRateLimitCount >= 3) {
+              this.log(`⏭ 그룹 ${num} — rate-limit 3회 재시도 모두 실패, skip. 다음 그룹 계속`);
+              this.send('flow-skip-group', { index: i, num, reason: 'rate-limit', attempts: this._groupRateLimitCount });
+            } else {
+              this.log(`[${num}] rate-limit 후 다른 사유로 실패 — skip (연쇄 fail 카운팅 제외)`);
+              this.send('flow-skip-group', { index: i, num, reason: 'rate-limit-fallback', attempts: this._groupRateLimitCount });
+            }
+            if (this._failedNums) this._failedNums.push({ num, text: paragraphs[i].substring(0, 80), reason: 'rate-skipped' });
+          }
+          this._resetGroupRateLimitCounter();
+          // 다음 단락으로 자연 진행 (단순화 재시도 분기로 fall-through 안 함 — else if 라서 안전)
         } else {
           // 재시도 전략: 최대 5회
           // 1~2회: 빠른 단순화 재시도
@@ -1702,6 +1829,21 @@ class FlowAutomator {
       }
 
       // 실패 감지
+      // v1.13.21: rate-limit toast 우선 감지 — 키워드 매칭 시 플래그만 셋하고 null 리턴.
+      // 호출자가 _rateLimitDetected 플래그를 보고 분기 (단순화 재시도 X, 점진 대기 후 원본 재시도).
+      try {
+        const rl = await this._detectRateLimitText();
+        if (rl) {
+          this._rateLimitDetected = true;
+          this._rateLimitDetectedText = rl.text;
+          this._lastRateLimitAt = Date.now();
+          this.log(`⚠ Flow rate-limit 토스트 감지 — "${rl.text.slice(0, 80)}"`);
+          // 토스트 정리 (실패 카드 dismiss 와 동일 동작)
+          try { await this._dismissFailure(); } catch {}
+          return null;
+        }
+      } catch {}
+
       try {
         const failureText = await this.page.evaluate(() => {
           const candidates = document.querySelectorAll('div, span, p, h1, h2, h3');

@@ -3858,12 +3858,46 @@ ipcRenderer.on('rate-limit', (_, payload) => {
   try {
     const sec = Math.max(1, parseInt((payload && payload.waitSeconds), 10) || 30);
     const reason = (payload && payload.reason) || 'rate-limit';
+    const occurrence = (payload && payload.occurrence) || 0;
     if (typeof _autoCooldownUntil !== 'undefined') {
       _autoCooldownUntil = Date.now() + sec * 1000;
     }
-    addLog(`⏸ rate-limit 감지 — ${sec}초 대기 (${reason})`, 'warn');
+    // v1.13.21: reason 별 메시지 차별화
+    const occText = occurrence > 0 ? ` (${occurrence}회차)` : '';
+    if (reason === 'flow-toast') {
+      addLog(`🚦 Flow rate-limit 토스트 감지 — ${sec}초 대기 후 원본 프롬프트 자동 재시도${occText}`, 'warn');
+    } else if (reason === 'cooldown') {
+      addLog(`⏸ anti-detect 쿨다운 — ${sec}초 대기${occText}`, 'info');
+    } else {
+      addLog(`⏸ rate-limit 감지 — ${sec}초 대기 (${reason})${occText}`, 'warn');
+    }
   } catch (e) {
     console.error('[rate-limit IPC]', e);
+  }
+});
+
+// v1.13.21: Flow rate-limit 으로 그룹 skip 시 — 해당 그룹 상태 표시 + 자동제작 폴링이 더 기다리지 않게.
+// 페이로드: {index, num, reason, attempts}
+ipcRenderer.on('flow-skip-group', (_, payload) => {
+  try {
+    const order = window._pendingGroupOrder || [];
+    const idx = (payload && typeof payload.index === 'number') ? payload.index : -1;
+    const gid = idx >= 0 ? order[idx] : null;
+    const num = (payload && payload.num) || (idx + 1);
+    const attempts = (payload && payload.attempts) || 0;
+    if (gid) {
+      // 그룹 객체의 imageStatus 도 함께 셋 — 자동제작 폴링 / 도입부 영상 변환이 fail 과 동일하게 처리
+      const owner = (typeof _findProjectByGroupId === 'function') ? _findProjectByGroupId(gid) : null;
+      const proj = owner || window._currentProject;
+      if (proj && proj.groups) {
+        const g = proj.groups.find(x => x.id === gid);
+        if (g) g.imageStatus = 'rate-skipped';
+      }
+      _setGroupImageStatus(gid, 'rate-skipped');
+    }
+    addLog(`⏭ 그룹 ${num} — Flow rate-limit ${attempts}회 재시도 모두 실패, skip. 다음 그룹 계속`, 'warn');
+  } catch (e) {
+    console.error('[flow-skip-group IPC]', e);
   }
 });
 
@@ -11053,7 +11087,8 @@ async function _convertIntroGroupsProgressively(proj, introGroups) {
       const waitStart = Date.now();
       while (Date.now() - waitStart < PER_GROUP_TIMEOUT) {
         if (!window._grokConvertActive) return { success, fail, skipped };
-        if (g.imageStatus === 'fail') break;             // 이미지 실패 → 비디오 스킵
+        // v1.13.21: rate-limit 으로 skip 된 그룹은 fail 과 동일하게 영상 변환 skip
+        if (g.imageStatus === 'fail' || g.imageStatus === 'rate-skipped') break;
         if (g.imagePath && fs.existsSync(g.imagePath)) break;
         await new Promise(r => setTimeout(r, POLL_INTERVAL));
       }
@@ -11789,8 +11824,9 @@ async function generateAll() {
     const POLL_TIMEOUT = 6 * 60 * 1000;  // 최대 6분
     const pollStart = Date.now();
     while (Date.now() - pollStart < POLL_TIMEOUT) {
+      // v1.13.21: rate-limit 으로 skip 된 그룹도 pending 에서 제외 — 자동제작이 무한 대기하지 않게
       const pending = proj.groups.filter(g =>
-        (!g.imagePath || !fsImg2.existsSync(g.imagePath)) && g.imageStatus !== 'fail'
+        (!g.imagePath || !fsImg2.existsSync(g.imagePath)) && g.imageStatus !== 'fail' && g.imageStatus !== 'rate-skipped'
       );
       if (pending.length === 0) break;
       await new Promise(r => setTimeout(r, 2000));
@@ -12508,6 +12544,11 @@ function _setGroupImageStatus(groupId, status, extraText) {
   } else if (status === 'fail') {
     el.textContent = '❌ 실패';
     el.style.color = 'var(--danger)';
+  } else if (status === 'rate-skipped') {
+    // v1.13.21: rate-limit 으로 인한 그룹 skip — 다시 시도 버튼으로 복구 가능
+    el.textContent = '⏭ rate-limit 스킵';
+    el.style.color = 'var(--warning, #e8a84c)';
+    el.title = 'Flow rate-limit 으로 3회 재시도 실패. 작업 종료 후 [선택 그룹 이미지] 로 재시도 가능';
   } else {
     el.textContent = extraText || '🖼 미생성';
     el.style.color = 'var(--text-muted)';
