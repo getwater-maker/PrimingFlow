@@ -328,9 +328,43 @@ class FlowAutomator {
       fs.writeFileSync(this._logFilePath, `=== 생성 시작 ${ts} ===\n출력: ${outputDir}\n단락 수: ${paragraphs.length}\n\n`, 'utf-8');
     } catch {}
 
+    // v1.13.30: profileId 변경 감지 — 폴백으로 다른 프로필 들어오면 기존 context 종료 후 새 profileDir 로 재시작
+    {
+      const desiredProfileId = (config && config.profileId) || 'default';
+      const desiredProfileDir = path.join(os.homedir(), '.flow-app', 'profiles', desiredProfileId.replace(/[\s\\\/:*?"<>|]/g, '_'));
+      if (this.profileDir !== desiredProfileDir) {
+        if (this.context) {
+          this.log(`[Flow] 프로필 변경 감지: ${this.profileDir} → ${desiredProfileDir} — 기존 컨텍스트 종료 후 재시작`);
+          try { await this.context.close(); } catch (e) { this.debug(`[Flow] 기존 컨텍스트 close 오류 (무시): ${e.message}`); }
+        }
+        this.context = null;
+        this.page = null;
+        this.profileDir = desiredProfileDir;
+      }
+    }
+
+    // v1.13.30: context/page health check — closed 면 자동 재시작
+    let needNewContext = !this.context || !this.page;
+    if (!needNewContext) {
+      try {
+        if (this.page.isClosed && this.page.isClosed()) {
+          needNewContext = true;
+        } else {
+          // 가벼운 health probe — closed context 면 throw
+          await this.page.evaluate(() => 1);
+        }
+      } catch (e) {
+        this.log(`[Flow] 기존 브라우저 health check 실패 — 재시작 (${e.message.split('\n')[0].slice(0, 80)})`);
+        needNewContext = true;
+        try { if (this.context) await this.context.close(); } catch {}
+        this.context = null;
+        this.page = null;
+      }
+    }
+
     // 브라우저 준비
-    if (!this.context || !this.page) {
-      this.log('[Flow] 브라우저 시작...');
+    if (needNewContext) {
+      this.log(`[Flow] 브라우저 시작 (profile=${path.basename(this.profileDir)})...`);
       this.context = await chromium.launchPersistentContext(this.profileDir, {
         headless: false,
         viewport: { width: 1400, height: 900 },
@@ -342,7 +376,7 @@ class FlowAutomator {
         Object.defineProperty(navigator, 'webdriver', { get: () => false });
       });
     } else {
-      this.log('[Flow] 기존 브라우저 재사용');
+      this.log(`[Flow] 기존 브라우저 재사용 (profile=${path.basename(this.profileDir)})`);
     }
 
     // Flow 접속
