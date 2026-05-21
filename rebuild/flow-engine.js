@@ -813,30 +813,71 @@ class FlowAutomator {
             if (this._failedNums) this._failedNums.push({ num, text: paragraphs[i].substring(0, 80) });
             consecutiveFails++;
 
-            // 연속 실패 감지: 세션 붕괴/쿨다운 필요 판정
-            if (consecutiveFails >= CONSECUTIVE_ABORT) {
-              this.log(`[!] ${CONSECUTIVE_ABORT}개 연속 실패 감지 → 생성 중단 (Google Flow 세션 문제 또는 레이트 리밋)`);
-              this.log(`[!] 잠시 후 재시도하거나 다른 계정으로 시도해주세요`);
-              break;
-            }
+            // v1.13.29: 연속 실패 감지 — 5회 도달 시 60초 대기 대신 즉시 폴백 트리거.
+            // 그 계정으로 더 시도해도 의미 없다고 판단 (정책 위반 / 차단 / 세션 붕괴 등).
+            // 다음 프로필로 폴백해 끝까지 작업 진행.
             if (consecutiveFails >= CONSECUTIVE_DEEP_RECOVERY) {
-              this.log(`[!] ${consecutiveFails}개 연속 실패 → 60초 쿨다운 + 페이지 완전 재진입`);
-              await this.page.waitForTimeout(60000);
-              if (this._stopped) break;
-              try {
-                await this.page.goto('https://labs.google/fx/ko/tools/flow', { waitUntil: 'domcontentloaded', timeout: 60000 });
-                await this.page.waitForTimeout(5000);
-                await this._dismissBanners().catch(() => {});
-                settingsConfigured = false; // 설정 다시 적용 필요
-                this.log(`[!] 재진입 완료 — 생성 재개`);
-              } catch (recErr) {
-                this.debug(`[!] 재진입 실패: ${recErr.message}`);
+              this.log(`🛑 프로필 ${this._currentProfileId || 'default'} 에서 ${consecutiveFails}개 연속 실패 — 현재 프로필 차단 의심, 다음 프로필로 폴백 트리거`);
+              const remainingNumsArr = [];
+              for (let j = i + 1; j < paragraphs.length; j++) {
+                remainingNumsArr.push(String(j + 1).padStart(2, '0'));
               }
+              this.send('flow-rate-exhausted', {
+                profileId: this._currentProfileId || 'default',
+                completedNums: this._completedNums ? this._completedNums.slice() : [],
+                remainingNums: remainingNumsArr,
+                sessionRateLimitCount: this._sessionRateLimitCount,
+                reason: 'consecutive-fails',
+                consecutiveFails,
+              });
+              this._rateExhaustedFlag = true;
+              break;
             }
           }
         }
       } catch (err) {
         this.log(`[${num}] 오류: ${err.message}`);
+        // v1.13.29: catch 블록에서도 연속 실패 카운팅 (silent fail 방지).
+        // 이전엔 throw 발생 시 fail 카운트 안 됨 → 0/N 케이스에서도 폴백 안 트리거.
+        if (this._failedNums) this._failedNums.push({ num, text: paragraphs[i].substring(0, 80), reason: 'exception' });
+        consecutiveFails++;
+        if (consecutiveFails >= CONSECUTIVE_DEEP_RECOVERY) {
+          this.log(`🛑 프로필 ${this._currentProfileId || 'default'} 에서 ${consecutiveFails}개 연속 실패(예외 포함) — 다음 프로필로 폴백 트리거`);
+          const remainingNumsArr = [];
+          for (let j = i + 1; j < paragraphs.length; j++) {
+            remainingNumsArr.push(String(j + 1).padStart(2, '0'));
+          }
+          this.send('flow-rate-exhausted', {
+            profileId: this._currentProfileId || 'default',
+            completedNums: this._completedNums ? this._completedNums.slice() : [],
+            remainingNums: remainingNumsArr,
+            sessionRateLimitCount: this._sessionRateLimitCount,
+            reason: 'consecutive-fails-exception',
+            consecutiveFails,
+          });
+          this._rateExhaustedFlag = true;
+          break;
+        }
+      }
+
+      // v1.13.29: 0-success 안전망 — 첫 N개 연속 실패면 계정 차단 명확 신호. 즉시 폴백.
+      // 5회 cap 도달 전이라도 처음부터 한 개도 못 만들면 그 계정 시도 무의미.
+      if (successCount === 0 && consecutiveFails >= 3 && i < paragraphs.length - 1 && !this._rateExhaustedFlag) {
+        this.log(`🛑 프로필 ${this._currentProfileId || 'default'} 처음 ${i + 1}개 시도 모두 실패 (성공 0) — 계정 차단 의심, 즉시 다음 프로필로 폴백`);
+        const remainingNumsArr = [];
+        for (let j = i + 1; j < paragraphs.length; j++) {
+          remainingNumsArr.push(String(j + 1).padStart(2, '0'));
+        }
+        this.send('flow-rate-exhausted', {
+          profileId: this._currentProfileId || 'default',
+          completedNums: [],
+          remainingNums: remainingNumsArr,
+          sessionRateLimitCount: this._sessionRateLimitCount,
+          reason: 'zero-success-early',
+          consecutiveFails,
+        });
+        this._rateExhaustedFlag = true;
+        break;
       }
 
       // v1.13.23: 적극적 순차 전환 — N개 그룹 성공 시 rate-limit 발생 전에 자동 교대

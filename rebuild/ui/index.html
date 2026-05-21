@@ -3897,6 +3897,13 @@ ipcRenderer.on('flow-rate-exhausted', (_, payload) => {
       addLog(`🔄 프로필 ${profileId} — 예정된 ${completed}개 완료, 적극적 순차 전환으로 다음 프로필로 교대 (남은 ${remaining}개)`, 'info');
     } else if (reason === 'suspicious-activity') {
       addLog(`🚨 프로필 ${profileId} 비정상 활동 감지 — 계정 차단 의심. ${completed}개 완료, ${remaining}개 남음. 다음 프로필로 즉시 폴백`, 'err');
+    } else if (reason === 'consecutive-fails' || reason === 'consecutive-fails-exception') {
+      // v1.13.29: 연속 실패 누적 (정책 위반 / 차단 / 세션 붕괴) → 다음 프로필로
+      const cf = (payload && payload.consecutiveFails) || 0;
+      addLog(`🛑 프로필 ${profileId} 연속 ${cf}회 실패 — 계정 차단/세션 붕괴 의심. ${completed}개 완료, ${remaining}개 남음. 다음 프로필로 폴백`, 'err');
+    } else if (reason === 'zero-success-early') {
+      // v1.13.29: 처음부터 한 개도 못 만든 케이스 → 계정 차단 명확. 즉시 폴백
+      addLog(`🛑 프로필 ${profileId} 처음부터 ${remaining ? '0' : completed}개 성공 — 계정 차단 명확. 즉시 다음 프로필로 폴백 (남은 ${remaining}개)`, 'err');
     } else {
       addLog(`🚦 프로필 ${profileId} rate-limit 도달 — 이번 프로필에서 ${completed}개 완료, ${remaining}개 남음. 다음 프로필로 폴백 시도`, 'warn');
     }
