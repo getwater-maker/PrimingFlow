@@ -40,7 +40,8 @@ class OmniVoiceProvider {
     this.label = 'OmniVoice (Voice Clone)';
     this.ready = false;
     this.baseUrl = (opts.baseUrl || DEFAULT_BASE_URL).replace(/\/$/, '');
-    this.timeout = opts.timeout || 120000;
+    // v1.13.34: 120초 → 60초 — 한 sentence 합성 정상 시 5~30초. 60초면 서버 hang 빠르게 감지.
+    this.timeout = opts.timeout || 60000;
     this._tokenCache = new Map(); // {fileHash: token}
   }
 

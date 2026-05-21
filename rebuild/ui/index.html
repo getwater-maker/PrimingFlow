@@ -9729,8 +9729,24 @@ async function _convertSentenceImpl(projectId, sid, preset, channel, _opts = {})
       addLog(`[${sentence.num}] ${preset.name} (${preset.engine}/${opts.voice})${refTag}${seedTag} · "${textPreview}"`, 'info');
     }
     const _ttsStartedAt = Date.now();
-    const result = await mgr.synthesize(sentence.text, { provider: preset.engine, ...opts });
+    // v1.13.34: silent 모드에서도 매 sentence 합성 시작 로그 — 자동제작 mini-log 가시성
+    if (_opts.silent) {
+      const _txtPreview = (sentence.text || '').trim().slice(0, 30) + (sentence.text.length > 30 ? '…' : '');
+      addLog(`🎙 [${sentence.num}] TTS 합성 시작 — "${_txtPreview}"`, 'info');
+    }
+    let result;
+    try {
+      result = await mgr.synthesize(sentence.text, { provider: preset.engine, ...opts });
+    } catch (synthErr) {
+      const _wallSec = ((Date.now() - _ttsStartedAt) / 1000).toFixed(1);
+      addLog(`⏱ [${sentence.num}] TTS 합성 실패/타임아웃 (${_wallSec}초 대기 후) — ${(synthErr.message || '').substring(0, 100)}`, 'err');
+      throw synthErr;
+    }
     const _ttsWallMs = Date.now() - _ttsStartedAt;
+    if (_opts.silent) {
+      const _wallSec = (_ttsWallMs / 1000).toFixed(1);
+      addLog(`✓ [${sentence.num}] TTS 합성 완료 (${_wallSec}초, ${result.durationSec.toFixed(1)}s 음성)`, 'ok');
+    }
 
     const fs = require('fs');
     const path = require('path');
@@ -9811,7 +9827,8 @@ let _autoCurrentItem    = { step: null, label: '', sub: '', t: 0 };
 let _autoStuckActive    = false;
 let _autoStuckLevel     = '';                                          // '' | 'warn' | 'danger'
 let _autoCooldownUntil  = 0;
-const _AUTO_STUCK_THRESHOLDS_MS = { img: 90000, tts: 60000, video: 480000, vrew: 30000 };
+// v1.13.34: tts 60→150초 — OmniVoice timeout(60s) + 재시도(60s) + 여유. 정상 대기를 stuck 으로 오판 방지
+const _AUTO_STUCK_THRESHOLDS_MS = { img: 90000, tts: 150000, video: 480000, vrew: 30000 };
 const _AUTO_RING_LIMIT       = 24;
 const _AUTO_MINI_DOM_LINES   = 8;
 const _AUTO_RATE_MIN_SAMPLES = 5;
