@@ -12335,16 +12335,22 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
   return true;
 }
 
-// v1.13.22: 폴백 프로필 큐 생성 — 첫 번째 = 시작 프로필, 나머지 = 등록된 다른 프로필들.
-// 사용자가 미리 여러 Google 계정으로 등록해두면 자동 순환.
+// v1.13.22 → v1.13.24: 폴백 프로필 큐 — circular rotation.
+// 시작 프로필 = 프리셋에서 선택한 것. 그 위치부터 등록 순서대로 한 바퀴 순환.
+// 예: 등록 [1,2,3,4,5,6] + 시작 3 → 큐 = [3,4,5,6,1,2]
 async function _getFallbackProfileQueue(firstProfileId) {
   try {
     const profiles = await ipcRenderer.invoke('get-profiles');
     const list = Array.isArray(profiles) ? profiles : [];
     // 프로필 형태: 문자열 ID 또는 { id, name } 객체 — 둘 다 대응
     const ids = list.map(p => (typeof p === 'string') ? p : (p && p.id)).filter(Boolean);
-    const others = ids.filter(id => id !== firstProfileId);
-    return [firstProfileId, ...others];
+    const startIdx = ids.indexOf(firstProfileId);
+    if (startIdx < 0) {
+      // 시작 프로필이 등록 목록에 없음 — 그대로 첫째 + 나머지 전체 등록 순서
+      return [firstProfileId, ...ids];
+    }
+    // circular: 시작점부터 끝까지 + 처음부터 시작점 직전까지
+    return [...ids.slice(startIdx), ...ids.slice(0, startIdx)];
   } catch (e) {
     console.warn('[fallback-queue] get-profiles 실패:', e.message);
     return [firstProfileId];
