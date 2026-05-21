@@ -201,13 +201,38 @@ const DEFAULT_SPEAKER = {
   versions: ['v4'], isUnavailable: false,
 };
 
+// 켄번스 패턴 풀 — 그룹 크기를 늘려도 단조롭지 않도록 10개로 확장.
+// 줌인/줌아웃/대각 팬/4방향 팬을 골고루 — 인접 그룹이 같은 방향성을 안 갖도록 분포.
 const KEN_BURNS_PATTERNS = [
+  // 좌상 → 중앙 줌인
   { from: { scale: 0.668, centerX: 0.5312, centerY: 0.354 }, to: { scale: 0.98, centerX: 0.51, centerY: 0.51 } },
+  // 중앙 줌아웃 (close-up → wide)
   { from: { scale: 1.00, centerX: 0.50, centerY: 0.50 }, to: { scale: 0.65, centerX: 0.50, centerY: 0.50 } },
+  // 상단 → 중앙 줌인
   { from: { scale: 0.54, centerX: 0.51, centerY: 0.37 }, to: { scale: 1.00, centerX: 0.50, centerY: 0.50 } },
+  // 중앙 → 상단 줌아웃
   { from: { scale: 1.00, centerX: 0.50, centerY: 0.50 }, to: { scale: 0.55, centerX: 0.50, centerY: 0.44 } },
+  // 우상 → 좌하 대각 팬 (확대)
   { from: { scale: 0.70, centerX: 0.65, centerY: 0.35 }, to: { scale: 0.85, centerX: 0.40, centerY: 0.55 } },
+  // 좌측 → 우측 가로 팬
+  { from: { scale: 0.80, centerX: 0.35, centerY: 0.50 }, to: { scale: 0.80, centerX: 0.65, centerY: 0.50 } },
+  // 우측 → 좌측 가로 팬 (반대 방향)
+  { from: { scale: 0.78, centerX: 0.62, centerY: 0.48 }, to: { scale: 0.92, centerX: 0.38, centerY: 0.52 } },
+  // 하단 → 상단 세로 팬 (확대)
+  { from: { scale: 0.60, centerX: 0.50, centerY: 0.62 }, to: { scale: 0.95, centerX: 0.50, centerY: 0.38 } },
+  // 좌하 → 우상 대각 팬
+  { from: { scale: 0.72, centerX: 0.35, centerY: 0.65 }, to: { scale: 0.88, centerX: 0.62, centerY: 0.38 } },
+  // 슬로우 줌인 (전체 → 중앙 확대)
+  { from: { scale: 0.95, centerX: 0.50, centerY: 0.50 }, to: { scale: 0.62, centerX: 0.52, centerY: 0.48 } },
 ];
+
+// 인접 그룹이 같은 패턴을 받지 않도록 의사 난수 시퀀스 (소수 곱셈 + 오프셋).
+// groupIdx 0→3, 1→0, 2→7, 3→4 ... 처럼 패턴 풀 안에서 비반복 순회.
+// KEN_BURNS_PATTERNS.length 와 서로소(7)인 곱수 사용 — 풀 길이가 10이라도 인덱스가 모든 값 순회 가능.
+function _pickKenBurnsIndex(groupIdx) {
+  const len = KEN_BURNS_PATTERNS.length;
+  return ((groupIdx * 7) + 3) % len;
+}
 
 function ttsCleanText(text) {
   return String(text)
@@ -660,7 +685,8 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
       isTransparent: false, fileLocation: 'IN_MEMORY',
     });
 
-    const kb = KEN_BURNS_PATTERNS[groupIdx % KEN_BURNS_PATTERNS.length];
+    // 의사 난수 인덱스 — 인접 그룹이 같은 패턴/방향성 안 가지도록 분산
+    const kb = KEN_BURNS_PATTERNS[_pickKenBurnsIndex(groupIdx)];
     pj.props.tracks[tid] = {
       trackId: tid, mediaId: mid,
       xPos: -0.004, yPos: 0, height: 1, width: 1.008,

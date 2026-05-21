@@ -1422,16 +1422,20 @@
         </div>
 
         <!-- 그룹 크기 — 도입부 / 본론 분리 -->
-        <div class="setting" style="display:flex; align-items:center; gap:6px; margin-bottom:8px; flex-wrap:wrap;">
+        <div class="setting" style="display:flex; align-items:center; gap:6px; margin-bottom:4px; flex-wrap:wrap;">
           <label style="font-size:13px; color:var(--info); font-weight:600; white-space:nowrap;">📘 도입부</label>
           <input type="number" id="introSentenceSize" min="1" max="20" value="3" oninput="autoSplitDebounced()"
                  style="width:50px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
           <span style="font-size:12px; color:var(--text-muted); white-space:nowrap;">문장씩</span>
           <span style="color:var(--border); margin:0 4px;">|</span>
           <label style="font-size:13px; color:var(--text-soft); white-space:nowrap;">📕 본론</label>
-          <input type="number" id="mainSentenceSize" min="1" max="20" value="5" oninput="autoSplitDebounced()"
+          <input type="number" id="mainSentenceSize" min="1" max="20" value="7" oninput="autoSplitDebounced()"
+                 title="본론 문장 수를 늘리면 그룹이 줄어 이미지 생성 시간이 단축됩니다 (Flow 호출 횟수↓). 켄번스 패턴 10개가 그룹마다 다르게 적용되어 단조롭지 않습니다. 권장 7~10."
                  style="width:50px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
           <span style="font-size:12px; color:var(--text-muted); white-space:nowrap;">문장씩</span>
+        </div>
+        <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px; line-height:1.4;">
+          💡 본론을 7~10 문장으로 늘리면 이미지 생성 횟수가 줄어 작업 시간이 단축됩니다. 켄번스 10패턴이 자동 순회되어 영상은 단조롭지 않습니다.
         </div>
 
         <!-- 기존 stages 시스템 (UI 비표시 — autoSplit 분기 호환용) -->
