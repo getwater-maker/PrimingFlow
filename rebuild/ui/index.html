@@ -814,8 +814,8 @@
   }
   .task-list-header {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    gap: 8px;
     margin-bottom: 12px;
     padding-bottom: 10px;
     border-bottom: 1px solid var(--border-soft);
@@ -1336,18 +1336,25 @@
     <div class="col col-task">
       <div class="task-list-card">
         <div class="task-list-header">
-          <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-            <div class="task-list-title" style="flex-shrink:0;">📋 작업 목록</div>
-            <span id="taskListFileName" style="display:none; font-size:12px; color:var(--text-soft); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title=""></span>
+          <!-- Row 1: 라벨/파일명 + 검색/시간/진행 (정보) -->
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1 1 auto;">
+              <div class="task-list-title" style="flex-shrink:0;">📋 작업 목록</div>
+              <span id="taskListFileName" style="display:none; font-size:12px; color:var(--text-soft); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title=""></span>
+            </div>
+            <div style="display:flex; gap:6px; align-items:center; flex:0 0 auto;">
+              <input type="text" id="taskSearchInput" placeholder="🔍 단어/문장 검색"
+                     oninput="searchTaskList(this.value)"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();searchTaskListNext();}"
+                     title="입력 후 Enter — 다음 결과로 이동"
+                     style="width:160px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:4px 8px; font-size:12px; border-radius:4px;">
+              <span id="taskSearchCount" style="font-size:11px; color:var(--text-muted); min-width:32px; text-align:center;"></span>
+              <span id="taskListTotalDuration" title="변환된 전체 음성 재생 시간" style="font-size:12px; color:var(--text-muted); padding:4px 8px; background:var(--bg-soft); border-radius:6px; min-width:48px; text-align:center; white-space:nowrap;">⏱ 00:00</span>
+              <div class="task-list-progress" id="taskListProgress" style="white-space:nowrap;">0 / 0</div>
+            </div>
           </div>
-          <div style="display:flex; gap:6px; align-items:center;">
-            <input type="text" id="taskSearchInput" placeholder="🔍 단어/문장 검색"
-                   oninput="searchTaskList(this.value)"
-                   onkeydown="if(event.key==='Enter'){event.preventDefault();searchTaskListNext();}"
-                   title="입력 후 Enter — 다음 결과로 이동"
-                   style="width:140px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:4px 8px; font-size:12px; border-radius:4px;">
-            <span id="taskSearchCount" style="font-size:11px; color:var(--text-muted); min-width:32px; text-align:center;"></span>
-            <span id="taskListTotalDuration" title="변환된 전체 음성 재생 시간" style="font-size:12px; color:var(--text-muted); padding:4px 8px; background:var(--bg-soft); border-radius:6px; min-width:48px; text-align:center;">⏱ 00:00</span>
+          <!-- Row 2: 액션 버튼들 (우측 정렬) -->
+          <div style="display:flex; gap:6px; align-items:center; justify-content:flex-end; flex-wrap:wrap;">
             <select id="previewSpeedSelect" onchange="_onPreviewSpeedChange()" title="미리듣기 배속 (단일·전체 공통)" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:4px 6px; font-size:12px; border-radius:4px;">
               <option value="0.75">0.75×</option>
               <option value="1" selected>1×</option>
@@ -1360,7 +1367,7 @@
             <button class="btn-sm" id="editScriptBtn" onclick="openScriptInputModal()" title="대본 전체 수정 — 모달에서 textarea 로 일괄 편집" style="font-size:12px; padding:4px 10px; display:none;">✏️ 대본 수정</button>
             <button class="btn-sm" id="scriptDictBtn" onclick="openScriptDictModal()" title="대본 발음 사전 — 숫자/고유명사 발음 지정" style="font-size:12px; padding:4px 10px; display:none;">🔢 발음 사전 <span id="scriptDictBadge" style="display:none; background:var(--accent); color:white; border-radius:8px; padding:0 5px; font-size:11px; margin-left:2px;"></span></button>
             <button class="btn-sm" id="clearScriptBtn" onclick="clearScript()" title="모두 지우고 처음 상태로" style="font-size:12px; padding:4px 10px;">초기화</button>
-            <div class="task-list-progress" id="taskListProgress">0 / 0</div>
+            <button class="btn-sm" id="undoGroupBtn" onclick="undoGroupChange()" disabled title="마지막 그룹 구조 변경(합치기/나누기/재배치) 되돌리기 — Ctrl+Z" style="font-size:12px; padding:4px 10px; opacity:0.5;">↶ 되돌리기</button>
           </div>
         </div>
         <div class="task-list-body" id="taskListBody">
@@ -1393,6 +1400,7 @@
         <button class="btn-sm" onclick="openCurrentOutputFolder()" id="folderBtn" title="현재 활성 프리셋의 출력 폴더를 윈도우 탐색기로 열기" style="padding:6px 10px;">📂 저장폴더 보기</button>
         <button class="btn-sm" onclick="saveProjectFile()" id="projectSaveBtn" title="현재 작업 상태(분할/sentence/그룹/자산 경로)를 출력 폴더 안 project.pflow 로 저장" style="padding:6px 10px;">💾 저장</button>
         <button class="btn-sm" onclick="loadProjectFile()" title="저장한 project.pflow 를 열어 작업 이어가기" style="padding:6px 10px;">📂 불러오기</button>
+        <button class="btn-sm" onclick="openScriptCopyModal()" title="현재 분할된 도입부/그룹별 대본을 클립명과 함께 한 번에 복사" style="padding:6px 10px;">📋 대본 복사</button>
       </div>
 
       <!-- 자동저장 상태 라벨 — 그룹 안 중앙 정렬 -->
@@ -1457,6 +1465,19 @@
         </div>
 
         <div id="splitGroupCountPreview" style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--border-soft); font-size:12px; font-weight:600; color:var(--text-strong);"></div>
+      </div>
+
+      <!-- 🎬 도입부 비디오 준비 — 도입부 sentence 일괄 TTS + 음성 9초 기준 재배치 -->
+      <div style="border-top:1px solid var(--border-soft); padding-top:10px; margin-top:10px;">
+        <div style="font-size:12px; font-weight:700; color:var(--text-strong); margin-bottom:4px;">🎬 도입부 비디오 준비</div>
+        <div style="font-size:11px; color:var(--text-muted); margin-bottom:6px; line-height:1.4;">
+          도입부 sentence 들을 일괄 TTS 합성한 뒤 음성 길이 9초 기준으로 그룹을 자동 재배치합니다 (1 그룹 = 1 비디오 클립 ≤ 10초).
+        </div>
+        <button class="btn-sm" id="prepareIntroVideosBtn" onclick="prepareIntroVideos()" title="도입부 sentence 전체 TTS 합성 후 실제 음성 길이 9초 한도로 그룹을 다시 묶습니다. 자산이 이미 있으면 확인 후 초기화."
+                style="width:100%; padding:8px 12px; background:var(--accent-soft); color:var(--accent-hover); border:1px solid var(--accent); font-weight:600;">
+          🎙 도입부 TTS + 9초 재배치
+        </button>
+        <div id="prepareIntroProgress" style="font-size:11px; color:var(--text-muted); margin-top:6px; text-align:center;">—</div>
       </div>
 
       <!-- 실행 + 일괄 액션 (통합: 작업시작 섹션 내부) -->
@@ -1975,6 +1996,69 @@
   </div>
 </div>
 
+<!-- 대본 복사 모달 — 도입부/그룹별로 묶어 한 번에 텍스트 복사 -->
+<div id="scriptCopyModal" style="display:none; position:fixed; inset:0; background:rgba(58,52,46,0.5); z-index:999; align-items:center; justify-content:center;" onclick="if(event.target===this)closeScriptCopyModal()">
+  <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:14px; width:980px; max-width:96vw; height:88vh; box-shadow:var(--shadow-lg); display:flex; flex-direction:column; overflow:hidden;">
+    <!-- 헤더 -->
+    <div style="flex:none; padding:18px 24px 10px 24px; display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="font-size:19px; color:var(--accent); margin:0;">📋 대본 복사 (클립명 포함)</h2>
+      <button class="btn-sm" onclick="closeScriptCopyModal()" style="font-size:15px;">✕</button>
+    </div>
+
+    <!-- 설정 영역 (헤더 직후): 스타일 + 사전설정 + Flow 프롬프트 -->
+    <div style="flex:none; padding:0 24px 10px 24px; display:grid; grid-template-columns:1fr 1fr; gap:10px 14px;">
+      <!-- 스타일 (좌측) -->
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        <label style="font-size:12px; font-weight:600; color:var(--text-strong);">🎨 스타일
+          <span style="font-size:11px; color:var(--text-muted); font-weight:400;">(미디어 설정과 연동)</span>
+        </label>
+        <select id="scriptCopyStyleSelect" onchange="_onScriptCopyStyleChange()" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 8px; border-radius:6px; font-size:13px;"></select>
+      </div>
+      <!-- Flow 프롬프트 (우측) -->
+      <div style="display:flex; flex-direction:column; gap:4px;" id="scriptCopyFlowPromptWrap">
+        <label style="font-size:12px; font-weight:600; color:var(--text-strong);">⚡ Flow 프롬프트
+          <span style="font-size:11px; color:var(--text-muted); font-weight:400;">(모달 전용 · 복사에 포함)</span>
+        </label>
+        <textarea id="scriptCopyFlowPrompt" rows="2" placeholder="Flow 에 추가로 함께 붙여넣을 텍스트가 있으면 여기에 입력" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 8px; border-radius:6px; font-size:13px; resize:vertical; font-family:inherit;"></textarea>
+      </div>
+      <!-- 사전설정 (전체 폭) -->
+      <div style="display:flex; flex-direction:column; gap:4px; grid-column:1 / -1;">
+        <label style="font-size:12px; font-weight:600; color:var(--text-strong);">📝 사전설정 (presetPrompt)
+          <span style="font-size:11px; color:var(--text-muted); font-weight:400;">(미디어 설정의 사전 설정과 즉시 동기화)</span>
+        </label>
+        <textarea id="scriptCopyPresetPrompt" rows="2" oninput="_onScriptCopyPresetPromptChange()" placeholder="예: 30대 한국 남성, 짧은 머리, 회색 양복, 현대 사무실 배경, 따뜻한 조명" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 8px; border-radius:6px; font-size:13px; resize:vertical; font-family:inherit;"></textarea>
+      </div>
+    </div>
+
+    <!-- 청크 버튼 영역 -->
+    <div style="flex:none; padding:6px 24px 8px 24px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; border-top:1px solid var(--border-soft);">
+      <span style="font-size:12px; color:var(--text-muted);">📦 범위 선택:</span>
+      <label style="display:inline-flex; align-items:center; gap:4px; font-size:11px; color:var(--text-muted); margin-right:4px;" title="청크 1개에 묶일 그룹 수. 변경하면 자동 저장되어 다음에도 적용됩니다.">
+        <input type="number" id="scriptCopyChunkSizeInput" min="1" max="999" oninput="_onScriptCopyChunkSizeChange()" style="width:46px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:2px 4px; border-radius:4px; font-size:11px; text-align:center;">
+        <span>개씩</span>
+      </label>
+      <div id="scriptCopyChunkBtns" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+    </div>
+
+    <!-- 본문 -->
+    <div style="flex:1; min-height:0; padding:0 24px 4px 24px; display:flex; flex-direction:column;">
+      <div style="font-size:12px; color:var(--text-muted); margin-bottom:6px;">상단 설정(스타일/사전설정/Flow 프롬프트) 이 복사 텍스트 맨 위에 자동으로 들어갑니다. 텍스트를 직접 수정해도 OK — 복사 버튼은 현재 보이는 그대로를 복사합니다.</div>
+      <textarea id="scriptCopyArea"
+        spellcheck="false"
+        style="flex:1; width:100%; background:var(--bg-input); color:var(--text-strong); border:1px solid var(--border); border-radius:8px; padding:14px; font-size:14px; line-height:1.7; resize:none; font-family:Consolas, 'Courier New', monospace; min-height:0;"></textarea>
+    </div>
+
+    <!-- Footer -->
+    <div style="flex:none; padding:12px 24px 18px 24px; border-top:1px solid var(--border-soft); margin-top:8px; display:flex; justify-content:space-between; align-items:center; gap:12px;">
+      <div style="font-size:12px; color:var(--text-muted);" id="scriptCopyMeta">—</div>
+      <div style="display:flex; gap:8px; flex:none;">
+        <button class="btn-sm" onclick="closeScriptCopyModal()" style="min-width:64px;">닫기</button>
+        <button class="btn btn-primary" id="scriptCopyBtn" onclick="copyScriptToClipboard()" style="padding:8px 18px; white-space:nowrap;">📋 클립보드 복사</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- 글로벌 발음 사전 모달 -->
 <div id="globalDictModal" style="display:none; position:fixed; inset:0; background:rgba(58,52,46,0.5); z-index:999; align-items:center; justify-content:center;" onclick="if(event.target===this)closeGlobalDictModal()">
   <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:14px; width:520px; max-height:85vh; overflow-y:auto; padding:24px; box-shadow:var(--shadow-lg);">
@@ -2315,7 +2399,7 @@
           style="flex:2 1 160px; min-width:120px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px;">
           <option value="">— 보관소가 비어있습니다 —</option>
         </select>
-        <button class="btn-sm" onclick="playRefAudioPreview()" title="선택한 참조 음성 들어보기" style="padding:6px 8px; flex:none;">▶</button>
+        <button class="btn-sm" id="presetForm_refAudioPlayBtn" onclick="playRefAudioPreview()" title="선택한 참조 음성 들어보기 (다시 누르면 정지)" style="padding:6px 8px; flex:none;">▶</button>
         <button class="btn-sm" onclick="refreshRefAudioVault()" title="목록 새로고침" style="padding:6px 8px; flex:none;">🔄</button>
         <button class="btn-sm" onclick="openRefAudioVault()" title="보관소 폴더를 윈도우 탐색기로 열기" style="padding:6px 8px; flex:none;">📂</button>
         <input type="text" id="presetForm_previewTextClone" value="우리 마음을 예수 그리스도의 가르침으로 회복해요." placeholder="미리듣기 텍스트" style="flex:3 1 180px; min-width:120px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px;">
@@ -2806,7 +2890,9 @@
       <div>
         <label style="font-size:13px; color:var(--text-strong); display:block; margin-bottom:6px;">1️⃣ 음성 파일 (m4a / mp3 / wav)</label>
         <div style="display:flex; gap:8px; align-items:center;">
-          <input type="file" id="r2rFileInput" accept=".m4a,.mp3,.wav,audio/*" style="flex:1; font-size:13px;" />
+          <!-- 호환성 위해 기존 input 은 hidden 으로 유지 (r2r_show 의 input.files 체크 흐름에서 사용) -->
+          <input type="file" id="r2rFileInput" accept=".m4a,.mp3,.wav,audio/*" style="display:none;" />
+          <button class="btn-sm" id="r2rPickBtn" onclick="r2r_pickFile()" style="flex:1; padding:6px 12px;">📂 파일 선택</button>
           <button class="btn-sm" id="r2rLoadBtn" onclick="r2r_load()" disabled>▶ 파형 표시</button>
         </div>
         <div id="r2rFileLabel" style="font-size:12px; color:var(--text-muted); margin-top:4px;"></div>
@@ -2815,10 +2901,19 @@
       <div id="r2rWaveWrap" style="display:none;">
         <label style="font-size:13px; color:var(--text-strong); display:block; margin-bottom:6px;">2️⃣ 파형 — 드래그로 자를 구간 선택</label>
         <div id="r2rWaveform" style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:6px;"></div>
-        <div style="display:flex; gap:8px; align-items:center; margin-top:8px; font-size:12px;">
+        <div style="display:flex; gap:8px; align-items:center; margin-top:8px; font-size:12px; flex-wrap:wrap;">
           <button class="btn-sm" onclick="r2r_playPause()" id="r2rPlayBtn">▶ 재생</button>
           <label style="display:flex; align-items:center; gap:4px; color:var(--text-strong);">
             <input type="checkbox" id="r2rPlaySelectedOnly" checked /> 선택 구간만 재생
+          </label>
+          <!-- 볼륨 조정 — 저장 시 ffmpeg 로 적용 (alimiter 로 클리핑 방지) -->
+          <label style="display:flex; align-items:center; gap:6px; color:var(--text-strong); margin-left:12px;" title="저장 시 적용될 볼륨 배수. 1.0 = 원본 그대로. 증폭해도 alimiter 가 자동으로 클리핑을 막아줍니다.">
+            🔊 볼륨
+            <input type="range" id="r2rVolume" min="0.3" max="3.0" step="0.1" value="1.0"
+                   oninput="document.getElementById('r2rVolumeValue').textContent = parseFloat(this.value).toFixed(1) + 'x'; if (_r2rState && _r2rState.wavesurfer) { try { _r2rState.wavesurfer.setVolume(Math.min(1, parseFloat(this.value))); } catch(_){} }"
+                   style="width:120px;">
+            <span id="r2rVolumeValue" style="min-width:32px; text-align:center; color:var(--text-muted);">1.0x</span>
+            <button type="button" class="btn-sm" onclick="document.getElementById('r2rVolume').value=1.0; document.getElementById('r2rVolume').dispatchEvent(new Event('input'));" title="원래 볼륨으로 리셋" style="padding:2px 6px; font-size:11px;">↺</button>
           </label>
           <span id="r2rRange" style="color:var(--text-muted); margin-left:auto;">전체</span>
         </div>
@@ -4678,6 +4773,43 @@ function _r2rDestroyWavesurfer() {
   });
 })();
 
+// Electron dialog 로 파일 선택 — 기본 시작 경로 = G:\내 드라이브\음악
+// (없으면 사용자 홈으로 폴백)
+async function r2r_pickFile() {
+  const { ipcRenderer } = require('electron');
+  const fs = require('fs');
+  const os = require('os');
+  let defaultPath = 'G:\\내 드라이브\\음악';
+  try {
+    if (!fs.existsSync(defaultPath)) defaultPath = os.homedir();
+  } catch (_) {
+    defaultPath = os.homedir();
+  }
+  let result;
+  try {
+    result = await ipcRenderer.invoke('show-open-dialog', {
+      title: '참조 음성 파일 선택',
+      defaultPath: defaultPath,
+      filters: [
+        { name: '음성 파일', extensions: ['m4a', 'mp3', 'wav'] },
+        { name: '전체', extensions: ['*'] },
+      ],
+      properties: ['openFile'],
+    });
+  } catch (e) {
+    addLog(`파일 다이얼로그 실패: ${e.message}`, 'err');
+    return;
+  }
+  if (!result || result.canceled || !result.filePaths || result.filePaths.length === 0) return;
+  const filePath = result.filePaths[0];
+  _r2rState.sourcePath = filePath;
+  document.getElementById('r2rFileLabel').textContent = filePath;
+  document.getElementById('r2rLoadBtn').disabled = !filePath;
+  document.getElementById('r2rWaveWrap').style.display = 'none';
+  document.getElementById('r2rSttBtn').disabled = true;
+  document.getElementById('r2rSaveBtn').disabled = true;
+}
+
 async function r2r_load() {
   if (!_r2rState.sourcePath) return;
   _r2rDestroyWavesurfer();
@@ -4818,9 +4950,13 @@ async function r2r_save() {
   const name = (document.getElementById('r2rFilename').value || '').trim();
   if (!name) return alert('파일명을 입력하세요.');
   const refText = document.getElementById('r2rTextarea').value || '';
+  // 볼륨 슬라이더 값 (1.0 = 원본 그대로, 0.3 ~ 3.0)
+  const volEl = document.getElementById('r2rVolume');
+  const volume = volEl ? (parseFloat(volEl.value) || 1.0) : 1.0;
+  const volLabel = Math.abs(volume - 1.0) > 0.05 ? ` · 🔊 ${volume.toFixed(1)}x` : '';
   const btn = document.getElementById('r2rSaveBtn');
   btn.disabled = true; btn.textContent = '⏳ 저장 중...';
-  document.getElementById('r2rSaveStatus').textContent = '🔄 ffmpeg 로 WAV 자르기 + 보관소 저장...';
+  document.getElementById('r2rSaveStatus').textContent = `🔄 ffmpeg 로 WAV 자르기${volLabel} + 보관소 저장...`;
   try {
     const MediaUtils = require('../core/media-utils');
     const RefVault = require('../core/ref-audio-vault');
@@ -4829,11 +4965,12 @@ async function r2r_save() {
     await MediaUtils.convertToRefWav(_r2rState.sourcePath, tmpWav, {
       startSec: _r2rState.region.start,
       endSec: _r2rState.region.end,
+      volumeMultiplier: volume,
     });
     const buf = fs.readFileSync(tmpWav);
     const result = RefVault.saveItem(name, buf, refText);
     try { fs.unlinkSync(tmpWav); } catch (_) {}
-    document.getElementById('r2rSaveStatus').textContent = `✅ 저장: ${result.wavPath}`;
+    document.getElementById('r2rSaveStatus').textContent = `✅ 저장: ${result.wavPath}${volLabel}`;
     // Voice Clone 드롭다운 자동 새로고침 + 새로 저장된 항목 자동 선택
     try { if (typeof refreshRefAudioVault === 'function') refreshRefAudioVault(result.wavPath); } catch (_) {}
   } catch (e) {
@@ -5180,6 +5317,315 @@ function openScriptInputModal() {
 function closeScriptInputModal() {
   document.getElementById('scriptInputModal').style.display = 'none';
   try { _clearScriptSearchHighlight(); } catch (_) {}
+}
+
+// ─── 대본 복사 모달 (도입부/그룹별 클립명 + 본문 + 헤더 + 청크 선택) ───────────────
+// 청크 단위 — 그룹(도입부+본론) 일련번호 N개씩 묶음
+// 사용자가 모달 안 입력칸으로 조정 가능. localStorage 에 영구 보존.
+const SCRIPT_COPY_CHUNK_SIZE_DEFAULT = 30;
+const SCRIPT_COPY_CHUNK_SIZE_KEY = 'pf_scriptCopyChunkSize';
+function _getScriptCopyChunkSize() {
+  try {
+    const v = parseInt(localStorage.getItem(SCRIPT_COPY_CHUNK_SIZE_KEY), 10);
+    if (Number.isFinite(v) && v >= 1 && v <= 999) return v;
+  } catch (_) {}
+  return SCRIPT_COPY_CHUNK_SIZE_DEFAULT;
+}
+function _setScriptCopyChunkSize(v) {
+  try { localStorage.setItem(SCRIPT_COPY_CHUNK_SIZE_KEY, String(v)); } catch (_) {}
+}
+// 모든 스타일 prompt 뒤에 자동으로 붙는 공통 접미사
+const SCRIPT_COPY_STYLE_SUFFIX = 'highly detailed, no text, no watermark';
+// Flow 프롬프트 기본 문구 — 첫 사용 시 자동 채움, 사용자가 수정/삭제하면 그 값을 세션 동안 유지
+const SCRIPT_COPY_FLOW_PROMPT_DEFAULT = '이미지의 파일명은 대괄호안에 있는 문구로 수정해줘';
+// 모달 전용 Flow 프롬프트 (세션 동안 보존, 프로젝트와 무관)
+if (typeof window._scriptCopyFlowPrompt !== 'string') window._scriptCopyFlowPrompt = SCRIPT_COPY_FLOW_PROMPT_DEFAULT;
+// 현재 선택된 청크 범위 [start, end) — 모달 안 상태
+let _scriptCopyRange = null;
+
+// 스타일 prompt 에 공통 접미사를 자연스럽게 합성 (이미 포함돼 있으면 중복 안 함)
+function _appendStyleSuffix(prompt) {
+  const base = String(prompt || '').trim();
+  if (!base) return '';
+  if (base.toLowerCase().includes(SCRIPT_COPY_STYLE_SUFFIX.toLowerCase())) return base;
+  // 끝의 콤마/마침표/세미콜론 정리 후 ", suffix" 로 부착
+  const cleaned = base.replace(/[\s,.;]+$/u, '');
+  return cleaned + ', ' + SCRIPT_COPY_STYLE_SUFFIX;
+}
+
+function _getActiveStylePrompt() {
+  // 모달의 스타일 select 값이 우선, 없으면 메인 styleSelect 값
+  const sel = document.getElementById('scriptCopyStyleSelect');
+  const styleId = (sel && sel.value) || (document.getElementById('styleSelect') || {}).value || '';
+  if (!styleId) return { id: '', name: '', prompt: '' };
+  // 1) sync 가 채워둔 dataset.prompt 우선
+  const opt = sel ? Array.from(sel.options).find(o => o.value === styleId) : null;
+  if (opt && opt.dataset && opt.dataset.prompt) {
+    return { id: styleId, name: opt.text || styleId, prompt: _appendStyleSuffix(opt.dataset.prompt) };
+  }
+  // 2) StyleStore 직접 조회 폴백
+  try {
+    const StyleStore = require('../core/style-store');
+    const s = StyleStore.getById(styleId);
+    if (s) return { id: s.id, name: s.name || styleId, prompt: _appendStyleSuffix(s.prompt) };
+  } catch (_) {}
+  return { id: styleId, name: opt ? (opt.text || styleId) : styleId, prompt: '' };
+}
+
+function _buildScriptCopyHeader() {
+  const lines = [];
+  const style = _getActiveStylePrompt();
+  if (style.prompt) lines.push(style.prompt.trim());
+  const presetPrompt = (document.getElementById('scriptCopyPresetPrompt') || {}).value || '';
+  const trimmedPreset = presetPrompt.trim();
+  if (trimmedPreset) lines.push(trimmedPreset);
+  const flowPrompt = (document.getElementById('scriptCopyFlowPrompt') || {}).value || '';
+  const trimmedFlow = flowPrompt.trim();
+  if (trimmedFlow) lines.push(trimmedFlow);
+  return lines.join('\n\n');
+}
+
+function _buildScriptCopyBody(project, startIdx, endIdx) {
+  if (!project || !Array.isArray(project.groups) || project.groups.length === 0) {
+    return '';
+  }
+  const total = project.groups.length;
+  const s = Math.max(0, startIdx | 0);
+  const e = Math.min(total, (endIdx | 0) || total);
+  const sentMap = new Map((project.sentences || []).map(x => [x.id, x]));
+  const sections = [];
+  for (let i = s; i < e; i++) {
+    const g = project.groups[i];
+    const gnum2 = String(g.num).padStart(2, '0');
+    let label = g.isIntro ? `도입부 ${gnum2}` : `그룹 ${gnum2}`;
+    if (g.title) label += ` — ${g.title}`;
+    const body = (g.sentenceIds || [])
+      .map(sid => {
+        const x = sentMap.get(sid);
+        return x ? String(x.text || '').replace(/\s+/g, ' ').trim() : '';
+      })
+      .filter(t => t.length > 0)
+      .join(' ');
+    sections.push(`[${label}]\n${body}`);
+  }
+  return sections.join('\n\n');
+}
+
+// 헤더 + 본문 합성. 빈 프로젝트면 안내 메시지.
+function _buildScriptCopyText(project, startIdx, endIdx) {
+  if (!project || !Array.isArray(project.groups) || project.groups.length === 0) {
+    return '대본이 없습니다. 먼저 대본을 첨부하거나 직접 입력해 분할해주세요.';
+  }
+  const header = _buildScriptCopyHeader();
+  const body = _buildScriptCopyBody(project, startIdx, endIdx);
+  return header ? `${header}\n\n${body}` : body;
+}
+
+// 모달의 스타일 select 옵션을 StyleStore 에서 직접 채움 — prompt 도 dataset 에 함께 저장
+// 현재 선택값은 메인 styleSelect 와 동기화
+function _syncScriptCopyStyleOptions() {
+  const main = document.getElementById('styleSelect');
+  const sel = document.getElementById('scriptCopyStyleSelect');
+  if (!sel) return;
+  let list = [];
+  try {
+    const StyleStore = require('../core/style-store');
+    list = StyleStore.loadAll() || [];
+  } catch (_) {}
+  sel.innerHTML = '';
+  for (const s of list) {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.text = s.isBuiltIn ? s.name : (s.name + ' ⭐');
+    if (typeof s.prompt === 'string') opt.dataset.prompt = s.prompt;
+    sel.appendChild(opt);
+  }
+  if (main && main.value && list.some(s => s.id === main.value)) {
+    sel.value = main.value;
+  } else if (list.length > 0) {
+    sel.value = list[0].id;
+  }
+}
+
+// 청크 버튼 동적 생성 — "전체" + N개씩 묶음 버튼
+function _renderScriptCopyChunkButtons(project) {
+  const wrap = document.getElementById('scriptCopyChunkBtns');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  const total = (project && project.groups) ? project.groups.length : 0;
+  const chunkSize = _getScriptCopyChunkSize();
+  const mkBtn = (label, start, end, key) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn-sm';
+    b.textContent = label;
+    b.dataset.rangeKey = key;
+    b.style.padding = '4px 10px';
+    b.style.fontSize = '12px';
+    b.onclick = () => _setScriptCopyRange(start, end, /*autoCopy*/true);
+    wrap.appendChild(b);
+  };
+  // 전체 버튼은 항상 표시
+  mkBtn(`전체 (1-${total || 0})`, 0, total, 'all');
+  // 그룹이 청크 크기 초과일 때만 청크 버튼들 표시
+  if (total > chunkSize) {
+    for (let s = 0; s < total; s += chunkSize) {
+      const e = Math.min(total, s + chunkSize);
+      mkBtn(`${s + 1}-${e}`, s, e, `${s}-${e}`);
+    }
+  }
+  _highlightScriptCopyChunkButton();
+}
+
+// 청크 크기 입력 변경 — localStorage 저장 + 버튼 다시 그리기 + 현재 textarea 유지
+function _onScriptCopyChunkSizeChange() {
+  const inp = document.getElementById('scriptCopyChunkSizeInput');
+  if (!inp) return;
+  let v = parseInt(inp.value, 10);
+  if (!Number.isFinite(v) || v < 1) return; // 입력 도중에는 무시
+  if (v > 999) v = 999;
+  _setScriptCopyChunkSize(v);
+  _renderScriptCopyChunkButtons(window._currentProject);
+}
+
+function _highlightScriptCopyChunkButton() {
+  const wrap = document.getElementById('scriptCopyChunkBtns');
+  if (!wrap || !_scriptCopyRange) return;
+  const project = window._currentProject;
+  const total = (project && project.groups) ? project.groups.length : 0;
+  const isAll = _scriptCopyRange.start === 0 && _scriptCopyRange.end === total;
+  const wantKey = isAll ? 'all' : `${_scriptCopyRange.start}-${_scriptCopyRange.end}`;
+  for (const b of Array.from(wrap.querySelectorAll('button'))) {
+    if (b.dataset.rangeKey === wantKey) {
+      b.style.background = 'var(--accent)';
+      b.style.color = '#fff';
+      b.style.borderColor = 'var(--accent)';
+    } else {
+      b.style.background = '';
+      b.style.color = '';
+      b.style.borderColor = '';
+    }
+  }
+}
+
+// 범위 설정 — textarea 갱신 + 메타 갱신 + (옵션) 즉시 클립보드 복사
+function _setScriptCopyRange(startIdx, endIdx, autoCopy) {
+  const project = window._currentProject;
+  _scriptCopyRange = { start: startIdx | 0, end: endIdx | 0 };
+  const ta = document.getElementById('scriptCopyArea');
+  if (ta) {
+    ta.value = _buildScriptCopyText(project, startIdx, endIdx);
+    try { ta.setSelectionRange(0, 0); ta.scrollTop = 0; } catch (_) {}
+  }
+  // 메타 갱신
+  const meta = document.getElementById('scriptCopyMeta');
+  if (meta) {
+    if (project && project.groups && project.groups.length > 0) {
+      const total = project.groups.length;
+      const n = Math.min(total, (endIdx | 0)) - Math.max(0, startIdx | 0);
+      meta.textContent = `${n} 그룹 (전체 ${total}) · 헤더 ${_buildScriptCopyHeader() ? '있음' : '없음'}`;
+    } else {
+      meta.textContent = '—';
+    }
+  }
+  _highlightScriptCopyChunkButton();
+  if (autoCopy) copyScriptToClipboard();
+}
+
+// 스타일 변경 — 메인 styleSelect 동기화 + textarea 다시 빌드
+function _onScriptCopyStyleChange() {
+  const sel = document.getElementById('scriptCopyStyleSelect');
+  const main = document.getElementById('styleSelect');
+  if (sel && main && sel.value !== main.value) {
+    main.value = sel.value;
+    try { main.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
+  }
+  if (_scriptCopyRange) _setScriptCopyRange(_scriptCopyRange.start, _scriptCopyRange.end, false);
+}
+
+// 사전설정 변경 — 메인 presetPrompt 동기화 + textarea 다시 빌드
+function _onScriptCopyPresetPromptChange() {
+  const ta = document.getElementById('scriptCopyPresetPrompt');
+  const main = document.getElementById('presetPrompt');
+  if (ta && main && main.value !== ta.value) {
+    main.value = ta.value;
+    try { main.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
+  }
+  if (_scriptCopyRange) _setScriptCopyRange(_scriptCopyRange.start, _scriptCopyRange.end, false);
+}
+
+// Flow 프롬프트 변경 — 세션 변수에 저장 + textarea 다시 빌드
+function _onScriptCopyFlowPromptChange() {
+  const ta = document.getElementById('scriptCopyFlowPrompt');
+  if (ta) window._scriptCopyFlowPrompt = ta.value || '';
+  if (_scriptCopyRange) _setScriptCopyRange(_scriptCopyRange.start, _scriptCopyRange.end, false);
+}
+
+function openScriptCopyModal() {
+  const project = window._currentProject;
+  // 1) 설정 영역 초기화 — 스타일 옵션 동기화, 사전설정 로드, Flow 프롬프트 복원
+  _syncScriptCopyStyleOptions();
+  const presetTa = document.getElementById('scriptCopyPresetPrompt');
+  const mainPreset = document.getElementById('presetPrompt');
+  if (presetTa) presetTa.value = (mainPreset && mainPreset.value) || '';
+  const flowTa = document.getElementById('scriptCopyFlowPrompt');
+  if (flowTa) {
+    flowTa.value = window._scriptCopyFlowPrompt || '';
+    // 입력 핸들러를 매번 다시 바인딩하지 않도록 oninput 으로 1회만
+    flowTa.oninput = _onScriptCopyFlowPromptChange;
+  }
+  // 2) 청크 크기 입력칸 + 청크 버튼 + 초기 범위(전체)
+  const chunkInp = document.getElementById('scriptCopyChunkSizeInput');
+  if (chunkInp) chunkInp.value = _getScriptCopyChunkSize();
+  _renderScriptCopyChunkButtons(project);
+  const total = (project && project.groups) ? project.groups.length : 0;
+  _setScriptCopyRange(0, total, /*autoCopy*/false);
+  // 3) 모달 표시
+  document.getElementById('scriptCopyModal').style.display = 'flex';
+  setTimeout(() => {
+    const ta = document.getElementById('scriptCopyArea');
+    if (ta) try { ta.focus(); ta.setSelectionRange(0, 0); ta.scrollTop = 0; } catch (_) {}
+  }, 50);
+}
+
+function closeScriptCopyModal() {
+  document.getElementById('scriptCopyModal').style.display = 'none';
+}
+
+function copyScriptToClipboard() {
+  const ta = document.getElementById('scriptCopyArea');
+  const btn = document.getElementById('scriptCopyBtn');
+  const text = (ta && ta.value) || '';
+  if (!text) {
+    addLog('복사할 대본이 없습니다', 'info');
+    return;
+  }
+  const flashOk = () => {
+    if (!btn) return;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '✓ 복사됨';
+    setTimeout(() => { btn.innerHTML = orig; }, 1500);
+  };
+  navigator.clipboard.writeText(text).then(() => {
+    addLog(`대본 복사 완료 (${text.length}자)`, 'ok');
+    flashOk();
+  }).catch(e => {
+    // 폴백 — execCommand
+    try {
+      const tmp = document.createElement('textarea');
+      tmp.value = text;
+      tmp.style.position = 'fixed';
+      tmp.style.opacity = '0';
+      document.body.appendChild(tmp);
+      tmp.select();
+      document.execCommand('copy');
+      tmp.remove();
+      addLog(`대본 복사 완료 (${text.length}자)`, 'ok');
+      flashOk();
+    } catch (e2) {
+      addLog(`복사 실패: ${e.message}`, 'err');
+    }
+  });
 }
 
 // ─── 대본 입력 모달 — 찾기 기능 ──────────────────────────
@@ -6140,6 +6586,28 @@ function renderTaskList(project) {
     const clipBadge = totalClips > g.sentenceIds.length
       ? ` / <span style="color:var(--info);">${totalClips} 자막</span>`
       : '';
+    // 도입부 한정: 의미문자 합계 배지 — 비디오 10초(=의미문자 약 50자) 한도 가시화
+    let charBadge = '';
+    if (g.isIntro) {
+      const charSum = g.sentenceIds.reduce((sum, sid) => {
+        const s = project.sentences.find(x => x.id === sid);
+        return sum + ((s && typeof s.charCount === 'number') ? s.charCount : 0);
+      }, 0);
+      const color = charSum > 50 ? 'var(--warn, #e8a84c)' : 'var(--text-muted)';
+      charBadge = ` / <span style="color:${color};">${charSum}자</span>`;
+    }
+    // 도입부 한정: 9초 초과 경고 배지 (regroupIntroByTtsDuration 가 마크)
+    let overBadge = '';
+    if (g.isIntro && g.isOverDuration) {
+      overBadge = ` <span style="color:var(--danger, #d94c4c); font-weight:600; font-size:11px; padding:1px 6px; background:rgba(217,76,76,0.12); border-radius:4px;" title="이 그룹의 TTS 음성이 9초를 초과합니다. 비디오 클립 최대 10초 한도를 넘을 수 있어 문장을 더 잘게 나눠야 합니다.">⚠ 9초 초과</span>`;
+    }
+    // 그룹 합치기 버튼: 위 그룹이 같은 종류(도입↔도입, 본론↔본론) 일 때만 표시
+    const groupIdx = project.groups.indexOf(g);
+    const prevG = groupIdx > 0 ? project.groups[groupIdx - 1] : null;
+    const canMergeUp = !!(prevG && !!prevG.isIntro === !!g.isIntro);
+    const mergeBtnHtml = canMergeUp
+      ? ` <button type="button" class="group-merge-btn" title="이 그룹을 위 그룹과 합치기 (자산이 있으면 확인 후 초기화)" onclick="event.stopPropagation(); mergeGroupWithPrev('${g.id}');" style="font-size:11px; padding:2px 8px; margin-left:6px; border:1px solid var(--accent); border-radius:4px; background:var(--accent-soft, rgba(180,130,80,0.15)); color:var(--accent-hover, var(--accent)); cursor:pointer; vertical-align:middle; font-weight:600;">⬆ 위와 합치기</button>`
+      : '';
     const header = document.createElement('div');
     header.className = 'group-card-header';
     const groupLabel = g.title
@@ -6156,7 +6624,7 @@ function renderTaskList(project) {
       `<input type="checkbox" class="group-select" data-group-id="${g.id}" ${g._uiChecked ? 'checked' : ''} onchange="_toggleGroupCheck('${g.id}', this.checked)" style="cursor:pointer;">` +
       `<span>${groupLabel} ` +
       `<span style="color:var(--text-muted); font-weight:400; font-size:12px;">` +
-      `(${g.sentenceIds.length} 문장${clipBadge})</span></span></label>` +
+      `(${g.sentenceIds.length} 문장${clipBadge}${charBadge})</span>${overBadge}${mergeBtnHtml}</span></label>` +
       `<span style="display:flex; align-items:center;">${durBadge}` +
       `<span class="group-img-status" data-group-id="${g.id}" style="font-size:11px; color:var(--text-muted);">🖼 미생성</span></span>`;
     card.appendChild(header);
@@ -6277,6 +6745,13 @@ function renderTaskList(project) {
         : (statusLabels[ttsStatus] || '대기');
       const playDisabledAttr = (ttsStatus === 'done') ? '' : 'disabled';
 
+      // 자르기 버튼: 그룹의 첫 sentence 가 아닐 때만 표시 (첫 sentence 에서 자르면 의미 없음)
+      const sIdxInGroup = g.sentenceIds.indexOf(s.id);
+      const canSplitHere = sIdxInGroup > 0;
+      const splitBtnHtml = canSplitHere
+        ? `<button class="sentence-split-btn btn-sm" title="여기서부터 새 그룹으로 분할 (이 문장이 새 그룹의 첫 문장이 됨)" style="font-size:11px; padding:2px 6px; color:var(--text-muted);">✂</button>`
+        : `<span style="display:inline-block; width:24px;"></span>`; // 정렬 유지용 빈 자리
+
       row.innerHTML =
         `<span class="num">${numLabel}</span>` +
         `<span class="text" contenteditable="true" spellcheck="false" title="클릭하여 수정 (Enter 로 저장)" style="outline:none; border-radius:3px; padding:1px 4px;">${escapeHtml(s.text)}</span>` +
@@ -6285,7 +6760,8 @@ function renderTaskList(project) {
           : '<span class="sentence-tag"></span>') +
         `<button class="sentence-tts-btn btn-sm" title="이 문장 TTS 변환" style="font-size:11px; padding:2px 6px;">🎙</button>` +
         `<button class="sentence-play-btn btn-sm" ${playDisabledAttr} title="변환된 음성 재생" style="font-size:11px; padding:2px 6px;">🔊</button>` +
-        `<span class="status ${ttsStatus}">${statusText}</span>`;
+        `<span class="status ${ttsStatus}">${statusText}</span>` +
+        splitBtnHtml;
 
       // 인라인 편집 — 텍스트 클릭하여 수정, blur/Enter 시 저장
       const textEl = row.querySelector('.text');
@@ -6307,9 +6783,11 @@ function renderTaskList(project) {
       // 버튼 핸들러 바인딩
       const ttsBtn = row.querySelector('.sentence-tts-btn');
       const playBtn = row.querySelector('.sentence-play-btn');
+      const splitBtn = row.querySelector('.sentence-split-btn');
       const sentenceId = s.id;
       ttsBtn.onclick = (e) => { e.stopPropagation(); convertSentence(sentenceId); };
       playBtn.onclick = (e) => { e.stopPropagation(); playSentence(sentenceId); };
+      if (splitBtn) splitBtn.onclick = (e) => { e.stopPropagation(); splitGroupAtSentence(sentenceId); };
 
       sList.appendChild(row);
 
@@ -7830,8 +8308,19 @@ async function removeProfileFromPreset() {
   }
 }
 
-// 선택한 참조 음성을 들어보기 (합성 없이 원본 wav/mp3 재생)
+// 선택한 참조 음성을 들어보기 (합성 없이 원본 wav/mp3 재생) — 토글: 재생 중 다시 누르면 정지
 function playRefAudioPreview() {
+  const btn = document.getElementById('presetForm_refAudioPlayBtn');
+  const setIdle = () => { if (btn) btn.textContent = '▶'; window._refAudioPreviewActive = null; };
+  const setPlaying = () => { if (btn) btn.textContent = '⏹'; };
+
+  // 이미 이 버튼으로 재생 중이면 정지 (토글)
+  if (window._refAudioPreviewActive) {
+    try { window._refAudioPreviewActive.pause(); } catch (_) {}
+    setIdle();
+    return;
+  }
+
   const sel = document.getElementById('presetForm_refAudioSelect');
   const wavPath = sel && sel.value;
   if (!wavPath) {
@@ -7842,7 +8331,22 @@ function playRefAudioPreview() {
   const url = _makeAudioUrl(wavPath);
   const audio = new Audio(url);
   window._sentencePlayer = audio;
-  audio.play().catch(e => addLog(`참조 음성 재생 실패: ${e.message}`, 'err'));
+  window._refAudioPreviewActive = audio;
+  // 종료/에러/일시정지 시 버튼 라벨 복원
+  audio.addEventListener('ended', setIdle);
+  audio.addEventListener('error', setIdle);
+  audio.addEventListener('pause', () => {
+    // currentTime 이 끝에 도달했거나 사용자가 다른 곳에서 pause 한 경우 — 라벨 복원
+    if (audio.ended || audio === window._refAudioPreviewActive) {
+      // 단 paused 상태에서도 같은 객체면 idle 로 — 안전 차원
+      if (audio.paused) setIdle();
+    }
+  });
+  setPlaying();
+  audio.play().catch(e => {
+    addLog(`참조 음성 재생 실패: ${e.message}`, 'err');
+    setIdle();
+  });
 }
 
 function openPresetModal(presetId) {
@@ -11395,6 +11899,298 @@ async function convertGroupSentences(groupId) {
   } else {
     addLog(`[그룹 ${g.num}] TTS 완료 — 성공 ${success} / 실패 ${fail}`, fail ? 'err' : 'ok');
   }
+}
+
+// ─── 도입부 일괄 TTS + 9초 재배치 ──────────────────────────────────
+// 도입부 sentence 전부 TTS 합성 → 실제 TTS 길이 9초 한도로 도입부 그룹 재구성.
+// 비디오 클립 최대 10초 제약에 안전 마진 1초 적용.
+async function prepareIntroVideos() {
+  const proj = window._currentProject;
+  if (!proj || !Array.isArray(proj.sentences) || !Array.isArray(proj.groups)) {
+    addLog('프로젝트가 없습니다', 'info');
+    return;
+  }
+  if (!_ensureActivePreset()) return;
+
+  // 가드 1 — 도입부 sentence 존재 여부
+  const introSentences = proj.sentences.filter(s => s.isIntro);
+  if (introSentences.length === 0) {
+    addLog('도입부 sentence 가 없습니다 (대본에 # 도입 같은 헤더 필요)', 'info');
+    return;
+  }
+
+  // 가드 2 — 자산 충돌 (이미지/비디오)
+  const introGroupsWithAssets = proj.groups.filter(g => g.isIntro && (g.imagePath || g.videoPath));
+  if (introGroupsWithAssets.length > 0) {
+    const ok = confirm(
+      `도입부 그룹 ${introGroupsWithAssets.length}개에 이미지/비디오 자산이 있습니다.\n` +
+      `재배치하면 그룹 경계가 바뀌어 자산 매핑이 깨지므로 자산 경로가 초기화됩니다.\n` +
+      `(디스크 파일은 삭제되지 않습니다)\n\n진행할까요?`
+    );
+    if (!ok) {
+      addLog('도입부 재배치 취소됨 (자산 충돌)', 'info');
+      return;
+    }
+    _pushGroupUndoSnapshot('도입부 9초 재배치');
+    // 자산 초기화 — 도입부 그룹 전체
+    for (const g of proj.groups) {
+      if (!g.isIntro) continue;
+      g.imagePath = null;
+      g.videoPath = null;
+      g.videoStatus = 'idle';
+      if ('videoDowngradedTo480p' in g) g.videoDowngradedTo480p = false;
+    }
+  } else {
+    _pushGroupUndoSnapshot('도입부 9초 재배치');
+  }
+
+  // Phase A — 도입부 sentence 일괄 TTS 합성
+  const btn = document.getElementById('prepareIntroVideosBtn');
+  const progress = document.getElementById('prepareIntroProgress');
+  const origBtnText = btn ? btn.innerHTML : '';
+  const setProgress = (text) => { if (progress) progress.textContent = text; };
+  const setBtnDisabled = (disabled) => {
+    if (!btn) return;
+    btn.disabled = disabled;
+    btn.style.opacity = disabled ? '0.6' : '';
+    btn.style.cursor = disabled ? 'wait' : '';
+  };
+
+  setBtnDisabled(true);
+  setProgress(`도입부 TTS 합성 준비 (${introSentences.length}문장)`);
+  addLog(`[도입부] 일괄 TTS 시작 — ${introSentences.length}문장`, 'info');
+  _setTtsConvertActive(true);
+
+  let success = 0, fail = 0, stopped = false;
+  let idx = 0;
+  for (const s of introSentences) {
+    idx++;
+    if (!window._ttsConvertActive) { stopped = true; break; }
+    setProgress(`합성 중 ${idx}/${introSentences.length} — "${(s.text || '').slice(0, 24)}"`);
+    const ok = await convertSentence(s.id, { silent: true });
+    if (ok) success++; else fail++;
+  }
+  _setTtsConvertActive(false);
+
+  if (stopped) {
+    setProgress(`중지됨 — 성공 ${success} / 실패 ${fail}`);
+    addLog(`[도입부] TTS 중지 — 성공 ${success} / 실패 ${fail}`, 'err');
+    setBtnDisabled(false);
+    if (btn) btn.innerHTML = origBtnText;
+    return;
+  }
+
+  if (fail > 0) {
+    addLog(`[도입부] TTS 일부 실패 — 성공 ${success} / 실패 ${fail}. 재배치는 계속 진행`, 'err');
+  } else {
+    addLog(`[도입부] TTS 완료 — ${success}문장`, 'ok');
+  }
+
+  // Phase B — 9초 기준 재배치
+  setProgress('9초 기준 재배치 중…');
+  let regroupResult;
+  try {
+    const GB = require('../core/group-builder');
+    regroupResult = GB.regroupIntroByTtsDuration(proj, { maxSec: 9 });
+  } catch (e) {
+    addLog(`[도입부] 재배치 실패: ${e.message}`, 'err');
+    setProgress('재배치 실패');
+    setBtnDisabled(false);
+    if (btn) btn.innerHTML = origBtnText;
+    return;
+  }
+
+  // 9초 초과 그룹 마크 (id 기반)
+  const overSet = new Set(regroupResult.overGroupIds || []);
+  for (const g of proj.groups) {
+    g.isOverDuration = !!(g.isIntro && overSet.has(g.id));
+  }
+
+  // Phase C — 저장 + UI 갱신
+  try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch (_) {}
+  try { if (typeof renderTaskList === 'function') renderTaskList(proj); } catch (_) {}
+
+  const newIntroGroupCount = proj.groups.filter(g => g.isIntro).length;
+  const overCount = overSet.size;
+  setProgress(`완료 — ${introSentences.length}문장 → ${newIntroGroupCount}그룹` + (overCount ? ` (⚠ 9초 초과 ${overCount})` : ''));
+  addLog(`[도입부] 재배치 완료 — ${introSentences.length}문장 → ${newIntroGroupCount}그룹 (9초 한도, 초과 ${overCount})`, 'ok');
+  setBtnDisabled(false);
+  if (btn) btn.innerHTML = origBtnText;
+}
+
+// ─── 그룹 구조 변경 Undo 스택 ────────────────────────────────────
+// 합치기/나누기/도입부 재배치 같은 그룹 구조 변경 직전 스냅샷을 저장 → Ctrl+Z 로 복원.
+// 스택 최대 20개. project.groups + project.sentences 의 깊은 복사 보관.
+const GROUP_UNDO_STACK_MAX = 20;
+if (!Array.isArray(window._groupUndoStack)) window._groupUndoStack = [];
+
+function _updateUndoBtn() {
+  const btn = document.getElementById('undoGroupBtn');
+  if (!btn) return;
+  const n = window._groupUndoStack.length;
+  if (n > 0) {
+    btn.disabled = false;
+    btn.style.opacity = '';
+    const last = window._groupUndoStack[n - 1];
+    btn.title = `되돌리기 — ${last.label} (${n}단계 보관) · Ctrl+Z`;
+  } else {
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.title = '되돌릴 그룹 변경이 없습니다 — Ctrl+Z';
+  }
+}
+
+function _pushGroupUndoSnapshot(label) {
+  const proj = window._currentProject;
+  if (!proj || !Array.isArray(proj.groups) || !Array.isArray(proj.sentences)) return;
+  try {
+    const snap = {
+      label: label || '그룹 변경',
+      ts: Date.now(),
+      groups: JSON.parse(JSON.stringify(proj.groups)),
+      sentences: JSON.parse(JSON.stringify(proj.sentences)),
+    };
+    window._groupUndoStack.push(snap);
+    if (window._groupUndoStack.length > GROUP_UNDO_STACK_MAX) {
+      window._groupUndoStack.shift();
+    }
+  } catch (e) {
+    console.warn('[undo] snapshot 저장 실패:', e.message);
+  }
+  _updateUndoBtn();
+}
+
+function undoGroupChange() {
+  const proj = window._currentProject;
+  if (!proj) return;
+  const snap = window._groupUndoStack.pop();
+  if (!snap) {
+    addLog('되돌릴 그룹 변경이 없습니다', 'info');
+    _updateUndoBtn();
+    return;
+  }
+  // 배열 자체를 교체하지 말고 splice 로 내용만 교체 — 외부에서 참조하는 곳이 있을 수 있음
+  proj.groups.length = 0;
+  for (const g of snap.groups) proj.groups.push(g);
+  proj.sentences.length = 0;
+  for (const s of snap.sentences) proj.sentences.push(s);
+  try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch (_) {}
+  try { if (typeof renderTaskList === 'function') renderTaskList(proj); } catch (_) {}
+  addLog(`↶ 되돌리기: ${snap.label}`, 'ok');
+  _updateUndoBtn();
+}
+
+// Ctrl+Z 전역 단축키 — input/textarea/contenteditable 안에서는 동작 안 함 (사용자 텍스트 편집 방해 X)
+document.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+  if (e.key !== 'z' && e.key !== 'Z') return;
+  const tgt = e.target;
+  if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return;
+  e.preventDefault();
+  undoGroupChange();
+});
+
+// 페이지 로드 시 버튼 상태 초기화
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', _updateUndoBtn);
+} else {
+  setTimeout(_updateUndoBtn, 0);
+}
+
+// ─── 그룹 수동 합치기 / 나누기 ──────────────────────────────────
+// 두 그룹의 자산이 매핑상 모호해지므로, 자산이 있는 경우 confirm 후 양쪽 초기화.
+function _clearGroupAssets(g) {
+  if (!g) return;
+  g.imagePath = null;
+  g.videoPath = null;
+  g.videoStatus = 'idle';
+  if ('videoDowngradedTo480p' in g) g.videoDowngradedTo480p = false;
+}
+
+function mergeGroupWithPrev(groupId) {
+  const proj = window._currentProject;
+  if (!proj || !Array.isArray(proj.groups)) return;
+  const idx = proj.groups.findIndex(g => g.id === groupId);
+  if (idx < 0) return;
+  if (idx === 0) { addLog('첫 그룹은 합칠 위 그룹이 없습니다', 'info'); return; }
+  const curr = proj.groups[idx];
+  const prev = proj.groups[idx - 1];
+  if (!!curr.isIntro !== !!prev.isIntro) {
+    addLog('도입부 ↔ 본론 경계는 합칠 수 없습니다', 'info');
+    return;
+  }
+  // 자산 충돌 검사
+  const hasAssets = (curr.imagePath || curr.videoPath || prev.imagePath || prev.videoPath);
+  if (hasAssets) {
+    const ok = confirm(
+      `그룹 ${prev.num} 또는 ${curr.num} 에 이미지/비디오 자산이 있습니다.\n` +
+      `합치면 자산 매핑이 모호해지므로 양쪽 자산을 초기화합니다.\n` +
+      `(디스크 파일은 삭제되지 않습니다)\n\n진행할까요?`
+    );
+    if (!ok) { addLog('그룹 합치기 취소됨 (자산 충돌)', 'info'); return; }
+    _pushGroupUndoSnapshot(`그룹 ${prev.num} + ${curr.num} 합치기`);
+    _clearGroupAssets(prev);
+    _clearGroupAssets(curr);
+  } else {
+    _pushGroupUndoSnapshot(`그룹 ${prev.num} + ${curr.num} 합치기`);
+  }
+  let r;
+  try {
+    const GB = require('../core/group-builder');
+    r = GB.mergeGroupWithPrev(proj, groupId, { maxSec: 9 });
+  } catch (e) {
+    addLog(`그룹 합치기 실패: ${e.message}`, 'err');
+    return;
+  }
+  if (!r || !r.ok) {
+    addLog(`그룹 합치기 실패: ${r ? r.reason : 'unknown'}`, 'err');
+    return;
+  }
+  try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch (_) {}
+  try { if (typeof renderTaskList === 'function') renderTaskList(proj); } catch (_) {}
+  addLog(`그룹 ${prev.num} + ${curr.num} → ${prev.num} 합치기 완료`, 'ok');
+}
+
+function splitGroupAtSentence(sentenceId) {
+  const proj = window._currentProject;
+  if (!proj || !Array.isArray(proj.sentences) || !Array.isArray(proj.groups)) return;
+  const s = proj.sentences.find(x => x.id === sentenceId);
+  if (!s) return;
+  const g = proj.groups.find(x => x.id === s.groupId);
+  if (!g) return;
+  const idxInGroup = g.sentenceIds.indexOf(sentenceId);
+  if (idxInGroup <= 0) {
+    addLog('첫 sentence 에서는 자를 수 없습니다', 'info');
+    return;
+  }
+  if (g.imagePath || g.videoPath) {
+    const ok = confirm(
+      `그룹 ${g.num} 에 이미지/비디오 자산이 있습니다.\n` +
+      `나누면 자산이 어느 그룹에 속해야 할지 모호해져 초기화됩니다.\n` +
+      `(디스크 파일은 삭제되지 않습니다)\n\n진행할까요?`
+    );
+    if (!ok) { addLog('그룹 나누기 취소됨 (자산 충돌)', 'info'); return; }
+    _pushGroupUndoSnapshot(`그룹 ${g.num} 나누기`);
+    _clearGroupAssets(g);
+  } else {
+    _pushGroupUndoSnapshot(`그룹 ${g.num} 나누기`);
+  }
+  const origNum = g.num;
+  let r;
+  try {
+    const GB = require('../core/group-builder');
+    r = GB.splitGroupAt(proj, g.id, sentenceId, { maxSec: 9 });
+  } catch (e) {
+    addLog(`그룹 나누기 실패: ${e.message}`, 'err');
+    return;
+  }
+  if (!r || !r.ok) {
+    addLog(`그룹 나누기 실패: ${r ? r.reason : 'unknown'}`, 'err');
+    return;
+  }
+  try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch (_) {}
+  try { if (typeof renderTaskList === 'function') renderTaskList(proj); } catch (_) {}
+  addLog(`그룹 ${origNum} → 2 그룹으로 분할`, 'ok');
 }
 
 // 통합 TTS 변환 활성 플래그 — 단일/그룹/일괄 모두 이 하나로 중단

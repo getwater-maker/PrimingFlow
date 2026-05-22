@@ -85,9 +85,13 @@ async function extractAudioMp3(videoPath, outMp3Path) {
 /**
  * 임의 오디오/영상 입력 → OmniVoice 표준 참조음성 WAV (24kHz / 16bit / mono).
  * startSec / endSec 둘 다 주어지면 그 구간만 자르고, 없으면 전체 변환.
+ *
+ * volumeMultiplier 가 1.0 이 아니면 ffmpeg volume 필터 적용 + alimiter 로 클리핑 방지.
+ * (예: 2.0 = 두 배 증폭, 0.5 = 절반 감쇄)
+ *
  * @param {string} inPath
  * @param {string} outWavPath
- * @param {{ startSec?: number, endSec?: number }} [opts]
+ * @param {{ startSec?: number, endSec?: number, volumeMultiplier?: number }} [opts]
  */
 async function convertToRefWav(inPath, outWavPath, opts = {}) {
   if (!inPath || !fs.existsSync(inPath)) throw new Error('입력 파일을 찾을 수 없습니다: ' + inPath);
@@ -100,6 +104,12 @@ async function convertToRefWav(inPath, outWavPath, opts = {}) {
   }
   if (typeof opts.endSec === 'number' && opts.endSec > 0) {
     args.push('-to', String(opts.endSec));
+  }
+  // 오디오 필터 — 볼륨 조정 + 클리핑 방지 리미터
+  const vol = (typeof opts.volumeMultiplier === 'number' && opts.volumeMultiplier > 0) ? opts.volumeMultiplier : 1.0;
+  if (Math.abs(vol - 1.0) > 0.001) {
+    // alimiter: 최종 진폭 0.95 (-0.45dB) 이하로 강제 — 볼륨 증폭 시 클리핑(찢어진 소리) 방지
+    args.push('-af', `volume=${vol.toFixed(3)},alimiter=limit=0.95`);
   }
   args.push(
     '-vn',

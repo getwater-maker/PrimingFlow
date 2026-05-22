@@ -23,6 +23,89 @@
 const { Sentence, Group, makeSentenceIder, finalizeGroupIds } = require('./project-model');
 const { splitLongSentenceAlgo } = require('./long-sentence-splitter/algo-splitter');
 
+// 도입부 한 그룹의 총 의미문자 수 상한 — 비디오 클립이 최대 10초까지만 만들어지므로
+// 그룹 단위 글자수도 같이 제한해야 분량을 맞출 수 있다.
+// thresholds.introMaxChars 로 외부 주입 시 그 값을 우선 사용.
+const INTRO_MAX_CHARS_DEFAULT = 50;
+
+// 후처리 단계 — 너무 짧은 도입부 그룹을 이웃과 병합할 때 쓰는 두 임계값.
+// INTRO_SHORT_GROUP_CHARS: 이 미만이면 "너무 짧음" → 합류 시도 대상.
+// INTRO_MAX_CHARS_SOFT: 합류 후 합산이 이 값 이하일 때만 합침 (50자 한도에 마진 5자).
+const INTRO_SHORT_GROUP_CHARS_DEFAULT = 15;
+const INTRO_MAX_CHARS_SOFT_DEFAULT = 55;
+
+/**
+ * 도입부 그룹의 의미문자 합계.
+ */
+function _introCharSum(group, sentMap) {
+  let sum = 0;
+  for (const sid of group.sentenceIds) {
+    const s = sentMap.get(sid);
+    if (s) sum += (s.charCount || 0);
+  }
+  return sum;
+}
+
+/**
+ * 후처리 — 너무 짧은 도입부 그룹을 이웃 도입부 그룹과 병합.
+ * - 본론 그룹/도입↔본론 경계는 절대 침범하지 않음.
+ * - 앞·뒤 이웃 후보 중 합산이 maxSoft 이하인 후보만 채택, 합산 작은 쪽 우선, 동등 시 뒤.
+ * - 한 패스로 처리 — 새 그룹 길이가 다시 짧을 가능성은 거의 없음(짧음 + 짧음 < 15+15 인데 양 이웃이 모두 짧을 확률 낮고 한 번 더 돌려도 같은 알고리즘).
+ * @returns {boolean} 변화가 있었는지
+ */
+function _mergeShortIntroGroups(groups, sentences, opts) {
+  const shortLimit = (opts && opts.introShortGroupChars) || INTRO_SHORT_GROUP_CHARS_DEFAULT;
+  const maxSoft = (opts && opts.introMaxCharsSoft) || INTRO_MAX_CHARS_SOFT_DEFAULT;
+  if (!Array.isArray(groups) || groups.length < 2) return false;
+  const sentMap = new Map(sentences.map(s => [s.id, s]));
+  let changed = false;
+  let i = 0;
+  while (i < groups.length) {
+    const g = groups[i];
+    if (!g.isIntro) { i++; continue; }
+    const sum = _introCharSum(g, sentMap);
+    if (sum >= shortLimit) { i++; continue; }
+
+    // 앞·뒤 도입부 이웃 찾기
+    const prev = (i > 0 && groups[i - 1].isIntro) ? groups[i - 1] : null;
+    const next = (i + 1 < groups.length && groups[i + 1].isIntro) ? groups[i + 1] : null;
+    const prevTotal = prev ? _introCharSum(prev, sentMap) + sum : Infinity;
+    const nextTotal = next ? _introCharSum(next, sentMap) + sum : Infinity;
+    const prevOk = prev && prevTotal <= maxSoft;
+    const nextOk = next && nextTotal <= maxSoft;
+
+    let target = null;
+    let mergeBefore = false; // true면 target 앞쪽에 끼움 (즉 next 에 합류)
+    if (prevOk && nextOk) {
+      // 합산 작은 쪽 우선, 동등이면 뒤
+      if (nextTotal <= prevTotal) { target = next; mergeBefore = true; }
+      else                        { target = prev; mergeBefore = false; }
+    } else if (prevOk) {
+      target = prev; mergeBefore = false;
+    } else if (nextOk) {
+      target = next; mergeBefore = true;
+    }
+
+    if (!target) { i++; continue; }
+
+    // 병합: target.sentenceIds 의 앞/뒤에 g.sentenceIds 를 끼움. sentence.groupId 는 finalizeGroupIds 에서 다시 잡힘.
+    if (mergeBefore) target.sentenceIds = [...g.sentenceIds, ...target.sentenceIds];
+    else             target.sentenceIds = [...target.sentenceIds, ...g.sentenceIds];
+    groups.splice(i, 1);
+    changed = true;
+    // 인덱스 보정: prev 와 합쳤다면 prev 위치는 그대로(i-1) → 다시 검사 안 함.
+    // next 와 합쳤다면 i 위치에 next 가 있음 — 그것도 한 번 더 평가하지는 않음.
+    // (짧음 + 짧음이 또 짧을 가능성은 무시할 만큼 낮음)
+  }
+
+  if (changed) {
+    // 그룹 번호 재발번호 + sentence.groupId 재정합
+    groups.forEach((g, idx) => { g.num = idx + 1; });
+    finalizeGroupIds(groups, sentences);
+  }
+  return changed;
+}
+
 /**
  * sentence 의 vrewClips 결정 — 긴 문장이면 splitLongSentenceAlgo 로 분할.
  * thresholds.disableLongSplit=true 면 분할 안 함 (한 문장 = 한 sub-clip).
@@ -187,6 +270,7 @@ function buildGroupsWithIntro(items, thresholds) {
   const { shortLen, longLen, introSentenceSize, mainSentenceSize } = thresholds;
   const vrewMaxChars = thresholds.vrewMaxChars || longLen;
   const disableLongSplit = !!thresholds.disableLongSplit;
+  const introMaxChars = thresholds.introMaxChars || INTRO_MAX_CHARS_DEFAULT;
 
   const sid = makeSentenceIder();
   const sentences = items.map((item, i) => {
@@ -202,6 +286,7 @@ function buildGroupsWithIntro(items, thresholds) {
   let gNum = 0;
   let currentGroup = null;
   let currentCount = 0;
+  let currentIntroChars = 0;    // 도입부 그룹 누적 의미문자 수 (본론은 0 유지)
   let currentMode = null;       // 'intro' | 'main'
 
   const startNewGroup = (isIntro) => {
@@ -210,6 +295,7 @@ function buildGroupsWithIntro(items, thresholds) {
     currentGroup.isIntro = isIntro;
     groups.push(currentGroup);
     currentCount = 0;
+    currentIntroChars = 0;
     currentMode = isIntro ? 'intro' : 'main';
   };
 
@@ -223,18 +309,28 @@ function buildGroupsWithIntro(items, thresholds) {
       ? (introSentenceSize || 2)
       : (mainSentenceSize || 3);
 
+    // 도입부: 글자수 한도 초과 시 (그룹이 비어있지 않을 때만) 새 그룹 시작.
+    // 그룹이 비어있고 단일 문장이 한도를 넘으면 그 문장 단독으로 그룹 형성.
+    if (s.isIntro && currentGroup.sentenceIds.length > 0
+        && currentIntroChars + s.charCount > introMaxChars) {
+      startNewGroup(true);
+    }
+
     if (s.isShort && currentGroup.sentenceIds.length > 0) {
       // 짧은 문장은 흡수
       currentGroup.sentenceIds.push(s.id);
       s.groupId = currentGroup.id;
+      if (s.isIntro) currentIntroChars += s.charCount;
     } else {
       if (currentCount >= groupSize) startNewGroup(s.isIntro);
       currentGroup.sentenceIds.push(s.id);
       s.groupId = currentGroup.id;
       currentCount++;
+      if (s.isIntro) currentIntroChars += s.charCount;
     }
   }
   finalizeGroupIds(groups, sentences);
+  _mergeShortIntroGroups(groups, sentences, thresholds);
   return { sentences, groups };
 }
 
@@ -260,6 +356,7 @@ function buildGroupsHybrid(items, thresholds) {
   const { shortLen, longLen, introSentenceSize, mainSentenceSize } = thresholds;
   const vrewMaxChars = thresholds.vrewMaxChars || longLen;
   const disableLongSplit = !!thresholds.disableLongSplit;
+  const introMaxChars = thresholds.introMaxChars || INTRO_MAX_CHARS_DEFAULT;
 
   const sid = makeSentenceIder();
   const sentences = items.map((item, i) => {
@@ -277,6 +374,7 @@ function buildGroupsHybrid(items, thresholds) {
   let gNum = 0;
   let currentGroup = null;
   let currentCount = 0;
+  let currentIntroChars = 0;       // md-intro 그룹 누적 의미문자 수
   let currentMode = null;          // 'md-intro' | 'md-main' | 'bracket'
   let currentSectionTitle = null;
 
@@ -293,6 +391,7 @@ function buildGroupsHybrid(items, thresholds) {
     currentGroup.title = s.sectionTitle || null;
     groups.push(currentGroup);
     currentCount = 0;
+    currentIntroChars = 0;
     currentMode = targetModeOf(s);
     currentSectionTitle = s.sectionTitle || null;
   };
@@ -312,19 +411,226 @@ function buildGroupsHybrid(items, thresholds) {
     } else {
       // md: 도입 N문장 / 본론 M문장
       const groupSize = s.isIntro ? (introSentenceSize || 2) : (mainSentenceSize || 3);
+
+      // 도입부: 글자수 한도 초과 시 (그룹이 비어있지 않을 때만) 새 그룹 시작.
+      if (s.isIntro && currentGroup.sentenceIds.length > 0
+          && currentIntroChars + s.charCount > introMaxChars) {
+        startNewGroup(s);
+      }
+
       if (s.isShort && currentGroup.sentenceIds.length > 0) {
         currentGroup.sentenceIds.push(s.id);
         s.groupId = currentGroup.id;
+        if (s.isIntro) currentIntroChars += s.charCount;
       } else {
         if (currentCount >= groupSize) startNewGroup(s);
         currentGroup.sentenceIds.push(s.id);
         s.groupId = currentGroup.id;
         currentCount++;
+        if (s.isIntro) currentIntroChars += s.charCount;
       }
     }
   }
   finalizeGroupIds(groups, sentences);
+  _mergeShortIntroGroups(groups, sentences, thresholds);
   return { sentences, groups };
 }
 
-module.exports = { buildGroups, buildGroupsWithSections, buildGroupsWithIntro, buildGroupsHybrid };
+// 도입부 비디오 한도 — 안전 마진 1초 두고 9초 (실제 비디오 클립 최대 10초)
+const INTRO_VIDEO_MAX_SEC_DEFAULT = 9;
+
+/**
+ * 도입부 그룹을 TTS 실제 재생 시간 기준으로 재배치.
+ *
+ * 동작:
+ *  - 본론 그룹은 순서대로 보존, 도입부 sentence 들만 추출(순서 유지) 후 재묶음.
+ *  - 누적 TTS 길이 ≤ maxSec 이 되도록 sentence 순차 합류.
+ *  - 단일 sentence 가 maxSec 초과면 단독 그룹 + isOverDuration:true 마크.
+ *  - 도입부는 본론 앞에 있다고 가정 (현재 워크플로 동일).
+ *
+ * @param {{sentences: Array, groups: Array}} project
+ * @param {{maxSec?: number}} [opts]
+ * @returns {{groups: Array, sentences: Array, overGroupIds: string[]}}
+ */
+function regroupIntroByTtsDuration(project, opts) {
+  const maxSec = (opts && opts.maxSec) || INTRO_VIDEO_MAX_SEC_DEFAULT;
+  if (!project || !Array.isArray(project.groups) || !Array.isArray(project.sentences)) {
+    return { groups: project ? project.groups : [], sentences: project ? project.sentences : [], overGroupIds: [] };
+  }
+
+  const sentMap = new Map(project.sentences.map(s => [s.id, s]));
+  // 본론 그룹은 그대로 보존
+  const mainGroups = project.groups.filter(g => !g.isIntro);
+  // 원래 도입부 그룹들에서 sentence 순서 그대로 추출
+  const introSentences = [];
+  for (const g of project.groups) {
+    if (!g.isIntro) continue;
+    for (const sid of g.sentenceIds) {
+      const s = sentMap.get(sid);
+      if (s) introSentences.push(s);
+    }
+  }
+
+  // 도입부 sentence 가 없으면 무동작
+  if (introSentences.length === 0) {
+    return { groups: project.groups, sentences: project.sentences, overGroupIds: [] };
+  }
+
+  // 새 도입부 그룹 재구성 — 누적 TTS 길이 기준
+  const newIntroGroups = [];
+  const overGroupRefs = []; // 9초 초과 그룹 참조 (id 확정 전이라 참조로 보관)
+  let currentGroup = null;
+  let currentSec = 0;
+
+  const startNewGroup = () => {
+    currentGroup = new Group({ num: 0, sentenceIds: [] }); // num 은 finalize 후 재발번호
+    currentGroup.isIntro = true;
+    currentGroup.isOverDuration = false;
+    newIntroGroups.push(currentGroup);
+    currentSec = 0;
+  };
+
+  for (const s of introSentences) {
+    const dur = (typeof s.ttsDurationSec === 'number' && s.ttsDurationSec > 0) ? s.ttsDurationSec : 0;
+    // 그룹 비어있지 않고 누적이 한도 초과면 새 그룹 시작
+    if (currentGroup && currentGroup.sentenceIds.length > 0 && currentSec + dur > maxSec) {
+      startNewGroup();
+    }
+    if (!currentGroup) startNewGroup();
+    currentGroup.sentenceIds.push(s.id);
+    s.groupId = currentGroup.id; // finalize 가 다시 잡지만 일관성 유지
+    currentSec += dur;
+    // 단독 sentence 가 한도 초과 → 그룹 마크
+    if (currentGroup.sentenceIds.length === 1 && dur > maxSec) {
+      currentGroup.isOverDuration = true;
+      overGroupRefs.push(currentGroup);
+      // 다음 sentence 는 새 그룹으로 가도록 (이미 한도 채워짐 — currentSec > maxSec 이라 다음 진입에서 분리됨)
+    }
+  }
+
+  // 도입부 + 본론 순서로 결합 (도입부는 항상 앞)
+  const newGroups = [...newIntroGroups, ...mainGroups];
+  // 그룹 번호 재발번호
+  newGroups.forEach((g, idx) => { g.num = idx + 1; });
+  // ID 정합
+  finalizeGroupIds(newGroups, project.sentences);
+
+  // 결과 적용 — project 의 groups 배열 자체를 교체 (참조 유지 위해 splice)
+  project.groups.length = 0;
+  for (const g of newGroups) project.groups.push(g);
+
+  // overGroupIds 는 finalize 후의 id 로 추출
+  const overGroupIds = overGroupRefs.map(g => g.id);
+  return { groups: project.groups, sentences: project.sentences, overGroupIds };
+}
+
+/**
+ * 그룹의 ttsDurationSec 합계.
+ */
+function _groupTtsSec(group, sentMap) {
+  let sum = 0;
+  for (const sid of group.sentenceIds) {
+    const s = sentMap.get(sid);
+    if (s && typeof s.ttsDurationSec === 'number') sum += s.ttsDurationSec;
+  }
+  return sum;
+}
+
+/**
+ * 주어진 그룹을 바로 위(앞) 그룹과 합치기.
+ * - 첫 그룹이거나 위 그룹과 isIntro 가 다르면 거부.
+ * - 합치기 후 도입부면 isOverDuration 재평가 (9초 한도).
+ * - 자산(imagePath/videoPath/...) 정리는 호출자 책임 (충돌 검사 + 사용자 confirm).
+ *
+ * @returns {{ok: boolean, reason?: string, newGroupId?: string}}
+ */
+function mergeGroupWithPrev(project, groupId, opts) {
+  const maxSec = (opts && opts.maxSec) || INTRO_VIDEO_MAX_SEC_DEFAULT;
+  if (!project || !Array.isArray(project.groups)) return { ok: false, reason: 'no-project' };
+  const idx = project.groups.findIndex(g => g.id === groupId);
+  if (idx < 0) return { ok: false, reason: 'not-found' };
+  if (idx === 0) return { ok: false, reason: 'no-prev' };
+  const curr = project.groups[idx];
+  const prev = project.groups[idx - 1];
+  if (!!curr.isIntro !== !!prev.isIntro) return { ok: false, reason: 'cross-boundary' };
+
+  // 합치기: prev 에 curr.sentenceIds 추가
+  prev.sentenceIds = [...prev.sentenceIds, ...curr.sentenceIds];
+  // 자산 보존 정책: prev 자산 우선 유지 — caller 가 충돌 시 초기화했어야 함.
+  // 그래도 안전 차원에서 curr 의 자산이 prev 에 없을 때만 옮김.
+  if (!prev.imagePath && curr.imagePath) prev.imagePath = curr.imagePath;
+  if (!prev.videoPath && curr.videoPath) { prev.videoPath = curr.videoPath; prev.videoStatus = curr.videoStatus || prev.videoStatus; }
+
+  // curr 제거
+  project.groups.splice(idx, 1);
+  // 도입부면 9초 평가
+  if (prev.isIntro) {
+    const sentMap = new Map(project.sentences.map(s => [s.id, s]));
+    prev.isOverDuration = _groupTtsSec(prev, sentMap) > maxSec;
+  }
+  // 번호 재발번호 + ID 정합
+  project.groups.forEach((g, i) => { g.num = i + 1; });
+  finalizeGroupIds(project.groups, project.sentences);
+  // finalize 가 prev.id 를 바꿨을 수 있음 — 인덱스로 재조회
+  const finalPrev = project.groups[idx - 1];
+  return { ok: true, newGroupId: finalPrev.id };
+}
+
+/**
+ * 주어진 그룹을 특정 sentence 위치에서 둘로 분할.
+ * - 그 sentence 부터 새 그룹으로 떨어져 나옴.
+ * - 그룹의 첫 sentence 에서는 자를 수 없음 (의미 없음 → 거부).
+ * - 합치기 후 도입부면 각 그룹의 isOverDuration 재평가.
+ * - 자산 처리는 호출자 책임 (분할이면 자산 매핑이 깨지므로 caller 가 초기화 권장).
+ *
+ * @returns {{ok: boolean, reason?: string, leftGroupId?: string, rightGroupId?: string}}
+ */
+function splitGroupAt(project, groupId, splitAtSentenceId, opts) {
+  const maxSec = (opts && opts.maxSec) || INTRO_VIDEO_MAX_SEC_DEFAULT;
+  if (!project || !Array.isArray(project.groups)) return { ok: false, reason: 'no-project' };
+  const gIdx = project.groups.findIndex(g => g.id === groupId);
+  if (gIdx < 0) return { ok: false, reason: 'not-found' };
+  const src = project.groups[gIdx];
+  const sIdx = src.sentenceIds.indexOf(splitAtSentenceId);
+  if (sIdx < 0) return { ok: false, reason: 'sentence-not-in-group' };
+  if (sIdx === 0) return { ok: false, reason: 'invalid-split' };
+
+  // 새 그룹 — splitAt 부터 끝까지
+  const newSentenceIds = src.sentenceIds.slice(sIdx);
+  const newGroup = new Group({ num: 0, sentenceIds: newSentenceIds });
+  newGroup.isIntro = !!src.isIntro;
+  if (src.title) newGroup.title = src.title;
+  if (src.isBracket) newGroup.isBracket = true;
+  // 자산은 새 그룹에 복사하지 않음 (분할이면 어느 쪽에 속해야 할지 모호 → caller 가 정리)
+
+  // 기존 그룹 축소
+  src.sentenceIds = src.sentenceIds.slice(0, sIdx);
+
+  // groups 배열에 새 그룹을 src 바로 뒤에 삽입
+  project.groups.splice(gIdx + 1, 0, newGroup);
+
+  // 도입부면 각 그룹 9초 평가
+  if (src.isIntro || newGroup.isIntro) {
+    const sentMap = new Map(project.sentences.map(s => [s.id, s]));
+    if (src.isIntro) src.isOverDuration = _groupTtsSec(src, sentMap) > maxSec;
+    if (newGroup.isIntro) newGroup.isOverDuration = _groupTtsSec(newGroup, sentMap) > maxSec;
+  }
+
+  // 번호 재발번호 + ID 정합
+  project.groups.forEach((g, i) => { g.num = i + 1; });
+  finalizeGroupIds(project.groups, project.sentences);
+  // ID 재발급되었을 수 있으므로 인덱스로 재조회
+  const finalLeft = project.groups[gIdx];
+  const finalRight = project.groups[gIdx + 1];
+  return { ok: true, leftGroupId: finalLeft.id, rightGroupId: finalRight.id };
+}
+
+module.exports = {
+  buildGroups,
+  buildGroupsWithSections,
+  buildGroupsWithIntro,
+  buildGroupsHybrid,
+  regroupIntroByTtsDuration,
+  mergeGroupWithPrev,
+  splitGroupAt,
+};
