@@ -32,8 +32,12 @@ const DEFAULT_PROFILE_DIR = path.join(os.homedir(), '.flow-app', 'profiles', 'de
 //
 // ❗ 문제가 생기면 이 한 줄을 false 로 바꾸고 앱을 재시작하세요 (npm start 또는 Ctrl+R 후 재기동).
 //    Chrome 본체 사용이 안 되는 환경(Chrome 미설치 등)에서는 자동으로 Chromium 폴백됩니다.
+//
+// 📌 v1.13.40: 사용자 요청으로 false 로 복구 (Google ToS 준수 방향 재검토 중).
+//    합법 provider (Stable Diffusion / Imagen / Pollinations) 도입 후 이 플래그는
+//    legacy Flow provider 의 옵션으로만 의미가 있음.
 // ════════════════════════════════════════════════════════════════════
-const USE_SYSTEM_CHROME = true;
+const USE_SYSTEM_CHROME = false;
 
 class FlowAutomator {
   constructor(mainWindow, profileDir) {
