@@ -24,6 +24,17 @@ const { AntiDetect } = require('./anti-detect');
 const FLOW_URL = 'https://labs.google/fx/ko/tools/flow';
 const DEFAULT_PROFILE_DIR = path.join(os.homedir(), '.flow-app', 'profiles', 'default');
 
+// ════════════════════════════════════════════════════════════════════
+// 🔧 SYSTEM CHROME SWITCH — v1.13.39
+//
+//   true  = 시스템에 설치된 정식 Google Chrome 사용 (권장 — Google 자동화 차단 회피)
+//   false = Playwright 번들 Chromium 사용 (옛 방식, fingerprint 차이로 차단 가능성)
+//
+// ❗ 문제가 생기면 이 한 줄을 false 로 바꾸고 앱을 재시작하세요 (npm start 또는 Ctrl+R 후 재기동).
+//    Chrome 본체 사용이 안 되는 환경(Chrome 미설치 등)에서는 자동으로 Chromium 폴백됩니다.
+// ════════════════════════════════════════════════════════════════════
+const USE_SYSTEM_CHROME = true;
+
 class FlowAutomator {
   constructor(mainWindow, profileDir) {
     this.win = mainWindow;
@@ -198,15 +209,32 @@ class FlowAutomator {
     } catch {}
 
     fs.mkdirSync(this.profileDir, { recursive: true });
-    this.log('[Flow] 브라우저 시작 (로그인)...');
 
-    this.context = await chromium.launchPersistentContext(this.profileDir, {
+    // v1.13.39: 로그인 흐름도 같은 채널 정책 적용 (run() 의 브라우저 준비 블록과 동일).
+    // 로그인은 Chromium, 작업은 Chrome 으로 갈리면 쿠키 일관성 깨짐.
+    const _loginLaunchOpts = {
       headless: false,
       viewport: { width: 1400, height: 900 },
       args: ['--disable-blink-features=AutomationControlled'],
       ignoreDefaultArgs: ['--enable-automation'],
       permissions: ['clipboard-read', 'clipboard-write'],
-    });
+    };
+    if (USE_SYSTEM_CHROME) {
+      try {
+        this.log('[Flow] 브라우저 시작 (로그인, 정식 Chrome 사용)...');
+        this.context = await chromium.launchPersistentContext(this.profileDir, {
+          ..._loginLaunchOpts,
+          channel: 'chrome',
+        });
+      } catch (e) {
+        this.log(`[Flow] ⚠ 정식 Chrome 실행 실패 (${e.message.split('\n')[0].slice(0, 100)}) — Chromium 으로 폴백`);
+        this.log('[Flow]   → Chrome 미설치 또는 경로 못 찾음. https://www.google.com/chrome 에서 설치 권장');
+        this.context = await chromium.launchPersistentContext(this.profileDir, _loginLaunchOpts);
+      }
+    } else {
+      this.log('[Flow] 브라우저 시작 (로그인, Chromium — USE_SYSTEM_CHROME=false)');
+      this.context = await chromium.launchPersistentContext(this.profileDir, _loginLaunchOpts);
+    }
 
     this.page = this.context.pages()[0] || await this.context.newPage();
     await this.page.addInitScript(() => {
@@ -332,13 +360,19 @@ class FlowAutomator {
     // v1.13.30: profileId 변경 감지 — 폴백으로 다른 프로필 들어오면 기존 context 종료 후 새 profileDir 로 재시작
     // v1.13.31: 공백(\s) 변환 제거 — 로그인 검증(flow-login IPC)이 공백 그대로 폴더 만들기 때문에
     // 변환하면 빈 새 폴더로 들어가서 로그인 정보 손실 → textbox 못 찾고 timeout. 공백 그대로 유지.
+    // v1.13.39: 프로필 전환 시 명시적으로 "닫고 새로 열기" 보장 — 사용자 요청.
+    //           기존엔 profileDir != desiredProfileDir 일 때만 close 했는데, 이전 인스턴스
+    //           재사용 케이스가 섞여 동작이 일관되지 않아 보였음. 이제 다른 프로필이면 무조건 close.
     {
       const desiredProfileId = (config && config.profileId) || 'default';
       const desiredProfileDir = path.join(os.homedir(), '.flow-app', 'profiles', desiredProfileId.replace(/[\\\/:*?"<>|]/g, '_'));
-      if (this.profileDir !== desiredProfileDir) {
+      const profileChanged = this.profileDir !== desiredProfileDir;
+      if (profileChanged) {
         if (this.context) {
-          this.log(`[Flow] 프로필 변경 감지: ${this.profileDir} → ${desiredProfileDir} — 기존 컨텍스트 종료 후 재시작`);
+          this.log(`[Flow] 프로필 변경: ${path.basename(this.profileDir)} → ${path.basename(desiredProfileDir)} — 기존 창 닫고 새 창 엽니다`);
           try { await this.context.close(); } catch (e) { this.debug(`[Flow] 기존 컨텍스트 close 오류 (무시): ${e.message}`); }
+          // close 후 OS 가 프로필 lock 해제할 시간 — 같은 폴더 재오픈은 아니지만 안전 마진
+          await new Promise(r => setTimeout(r, 500));
         }
         this.context = null;
         this.page = null;
@@ -367,13 +401,33 @@ class FlowAutomator {
 
     // 브라우저 준비
     if (needNewContext) {
-      this.log(`[Flow] 브라우저 시작 (profile=${path.basename(this.profileDir)})...`);
-      this.context = await chromium.launchPersistentContext(this.profileDir, {
+      // v1.13.39: USE_SYSTEM_CHROME=true 이면 시스템 정식 Chrome 사용 (Google 자동화 차단 회피).
+      // channel:'chrome' 지정 시 Playwright 가 시스템 Chrome 자동 탐지. 못 찾으면 명확한 안내 후 Chromium 폴백.
+      const launchOpts = {
         headless: false,
         viewport: { width: 1400, height: 900 },
         args: ['--disable-blink-features=AutomationControlled'],
         ignoreDefaultArgs: ['--enable-automation'],
-      });
+      };
+      let usedChannel = 'Chromium';
+      if (USE_SYSTEM_CHROME) {
+        try {
+          this.log(`[Flow] 브라우저 시작 (profile=${path.basename(this.profileDir)}, 정식 Chrome 사용)...`);
+          this.context = await chromium.launchPersistentContext(this.profileDir, {
+            ...launchOpts,
+            channel: 'chrome',
+          });
+          usedChannel = 'Chrome';
+        } catch (e) {
+          this.log(`[Flow] ⚠ 정식 Chrome 실행 실패 (${e.message.split('\n')[0].slice(0, 100)}) — Playwright Chromium 으로 폴백`);
+          this.log('[Flow]   → Chrome 미설치 또는 경로 못 찾음. https://www.google.com/chrome 에서 설치 권장');
+          this.context = await chromium.launchPersistentContext(this.profileDir, launchOpts);
+        }
+      } else {
+        this.log(`[Flow] 브라우저 시작 (profile=${path.basename(this.profileDir)}, Chromium 사용 — USE_SYSTEM_CHROME=false)`);
+        this.context = await chromium.launchPersistentContext(this.profileDir, launchOpts);
+      }
+      this.log(`[Flow] 브라우저 엔진: ${usedChannel}`);
       this.page = this.context.pages()[0] || await this.context.newPage();
       await this.page.addInitScript(() => {
         Object.defineProperty(navigator, 'webdriver', { get: () => false });
