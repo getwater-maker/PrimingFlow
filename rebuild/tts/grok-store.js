@@ -27,7 +27,9 @@ const DEFAULTS = {
   videoResolution: '720p',     // '480p' | '720p' (사용자 정책: 720p 기본)
   videoDuration:   '10s',      // '6s' | '10s' (사용자 정책: 10s 기본)
   videoAspect:     '16:9 Widescreen',  // '16:9 Widescreen' | '9:16 Vertical' | '1:1 Square' | '2:3 Tall' | '3:2 Wide'
-  maxDailyVideos: 30,
+  // v1.13.42: 사용자 요청으로 기본값 0(무제한) 로 변경. 0 이상 양수면 그 값이 일일 한도.
+  // 0 으로 두면 checkDailyLimit() 가 항상 통과 — Grok 측 자체 한도/차단만 신뢰.
+  maxDailyVideos: 0,
   todayCount: 0,
   lastDate: '',
   lastUsedAt: 0,
@@ -77,13 +79,14 @@ function update(patch) {
   return next;
 }
 
-/** 일일 한도 안에 있는지 확인 + 초과 시 사유 반환 */
+/** 일일 한도 안에 있는지 확인 + 초과 시 사유 반환.
+ *  v1.13.42: maxDailyVideos === 0 이면 무제한 (anti-detect 모듈의 dailyLimit=0 패턴과 동일). */
 function checkDailyLimit() {
   const cfg = load();
-  if (cfg.todayCount >= cfg.maxDailyVideos) {
+  if (cfg.maxDailyVideos > 0 && cfg.todayCount >= cfg.maxDailyVideos) {
     return {
       allowed: false,
-      reason: `일일 한도 초과 (${cfg.todayCount}/${cfg.maxDailyVideos}) — 내일 다시 시도하거나 maxDailyVideos 를 늘리세요`,
+      reason: `일일 한도 초과 (${cfg.todayCount}/${cfg.maxDailyVideos}) — 내일 다시 시도하거나 maxDailyVideos 를 늘리세요 (0 = 무제한)`,
       cfg,
     };
   }
