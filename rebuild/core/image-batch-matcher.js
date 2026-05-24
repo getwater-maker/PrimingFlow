@@ -48,9 +48,17 @@ function buildTitleMatcher(groupTitle) {
  * }}
  */
 /**
- * 파일명에서 "그룹 N" / "group N" / "scene N" / 맨 앞 숫자 같은 패턴으로 그룹 번호 추출.
+ * 파일명에서 "그룹 N" / "도입부 N" / "group N" / "scene N" / 맨 앞 숫자 같은 패턴으로 그룹 번호 추출.
+ *
+ * 그룹 번호 (g.num) 는 도입부+본론 통합 일련번호이므로 (예: 도입부 10 → 본론 11부터),
+ * `도입부_01.jpg` = g.num 1, `그룹_11.jpg` = g.num 11 처럼 PrimingFlow UI 라벨을 그대로
+ * 파일명으로 만들면 자동 매칭됨.
+ *
  * 매칭 후보:
  *   "그룹 01_..."          → 1
+ *   "도입부_01.jpg"        → 1   (도입부 키워드)
+ *   "도입_03"              → 3   (도입 단축형)
+ *   "intro 02"             → 2   (영문)
  *   "group 12 ..."         → 12
  *   "12_..."               → 12
  *   "scene_03..."          → 3
@@ -64,8 +72,9 @@ function extractGroupNumFromFilename(name) {
   if (!name) return null;
   // 확장자 제거
   const base = String(name).replace(/\.[a-z0-9]{1,5}$/i, '');
-  // 1) 그룹/group/scene/장면 + 숫자
-  let m = base.match(/(?:그룹|group|scene|장면|chapter|chap|ep|episode|씬)\s*[_\-]?\s*0*(\d{1,4})(?!\d)/i);
+  // 1) 그룹/도입부/group/intro/scene/장면 + 숫자 (한/영 키워드 통합)
+  //    '도입부' 가 '도입' 보다 먼저 와야 도입부가 우선 매칭됨 (regex alternation 첫 일치 규칙)
+  let m = base.match(/(?:그룹|도입부|도입|오프닝|장면|씬|group|intro|opening|scene|chapter|chap|episode|ep)\s*[_\-]?\s*0*(\d{1,4})(?!\d)/i);
   if (m) return parseInt(m[1], 10);
   // 2) 맨 앞 숫자 (예: "01_제목", "12 - 제목", "001_g_...")
   m = base.match(/^\s*0*(\d{1,4})(?!\d)/);

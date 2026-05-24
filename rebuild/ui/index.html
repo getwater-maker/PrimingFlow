@@ -425,7 +425,7 @@
 
   /* 결과 갤러리 */
   .gallery { display:none; padding:16px 20px; overflow-y:auto; flex:1; }
-  .gallery-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; }
+  .gallery-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; }
   .gallery-item { background:var(--bg-card); border-radius:8px; overflow:hidden; border:1px solid var(--border); box-shadow:var(--shadow-sm); }
   .gallery-item img { width:100%; display:block; }
   .gallery-item .caption { padding:8px; font-size:12px; color:var(--text-soft); }
@@ -3677,12 +3677,9 @@ function _autoSaveProject(projectId) {
       ? window._projects.find(p => p.id === projectId)
       : window._currentProject;
     if (!proj || !proj.sentences || proj.sentences.length === 0) return;
-    // 자동저장 — 사용자가 한 번이라도 [💾 프로젝트 저장] 을 눌렀거나 [📂 불러오기] 했을 때만
-    // 작동. 첫 저장 전엔 "미저장" 표시 유지 (보관 폴더에 마음대로 파일 만들지 않음).
-    if (!proj.pflowPath) {
-      if (isActive) _updateAutoSaveIndicator('');
-      return;
-    }
+    // 자동저장 — 첫 변경부터 활성화. pflowPath 가 없으면 saveProject 가 자동으로
+    // ~/.flow-app/projects/<scriptFileName 또는 project_YYYY-MM-DD>.pflow 를 만든다.
+    // (project-store.js:117~123 의 자동 이름 결정 로직)
     // 자동제작 진행 중에는 throttle — image-done IPC 가 30개/문장당 1번씩 호출 폭주 방지
     const isAutoGenRunning = !!(window._autoPollActive || window._grokConvertActive || window._ttsConvertActive);
     if (isAutoGenRunning) {
@@ -12928,6 +12925,7 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
       }
     }
 
+    const presetPromptText = (document.getElementById('presetPrompt').value || '').trim();
     customPrompts = targetGroups.map((g, i) => {
       if (!g.isBracket) return null;
       const body = paragraphs[i].trim();
@@ -12935,8 +12933,10 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
       const stylePrompt = (isInfographicGroup && forcedInfographicStyle)
         ? forcedInfographicStyle
         : userStylePrompt;
-      // 스타일 프롬프트 + 빈 줄 + 본문. 둘 다 한국어인 경우 그대로 Flow 에 입력됨.
-      return stylePrompt ? `${stylePrompt}\n\n${body}` : body;
+      // 스타일 + 사전설정 + 빈 줄 + 본문. 사전설정은 "모든 장면 공통 적용" UI 약속에 따라
+      // 대괄호 그룹에도 prepend (영문 흐름의 _buildEnglishPrompt 와 동등).
+      const head = [stylePrompt, presetPromptText].filter(Boolean).join(', ');
+      return head ? `${head}\n\n${body}` : body;
     });
     const bracketCnt = customPrompts.filter(p => p).length;
     if (bracketCnt > 0) {
