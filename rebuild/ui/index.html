@@ -11780,7 +11780,7 @@ async function openGrokLogin() {
 }
 
 /** 비디오 생성에 실패한 그룹만 골라서 일괄 재시도.
- *  도입부/본론 구분 없이 g.videoStatus === 'fail' 인 모든 그룹이 대상.
+ *  v1.13.43: 사용자 정책 — 그록 영상은 도입부 그룹만. 본론 실패는 자동 제외.
  *  재시도 전 status 를 'pending' 으로 리셋하고, 재시도 자체가 실패하면 다시 'fail' 로 돌아감. */
 async function retryFailedVideos() {
   try {
@@ -11790,13 +11790,18 @@ async function retryFailedVideos() {
       addLog('[Grok] 이미 다른 비디오 작업 진행 중', 'err');
       return;
     }
-    const failed = proj.groups.filter(g => g.videoStatus === 'fail');
+    const failedAll  = proj.groups.filter(g => g.videoStatus === 'fail');
+    const failed     = failedAll.filter(g => g.isIntro);
+    const mainSkipped = failedAll.length - failed.length;
+    if (mainSkipped > 0) {
+      addLog(`[Grok] 실패 재시도 — 본론 그룹 ${mainSkipped}개 자동 제외 (도입부만 변환 정책). 본론 재시도는 개별 카드 🎬 또는 선택 영상으로.`, 'info');
+    }
     if (failed.length === 0) {
-      addLog('[Grok] 재시도할 실패 영상 없음', 'info');
+      addLog(`[Grok] 재시도할 실패 도입부 영상 없음${mainSkipped > 0 ? ` (본론 ${mainSkipped}개 제외)` : ''}`, 'info');
       return;
     }
     const nums = failed.map(g => `#${g.num}`).join(', ');
-    addLog(`[Grok] 실패 영상 재시도 — ${failed.length}개 그룹 (${nums})`, 'info');
+    addLog(`[Grok] 실패 영상 재시도 — 도입부 ${failed.length}개 그룹 (${nums})`, 'info');
     failed.forEach(g => { g.videoStatus = 'pending'; });
     renderTaskList(proj);
     await _convertGroupListToVideo(failed.map(g => g.id), '실패 영상 재시도');
@@ -11850,9 +11855,16 @@ async function convertGroupRangeVideo() {
       return;
     }
 
-    const inRange = proj.groups.filter(g => g.num >= from && g.num <= to && g.imagePath);
+    // v1.13.43: 사용자 정책 — 그록 영상은 도입부 그룹만. 본론 그룹은 자동 제외.
+    //           본론 1개만 일회성으로 만들고 싶을 때는 개별 카드 🎬 또는 선택 영상 사용.
+    const inRangeAll  = proj.groups.filter(g => g.num >= from && g.num <= to && g.imagePath);
+    const inRange     = inRangeAll.filter(g => g.isIntro);
+    const mainSkipped = inRangeAll.length - inRange.length;
+    if (mainSkipped > 0) {
+      addLog(`[Grok] 범위 ${from}~${to} — 본론 그룹 ${mainSkipped}개 자동 제외 (도입부만 변환 정책). 본론은 개별 🎬 또는 선택 영상으로.`, 'info');
+    }
     if (inRange.length === 0) {
-      alert(`그룹 ${from}~${to} 중 이미지가 등록된 그룹이 없습니다.`);
+      alert(`그룹 ${from}~${to} 중 이미지가 등록된 도입부 그룹이 없습니다.\n(본론 ${mainSkipped}개는 정책상 제외)`);
       return;
     }
     // skip-existing — 이미 동영상 완성된 그룹은 건너뛰고 비어있는 그룹만 변환.
@@ -11860,10 +11872,10 @@ async function convertGroupRangeVideo() {
     const targets = inRange.filter(g => !_hasCompletedVideo(g));
     const skipped = inRange.length - targets.length;
     if (skipped > 0) {
-      addLog(`[Grok] 범위 ${from}~${to} — ${inRange.length}개 중 ${skipped}개는 이미 동영상 있음 (skip), ${targets.length}개 진행`, 'info');
+      addLog(`[Grok] 범위 ${from}~${to} — 도입부 ${inRange.length}개 중 ${skipped}개는 이미 동영상 있음 (skip), ${targets.length}개 진행`, 'info');
     }
     if (targets.length === 0) {
-      alert(`범위 ${from}~${to} 안의 모든 그룹이 이미 동영상을 가지고 있습니다.\n다시 만들고 싶다면 🎬 선택 영상 버튼으로 진행하세요.`);
+      alert(`범위 ${from}~${to} 안의 모든 도입부 그룹이 이미 동영상을 가지고 있습니다.\n다시 만들고 싶다면 🎬 선택 영상 버튼으로 진행하세요.`);
       return;
     }
     await _convertGroupListToVideo(targets.map(g => g.id), `범위 [${from}~${to}]`);
