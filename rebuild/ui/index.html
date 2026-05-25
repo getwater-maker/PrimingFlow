@@ -1255,6 +1255,45 @@
       <li><b>생성 시작</b> — 출력 폴더 선택 후 [생성 시작] 클릭</li>
     </ol>
 
+    <h3 style="color:var(--accent); margin:16px 0 8px;">📄 대본 파일 (.md) 구조</h3>
+    <p style="color:var(--text-soft); margin:6px 0 8px;">
+      대본은 일반 텍스트(<code>.txt</code>) 또는 마크다운(<code>.md</code>) 파일을 첨부할 수 있습니다.
+      <b>빈 줄 = 단락 구분</b>, <b>마침표/물음표/느낌표 = 문장 분할 기준</b>입니다.
+      마크다운 헤더와 대괄호 섹션 마커는 영상에 들어가지 않고 <b>그룹 분할 힌트</b>로만 쓰입니다.
+    </p>
+
+    <div style="background:var(--bg-input); border-radius:8px; padding:14px; font-family:'Consolas', monospace; font-size:12px; color:var(--text-base); line-height:1.7; white-space:pre-wrap; border:1px solid var(--border);"># 도입부
+오늘은 세종이 장영실에게 곤장 80대를 친 사건을 알아보겠습니다.
+조선 최고의 천재 발명가가 왜 사라졌을까요?
+
+# 본론
+
+[1장 — 안여 사고]
+1442년 봄, 장영실이 만든 임금의 안여가 부서졌습니다.
+세종은 격노했고, 장영실은 곤장 80대를 맞았습니다.
+
+[2장 — 사라진 천재]
+이후 장영실은 역사 기록에서 완전히 사라집니다.
+정말 처벌이 그 끝이었을까요?</div>
+
+    <h4 style="color:var(--text-strong); margin:14px 0 6px; font-size:13px;">파싱 규칙</h4>
+    <ul style="padding-left:20px; color:var(--text-soft); font-size:13px;">
+      <li><b><code>#</code> 헤더</b> — 헤더 줄 자체는 영상에서 제외. <b>"도입"</b> 단어가 포함된 헤더 다음 본문은 자동으로 <b>도입부 그룹</b>으로 분류 (예: <code># 도입부</code>, <code>## 영상 도입</code>)</li>
+      <li><b><code>[섹션명]</code> 대괄호 마커</b> — 줄 전체가 <code>[...]</code> 형태일 때만 인식. 영상에서는 제외되고 그룹 경계로만 작동 (예: <code>[1장]</code>, <code>[결말]</code>)</li>
+      <li><b>빈 줄</b> — 단락 구분. 단락 안의 줄바꿈은 같은 문장의 일부로 합쳐짐</li>
+      <li><b>종결부호</b> <code>. ! ? 。</code> — 문장 분할 기준. 부호 없이 단락이 끝나면 단락 전체가 한 문장 (긴 문장 → 자동 sub-clip 분할 대상)</li>
+      <li><b>따옴표·인용부호</b> <code>" '「」『』</code> — 자동 제거 (대화체에서 따옴표가 단독 문장이 되는 사고 방지)</li>
+      <li><b>이모지·특수기호</b> <code>★ ※ © ™ → ♪</code> 등 — 자동 제거 (TTS 발음 방지)</li>
+    </ul>
+
+    <h4 style="color:var(--text-strong); margin:14px 0 6px; font-size:13px;">권장 작성 흐름</h4>
+    <ol style="padding-left:20px; color:var(--text-soft); font-size:13px;">
+      <li>첫 줄에 <code># 도입부</code> 헤더 — 후킹 문장 2~3줄 (5~10초 분량)</li>
+      <li>본론은 <code>[1장]</code> <code>[2장]</code> ... 처럼 대괄호 마커로 챕터 구분 (옵션)</li>
+      <li>한 문장은 마침표로 명확히 끝내기 (긴 문장은 자동 분할되지만 의도된 단락이 더 깔끔)</li>
+      <li>대화체는 따옴표 없이 그냥 평문으로 작성</li>
+    </ol>
+
     <h3 style="color:var(--accent); margin:16px 0 8px;">🎨 스타일 (23종)</h3>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:2px 16px; color:var(--text-soft); font-size:13px;">
       <div>시네마틱 — 영화풍 드라마틱 조명</div>
@@ -1532,7 +1571,14 @@
 
           <!-- Row 4 -->
           <button class="btn btn-sm-action" id="batchConvertBtn" onclick="onBatchConvertClick()" title="모든 문장 TTS 변환">🎙 TTS 변환</button>
-          <button class="btn btn-sm-action" onclick="openTtsImportFromTab()" title="다른 탭에서 TTS 변환된 음성을 같은 대본의 같은 문장으로 가져오기 (경로만 참조 — 파일 복사 X)">🔗 다른 탭 TTS</button>
+          <!-- 실패 영상 재시도: 평소엔 숨김, videoStatus='fail' 인 그룹 1개 이상일 때만 표시.
+               다른 탭 TTS 자리로 이동 + 그리드 셀 폭(절반) 으로 자동 축소. -->
+          <button class="btn btn-sm-action" id="retryFailedVideoBtn"
+            onclick="retryFailedVideos()"
+            title="비디오 생성에 실패한 그룹만 골라서 다시 시도 (도입부/본론 모두)"
+            style="display:none; padding:6px 8px; font-size:12px; background:var(--warning, #c87000); color:#fff; font-weight:700;">
+            🔁 실패 영상 재시도 (<span id="retryFailedCount">0</span>)
+          </button>
 
           <!-- Row 5: Vrew 풀폭 -->
           <button class="btn btn-sm-action" onclick="saveVrew()" title="현재 프로젝트를 Vrew 4.0.1 호환 .vrew 파일로 저장" style="grid-column: span 2;">💾 Vrew</button>
@@ -1540,13 +1586,6 @@
           <!-- Row 5: Adobe Premiere Pro 호환 XML (FCP7 XMEML v5) 풀폭 -->
           <button class="btn btn-sm-action" onclick="savePremiereXml()" title="Adobe Premiere Pro (FCP7 XML) 형식으로 시퀀스 저장 + 자막 .srt 동봉. 이미지·오디오·자막 트랙 정렬된 상태로 프리미어 가져오기 가능" style="grid-column: span 2;">🎬 프리미어 XML 저장</button>
         </div>
-        <!-- 실패 영상 재시도: 평소엔 숨김, videoStatus='fail' 인 그룹 1개 이상일 때만 표시 -->
-        <button class="btn btn-sm-action" id="retryFailedVideoBtn"
-          onclick="retryFailedVideos()"
-          title="비디오 생성에 실패한 그룹만 골라서 다시 시도 (도입부/본론 모두)"
-          style="display:none; width:100%; margin-top:6px; background:var(--warning, #c87000); color:#fff; font-weight:700;">
-          🔁 실패 영상 재시도 (<span id="retryFailedCount">0</span>)
-        </button>
         <input type="file" id="imageBatchInput" multiple accept="image/jpeg,image/png,image/jpg,image/webp,video/mp4,video/webm,video/x-matroska,video/quicktime" style="display:none;">
       </div>
     </div>
@@ -6548,6 +6587,24 @@ function _groupTtsDuration(g, sentences) {
 }
 
 // 작업 목록 렌더 — 분할 결과를 그룹 카드 + 문장 행으로
+// 그룹 시작/끝 인풋 자동 채움 — 도입부 그룹이 있으면 그 범위, 없으면 전체.
+// 빈 값일 때만 채움 (사용자가 직접 입력한 값은 보존).
+// _splitScriptImpl 외에도 프로젝트 불러오기 / 탭 전환 / 자동 저장 복원 등 모든
+// renderTaskList 호출 경로에서 보장하기 위해 별도 헬퍼로 분리.
+function _refreshGroupRangeInputs(project) {
+  if (!project || !Array.isArray(project.groups) || project.groups.length === 0) return;
+  const fromEl = document.getElementById('videoRangeFrom');
+  const toEl   = document.getElementById('videoRangeTo');
+  if (!fromEl || !toEl) return;
+  const fromEmpty = !String(fromEl.value || '').trim();
+  const toEmpty   = !String(toEl.value || '').trim();
+  if (!fromEmpty && !toEmpty) return;
+  const introGroups = project.groups.filter(g => g.isIntro);
+  const target = introGroups.length > 0 ? introGroups : project.groups;
+  if (fromEmpty) fromEl.value = target[0].num;
+  if (toEmpty)   toEl.value   = target[target.length - 1].num;
+}
+
 function renderTaskList(project) {
   const empty = document.getElementById('taskEmpty');
   const groupsBox = document.getElementById('taskListGroups');
@@ -6555,6 +6612,9 @@ function renderTaskList(project) {
   const editBtn = document.getElementById('editScriptBtn');
 
   if (!groupsBox) return;
+
+  // 그룹 시작/끝 자동 채움 — 매 렌더마다 빈 입력만 채워서 모든 호출 경로 보장.
+  try { _refreshGroupRangeInputs(project); } catch (_) {}
 
   // 빈 상태 → 그룹 카드 모드
   if (empty) empty.style.display = 'none';
@@ -7483,6 +7543,19 @@ function _setBIButton(id, active) {
 }
 
 function collectCaptionStyleOpts() {
+  // 활성 프리셋에 저장된 captionStyle 이 source of truth.
+  // (DOM 의 select 값은 프리셋 모달 열렸을 때만 동기화되므로 모달 닫혀있으면 stale 가능 —
+  // 활성 프리셋의 'random' 같은 의도가 무시되는 버그가 있었음. 활성 프리셋 우선 + DOM 폴백.)
+  try {
+    if (typeof _activePresetId !== 'undefined' && _activePresetId) {
+      const PresetStore = require('../tts/preset-store');
+      const p = PresetStore.getById(_activePresetId);
+      if (p && p.captionStyle && Object.keys(p.captionStyle).length > 0) {
+        return { ...p.captionStyle };
+      }
+    }
+  } catch (_) {}
+
   const sizeRaw    = document.getElementById('captionSize')?.value || '100';
   // size: 'random' (빌드 시점에 100/125 중 결정) 또는 숫자 문자열
   const size       = (sizeRaw === 'random') ? 'random' : String(parseInt(sizeRaw, 10) || 100);
@@ -7597,6 +7670,20 @@ function applyAiNoticeToForm(opt) {
 
 // 빌더 옵션 수집 (saveVrew 가 호출)
 function collectAiNoticeOpts() {
+  // 활성 프리셋에 저장된 aiNotice 가 source of truth.
+  // (DOM 체크박스(aiNoticeBgNone 등)는 프리셋 모달 닫혀있어도 마지막 상태가 남아있지만,
+  // 활성 프리셋이 바뀌어도 DOM 은 동기화되지 않음 → bgNone=true 프리셋인데 DOM 은 false
+  // 인 채로 흰색 배경이 박히는 버그. 활성 프리셋 우선 + DOM 폴백.)
+  try {
+    if (typeof _activePresetId !== 'undefined' && _activePresetId) {
+      const PresetStore = require('../tts/preset-store');
+      const p = PresetStore.getById(_activePresetId);
+      if (p && p.aiNotice && Object.keys(p.aiNotice).length > 0) {
+        return { ...p.aiNotice };
+      }
+    }
+  } catch (_) {}
+
   const enabledEl = document.getElementById('aiNoticeEnabled');
   if (!enabledEl || !enabledEl.checked) return { enabled: false };
   const text = (document.getElementById('aiNoticeText').value || '').trim();

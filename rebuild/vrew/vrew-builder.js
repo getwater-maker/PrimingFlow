@@ -310,18 +310,15 @@ function addAiNoticeTrack(pj, opt, clipDurations, log) {
   };
 
   // customAttributes — bgNone 처리.
-  // (v1.13.17) 옛 코드는 attribute 자체를 빼서 투명 처리 시도했지만 Vrew 4.0.1 의 CSS
-  // default 가 흰색 fallback 이라 흰색 배경이 그대로 나오는 결함. 명시적으로 투명 RGBA 값
-  // 전달 + alpha=0 opacity attribute 도 함께 부여해서 어떤 Vrew render 경로에서도
-  // 배경이 투명하게 보장.
+  // 사용자가 Vrew 에서 직접 "배경 없음" 으로 만든 영상.vrew 와 동일한 형식 사용:
+  //   { type: 'color-hex', value: '#00000000' }  (alpha=00 의 8자리 hex)
+  // 옛 코드의 color-rgba 'rgba(0,0,0,0)' + textbox-bg-opacity 조합은 Vrew 4.0.1 일부 경로에서
+  // 흰색 fallback 되는 결함이 있었음. 검증된 hex 표기로 통일.
   const customAttributes = [
     { attributeName: '--textbox-align', type: 'textbox-align', value: 'start' },
   ];
   if (bgNone) {
-    customAttributes.unshift(
-      { attributeName: '--textbox-color', type: 'color-rgba', value: 'rgba(0, 0, 0, 0)' },
-      { attributeName: '--textbox-bg-opacity', type: 'number', value: '0' }
-    );
+    customAttributes.unshift({ attributeName: '--textbox-color', type: 'color-hex', value: '#00000000' });
   } else {
     customAttributes.unshift({ attributeName: '--textbox-color', type: 'color-hex', value: bgRaw });
   }
