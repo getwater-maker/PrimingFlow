@@ -156,6 +156,9 @@ class FlowAutomator {
 
   // v1.13.46: 프로필 전환 폴백 / 사용자 중지 시 즉시 창을 닫기 위한 통합 헬퍼.
   // 페이지 명시 close → context.close → OS lock 해제 대기 → 상태 리셋.
+  // v1.13.47: profileDir 리셋 제거 — login() 이 this.profileDir 을 직접 참조하므로
+  //           null 로 두면 path.join(null, 'SingletonLock') 에서 폭발. context/page 만
+  //           null 리셋으로 충분 (다음 run() 분기에서 needNewContext=true 자동 진입).
   async _closeContextAndCleanup(reason) {
     if (!this.context) return;
     this.log(`[Flow] 컨텍스트 종료 (${reason})`);
@@ -172,7 +175,7 @@ class FlowAutomator {
     await new Promise(r => setTimeout(r, 2000));
     this.context = null;
     this.page = null;
-    this.profileDir = null;
+    // profileDir 은 의도적으로 유지 — login() / 다른 메서드에서 직접 참조.
   }
 
   pause() {
