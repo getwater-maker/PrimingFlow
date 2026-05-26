@@ -45,6 +45,19 @@ function load() {
     if (fs.existsSync(STORE_PATH)) {
       const data = JSON.parse(fs.readFileSync(STORE_PATH, 'utf-8'));
       const merged = { ...DEFAULTS, ...data };
+
+      // v1.13.48: 1회성 마이그레이션 — v1.13.42 의 무제한(0) 정책이 코드 DEFAULTS 만
+      // 바뀌고 기존 사용자 파일은 옛 한도값(예: 30, 50) 그대로였던 함정 해소.
+      // _v48_migrated 플래그 없으면 maxDailyVideos > 0 인 옛 값을 0(무제한)으로 강제.
+      // 사용자가 명시적으로 한도 걸고 싶으면 마이그레이션 후 파일 다시 수정하면 됨.
+      if (!merged._v48_migrated) {
+        if (merged.maxDailyVideos > 0) {
+          merged.maxDailyVideos = 0;
+        }
+        merged._v48_migrated = true;
+        save(merged);
+      }
+
       // 날짜가 바뀌었으면 todayCount 리셋
       if (merged.lastDate !== _today()) {
         merged.todayCount = 0;
@@ -56,7 +69,7 @@ function load() {
   } catch (e) {
     console.error('[grok-store] 로드 실패:', e.message);
   }
-  const seed = { ...DEFAULTS, lastDate: _today() };
+  const seed = { ...DEFAULTS, lastDate: _today(), _v48_migrated: true };
   save(seed);
   return seed;
 }
