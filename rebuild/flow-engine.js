@@ -154,6 +154,27 @@ class FlowAutomator {
     this.log('중지 요청됨...');
   }
 
+  // v1.13.46: 프로필 전환 폴백 / 사용자 중지 시 즉시 창을 닫기 위한 통합 헬퍼.
+  // 페이지 명시 close → context.close → OS lock 해제 대기 → 상태 리셋.
+  async _closeContextAndCleanup(reason) {
+    if (!this.context) return;
+    this.log(`[Flow] 컨텍스트 종료 (${reason})`);
+    try {
+      const pages = this.context.pages ? this.context.pages() : [];
+      for (const p of pages) {
+        try { if (!p.isClosed()) await p.close({ runBeforeUnload: false }); } catch {}
+      }
+    } catch {}
+    try { await this.context.close(); } catch (e) {
+      this.debug(`[Flow] context.close 오류 무시: ${e.message}`);
+    }
+    // Chrome persistent context 의 OS-level 종료 lag — 500ms → 2000ms
+    await new Promise(r => setTimeout(r, 2000));
+    this.context = null;
+    this.page = null;
+    this.profileDir = null;
+  }
+
   pause() {
     if (this._paused) { this.log('이미 일시정지 상태'); return; }
     this._paused = true;
@@ -369,20 +390,17 @@ class FlowAutomator {
     // v1.13.39: 프로필 전환 시 명시적으로 "닫고 새로 열기" 보장 — 사용자 요청.
     //           기존엔 profileDir != desiredProfileDir 일 때만 close 했는데, 이전 인스턴스
     //           재사용 케이스가 섞여 동작이 일관되지 않아 보였음. 이제 다른 프로필이면 무조건 close.
+    // v1.13.46: close 로직을 _closeContextAndCleanup 헬퍼로 통합 (페이지 명시 close + 2초 대기).
     {
       const desiredProfileId = (config && config.profileId) || 'default';
       const desiredProfileDir = path.join(os.homedir(), '.flow-app', 'profiles', desiredProfileId.replace(/[\\\/:*?"<>|]/g, '_'));
       const profileChanged = this.profileDir !== desiredProfileDir;
       if (profileChanged) {
         if (this.context) {
-          this.log(`[Flow] 프로필 변경: ${path.basename(this.profileDir)} → ${path.basename(desiredProfileDir)} — 기존 창 닫고 새 창 엽니다`);
-          try { await this.context.close(); } catch (e) { this.debug(`[Flow] 기존 컨텍스트 close 오류 (무시): ${e.message}`); }
-          // close 후 OS 가 프로필 lock 해제할 시간 — 같은 폴더 재오픈은 아니지만 안전 마진
-          await new Promise(r => setTimeout(r, 500));
+          this.log(`[Flow] 프로필 변경: ${path.basename(this.profileDir)} → ${path.basename(desiredProfileDir)}`);
+          await this._closeContextAndCleanup('프로필 변경');
         }
-        this.context = null;
-        this.page = null;
-        this.profileDir = desiredProfileDir;
+        this.profileDir = desiredProfileDir;  // cleanup 이 null 로 리셋했으니 재설정
       }
     }
 
@@ -610,6 +628,12 @@ class FlowAutomator {
       profileId: this._currentProfileId || 'default',
     };
     this.send('done', result);
+    // v1.13.46: 폴백(_rateExhaustedFlag) 또는 사용자 중지(_stopped) 시 잔존 창 즉시 종료.
+    // 정상 완료는 동일 프로필 재호출 가능성 위해 컨텍스트 유지.
+    if (this._rateExhaustedFlag || this._stopped) {
+      const reason = this._stopped ? '사용자 중지' : `폴백 (${result.reason})`;
+      await this._closeContextAndCleanup(reason);
+    }
     // 로그 파일 경로 초기화 (다음 실행 때 새 파일로)
     this._logFilePath = null;
     this._failedNums = null;
