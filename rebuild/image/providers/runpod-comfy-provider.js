@@ -30,7 +30,15 @@ function loadWorkflow(name) {
     if (!fs.existsSync(manifestPath)) throw new Error(`매니페스트 없음: ${manifestPath}`);
     const workflow = JSON.parse(fs.readFileSync(wfPath, 'utf-8'));
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-    return { workflow: JSON.parse(JSON.stringify(workflow)), manifest };
+    if (manifest._placeholder || workflow._placeholder) {
+        throw new Error(`워크플로 '${name}' 가 아직 검증되지 않았습니다 (_placeholder).`);
+    }
+    const clone = JSON.parse(JSON.stringify(workflow));
+    // ComfyUI 제출 전 _ 로 시작하는 메타 키(_comment 등) 제거 — 노드 오인 방지
+    for (const k of Object.keys(clone)) {
+        if (k.startsWith('_')) delete clone[k];
+    }
+    return { workflow: clone, manifest };
 }
 
 function injectSlot(workflow, slot, value) {
@@ -211,38 +219,34 @@ class RunPodComfyProvider {
         const slots = manifest.slots || {};
         const defaults = manifest.defaults || {};
 
-        // 2a. 제출 전 checkpoint 목록 확인 (ComfyUI 시작 후 모델 스캔이 끝날 때까지 최대 2분 대기)
-        progress(0.05);
-        console.log('[runpod-comfy] ComfyUI checkpoint 목록 조회 중...');
-        let ckptList = await _fetchCheckpoints(endpointUrl, 120_000);
-        let ckptName = _pickSdxlName(ckptList);
-
-        if (!ckptName) {
-            // 목록에 없음 → Manager API 로 등록 시도
-            console.log('[runpod-comfy] SDXL 없음 — Manager API 재등록 시도 (현재 목록:', ckptList, ')');
-            progress(0.07);
-            ckptName = await _registerAndWait(endpointUrl);
+        // 2a. SDXL(CheckpointLoaderSimple) 워크플로만 checkpoint 자동 감지/등록.
+        //     Qwen-Image 등 UNETLoader 기반 워크플로는 건너뜀.
+        const ckptNode = Object.entries(workflow).find(
+            ([, n]) => n && n.class_type === 'CheckpointLoaderSimple'
+        );
+        if (ckptNode) {
+            progress(0.05);
+            console.log('[runpod-comfy] ComfyUI checkpoint 목록 조회 중...');
+            let ckptList = await _fetchCheckpoints(endpointUrl, 120_000);
+            let ckptName = _pickSdxlName(ckptList);
             if (!ckptName) {
-                // 마지막 목록 재조회
-                ckptList = await _fetchCheckpoints(endpointUrl, 10_000);
-                ckptName = _pickSdxlName(ckptList) || ckptList[0] || null;
+                console.log('[runpod-comfy] SDXL 없음 — Manager API 재등록 시도 (현재 목록:', ckptList, ')');
+                progress(0.07);
+                ckptName = await _registerAndWait(endpointUrl);
+                if (!ckptName) {
+                    ckptList = await _fetchCheckpoints(endpointUrl, 10_000);
+                    ckptName = _pickSdxlName(ckptList) || ckptList[0] || null;
+                }
             }
-        }
-
-        if (!ckptName) {
-            throw new Error(
-                `ComfyUI에 사용 가능한 checkpoint 없음.\n` +
-                `현재 목록: [${ckptList.join(', ')}]\n` +
-                `RunPod 대시보드에서 Pod에 네트워크 볼륨(lkkfxotjok)이 연결됐는지 확인 후 재시도하세요.`
-            );
-        }
-
-        console.log('[runpod-comfy] 사용할 checkpoint:', ckptName);
-
-        // 2b. 체크포인트 이름 동적 주입 (workflow 의 CheckpointLoaderSimple 노드)
-        const ckptNodeId = manifest.slots?.checkpoint?.nodeId || '4';
-        if (workflow[ckptNodeId] && workflow[ckptNodeId].class_type === 'CheckpointLoaderSimple') {
-            workflow[ckptNodeId].inputs.ckpt_name = ckptName;
+            if (!ckptName) {
+                throw new Error(
+                    `ComfyUI에 사용 가능한 checkpoint 없음.\n` +
+                    `현재 목록: [${ckptList.join(', ')}]\n` +
+                    `RunPod 대시보드에서 Pod에 네트워크 볼륨(lkkfxotjok)이 연결됐는지 확인 후 재시도하세요.`
+                );
+            }
+            console.log('[runpod-comfy] 사용할 checkpoint:', ckptName);
+            workflow[ckptNode[0]].inputs.ckpt_name = ckptName;
         }
 
         injectSlot(workflow, slots.prompt, prompt);

@@ -1,0 +1,92 @@
+{
+  "_comment": "Qwen-Image fp8 text-to-image. ComfyUI 네이티브. 한국어 프롬프트 직접 입력 가능. PrimingFlow 자동 주입: 6=positive, 7=negative, 3=KSampler(seed/steps/cfg), 5=latent(width/height).",
+  "37": {
+    "inputs": {
+      "unet_name": "qwen-image/qwen_image_fp8_e4m3fn.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": { "title": "Load Qwen-Image Diffusion" }
+  },
+  "38": {
+    "inputs": {
+      "clip_name": "qwen/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": { "title": "Load Qwen2.5-VL Text Encoder" }
+  },
+  "39": {
+    "inputs": {
+      "vae_name": "qwen-image/qwen_image_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": { "title": "Load Qwen-Image VAE" }
+  },
+  "6": {
+    "inputs": {
+      "text": "한국 전통 풍경, 영화 같은 조명, 고품질",
+      "clip": ["38", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Positive (한국어 직접 입력)" }
+  },
+  "7": {
+    "inputs": {
+      "text": "blurry, low quality, watermark, text, signature, deformed, ugly",
+      "clip": ["38", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Negative" }
+  },
+  "5": {
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": { "title": "Empty Latent" }
+  },
+  "66": {
+    "inputs": {
+      "model": ["37", 0],
+      "shift": 3.1
+    },
+    "class_type": "ModelSamplingAuraFlow",
+    "_meta": { "title": "Model Sampling (shift)" }
+  },
+  "3": {
+    "inputs": {
+      "seed": 0,
+      "steps": 20,
+      "cfg": 2.5,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model": ["66", 0],
+      "positive": ["6", 0],
+      "negative": ["7", 0],
+      "latent_image": ["5", 0]
+    },
+    "class_type": "KSampler",
+    "_meta": { "title": "KSampler" }
+  },
+  "8": {
+    "inputs": {
+      "samples": ["3", 0],
+      "vae": ["39", 0]
+    },
+    "class_type": "VAEDecode",
+    "_meta": { "title": "VAE Decode" }
+  },
+  "9": {
+    "inputs": {
+      "filename_prefix": "pf_qwen",
+      "images": ["8", 0]
+    },
+    "class_type": "SaveImage",
+    "_meta": { "title": "Save Image" }
+  }
+}

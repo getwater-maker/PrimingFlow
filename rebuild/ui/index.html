@@ -1555,9 +1555,17 @@
           <button class="btn" id="stopBtn" onclick="stopGeneration()" style="flex:1; padding:8px 12px; background:var(--danger); color:#fff; display:none; white-space:nowrap;">중지</button>
         </div>
 
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px; font-size:12px;">
+          <label style="color:var(--text-muted); white-space:nowrap;">이미지 모델</label>
+          <select id="runpodImageModel" title="SDXL=빠름/영문번역, Qwen=한국어 직접/고품질(약간 느림)" style="flex:1; padding:4px 6px; border-radius:4px;">
+            <option value="qwen-image">Qwen-Image (한국어 직접 · 고품질)</option>
+            <option value="sdxl-basic">SDXL (빠름 · 영문 번역)</option>
+          </select>
+        </div>
+
         <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px;">
           <!-- Row 1 -->
-          <button class="btn btn-sm-action" onclick="generateEmptyGroupImagesRunPod()" title="이미지가 비어있는 그룹만 순차적으로 RunPod ComfyUI(SDXL) 로 생성">☁ 빈 그룹 이미지</button>
+          <button class="btn btn-sm-action" onclick="generateEmptyGroupImagesRunPod()" title="이미지가 비어있는 그룹만 순차적으로 RunPod ComfyUI 로 생성 (모델은 위 드롭다운)">☁ 빈 그룹 이미지</button>
           <div class="range-cell">
             <span>그룹</span>
             <input type="number" id="videoRangeFrom" min="1" placeholder="시작" title="범위 시작 그룹 번호" />
@@ -12985,7 +12993,11 @@ async function _runRunPodImageGeneration(groupIds, label) {
   const { getInstance: getImageManager } = require('../image/image-manager');
   const mgr = getImageManager({ logger: addLog });
 
-  addLog(`[RunPod] ${label} ${targets.length}개 그룹 이미지 생성 시작 — Pod 시동 대기 중...`, 'info');
+  // 이미지 모델 선택 (Qwen=한국어 직접, SDXL=영문 번역)
+  const imageModel = (document.getElementById('runpodImageModel') || {}).value || 'qwen-image';
+  const isQwen = imageModel === 'qwen-image';
+
+  addLog(`[RunPod] ${label} ${targets.length}개 그룹 이미지 생성 시작 (모델: ${imageModel}) — Pod 시동 대기 중...`, 'info');
 
   // 시동 워밍업 (첫 그룹 시작 전 Pod 미리 켜기 — 사용자 체감 응답성 ↑)
   try {
@@ -13015,20 +13027,31 @@ async function _runRunPodImageGeneration(groupIds, label) {
         continue;
       }
 
-      addLog(`[RunPod] 그룹 ${num} (${i+1}/${targets.length}) — 번역 + 생성 중...`, 'info');
-      const englishText = await _translateKoToEn(koreanText);
-      // 사용자가 선택한 스타일 prompt 자동 반영 (한옥 키워드 강제 주입 제거)
+      // 스타일 prompt (SDXL=영문 스타일, Qwen=그대로 결합)
       let stylePrompt = '';
       try {
         const styleObj = _getActiveStylePrompt();
         stylePrompt = (styleObj && styleObj.prompt) ? styleObj.prompt.trim() : '';
       } catch (_) {}
-      const parts = [];
-      if (englishText) parts.push(englishText); else parts.push(koreanText);
-      if (stylePrompt) parts.push(stylePrompt);
-      else parts.push('cinematic lighting, masterpiece, highly detailed');
-      const prompt = parts.join(', ');
-      if (i === 0) addLog(`[RunPod] 스타일 ${stylePrompt ? '✓ 적용됨' : '미선택 — 기본 품질 키워드만'}`, 'info');
+
+      let prompt;
+      if (isQwen) {
+        // Qwen-Image: 한국어 직접 입력 (번역 불필요)
+        addLog(`[RunPod] 그룹 ${num} (${i+1}/${targets.length}) — Qwen 한국어 직접 생성 중...`, 'info');
+        const parts = [koreanText];
+        if (stylePrompt) parts.push(stylePrompt);
+        prompt = parts.join(', ');
+      } else {
+        // SDXL: 한국어 → 영문 번역
+        addLog(`[RunPod] 그룹 ${num} (${i+1}/${targets.length}) — 번역 + 생성 중...`, 'info');
+        const englishText = await _translateKoToEn(koreanText);
+        const parts = [];
+        if (englishText) parts.push(englishText); else parts.push(koreanText);
+        if (stylePrompt) parts.push(stylePrompt);
+        else parts.push('cinematic lighting, masterpiece, highly detailed');
+        prompt = parts.join(', ');
+      }
+      if (i === 0) addLog(`[RunPod] 스타일 ${stylePrompt ? '✓ 적용됨' : '미선택'} · 모델 ${imageModel}`, 'info');
 
       const filename = `그룹${String(num).padStart(2, '0')}_${Date.now()}.png`;
       const outputPath = path.join(imagesDir, filename);
@@ -13036,6 +13059,7 @@ async function _runRunPodImageGeneration(groupIds, label) {
       const result = await mgr.synth({
         prompt,
         outputPath,
+        workflowName: imageModel,
       });
 
       _setGroupImageThumbnail(g.id, result.path);
