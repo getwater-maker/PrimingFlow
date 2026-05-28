@@ -51,6 +51,63 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 30_000) {
     }
 }
 
+/**
+ * ComfyUI Manager API 로 SDXL 모델 재등록.
+ * 네트워크 볼륨에 파일이 있으면 다운로드 없이 15~30초 내 완료.
+ * Manager 가 없거나 실패해도 예외 없이 리턴 (이미 등록된 경우 포함).
+ */
+async function _registerSdxlViaManager(endpointUrl) {
+    const CKPT = 'SDXL/sd_xl_base_1.0.safetensors';
+    try {
+        // 1) 현재 등록 목록 확인
+        const infoResp = await fetchWithTimeout(`${endpointUrl}/object_info/CheckpointLoaderSimple`, {}, 10_000);
+        const info = await infoResp.json();
+        const list = info?.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
+        if (list.some(n => n === CKPT || n.endsWith('sd_xl_base_1.0.safetensors'))) {
+            console.log('[runpod-comfy] SDXL 이미 등록됨 — 재등록 불필요');
+            return;
+        }
+    } catch {}
+
+    console.log('[runpod-comfy] Manager API 로 SDXL 재등록 요청...');
+    try {
+        await fetchWithTimeout(`${endpointUrl}/manager/queue/install_model`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: 'checkpoints',
+                url: 'https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors',
+                filename: CKPT,
+                save_path: `models/checkpoints/${CKPT}`,
+            }),
+        }, 15_000);
+        await fetchWithTimeout(`${endpointUrl}/manager/queue/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
+        }, 10_000);
+    } catch (e) {
+        console.warn('[runpod-comfy] Manager 재등록 실패 (무시):', e.message);
+        return;
+    }
+
+    // 최대 90초 대기 — 볼륨에 파일 있으면 15~30초
+    const deadline = Date.now() + 90_000;
+    while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 5_000));
+        try {
+            const r = await fetchWithTimeout(`${endpointUrl}/object_info/CheckpointLoaderSimple`, {}, 10_000);
+            const j = await r.json();
+            const list = j?.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
+            if (list.some(n => n === CKPT || n.endsWith('sd_xl_base_1.0.safetensors'))) {
+                console.log('[runpod-comfy] ✅ SDXL 재등록 완료');
+                return;
+            }
+        } catch {}
+    }
+    console.warn('[runpod-comfy] SDXL 재등록 타임아웃 — 제출 재시도');
+}
+
 class RunPodComfyProvider {
     constructor(opts = {}) {
         this.ready = false;
@@ -138,16 +195,33 @@ class RunPodComfyProvider {
             injectSlot(workflow, slots.filenamePrefix, `pf_${Date.now()}_${finalSeed}`);
         }
 
-        // 3. 제출
+        // 3. 제출 (모델 미등록 시 자동 재등록 후 재시도)
         progress(0.08);
         const clientId = `pf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        const submitResp = await fetchWithTimeout(`${endpointUrl}/prompt`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: workflow, client_id: clientId }),
-        }, 30_000);
 
-        const submit = await submitResp.json();
+        let submit = await (async () => {
+            const r = await fetchWithTimeout(`${endpointUrl}/prompt`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: workflow, client_id: clientId }),
+            }, 30_000);
+            return r.json();
+        })();
+
+        // prompt_outputs_failed_validation = 모델 미등록 → Manager API 로 재등록 후 1회 재시도
+        if (submit.error?.type === 'prompt_outputs_failed_validation') {
+            console.log('[runpod-comfy] 모델 미등록 감지 — Manager API 재등록 시도...');
+            progress(0.1);
+            await _registerSdxlViaManager(endpointUrl);
+            progress(0.13);
+            const retryR = await fetchWithTimeout(`${endpointUrl}/prompt`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: workflow, client_id: clientId + '_r' }),
+            }, 30_000);
+            submit = await retryR.json();
+        }
+
         if (submit.error) {
             throw new Error(`ComfyUI 제출 거부: ${JSON.stringify(submit.error)}`);
         }
