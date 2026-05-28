@@ -1237,6 +1237,7 @@
   <button class="btn-sm" onclick="openRecToRef()" style="font-size:12px;">🎤 녹음→참조음성</button>
   <button class="btn-sm" onclick="openRefAudioVault()" style="font-size:12px;" title="~/.flow-app/ref-audio/ — 녹음→참조음성에서 저장된 WAV+TXT 묶음 폴더를 탐색기로 엽니다">📂 참조음성 폴더</button>
   <button class="btn-sm" onclick="openGallery()" style="font-size:12px;">🖼 갤러리</button>
+  <button class="btn-sm" onclick="openGeminiImgTest()" style="font-size:12px;" title="현재 프로젝트의 그룹 N개로 Gemini 이미지 생성 PoC 테스트 (gemini-2.5-flash-image)">🧪 Gemini 이미지</button>
   <button class="btn-sm" onclick="document.getElementById('helpModal').style.display='flex'" style="font-size:12px;">📖 사용법</button>
 </div>
 
@@ -1542,6 +1543,7 @@
           <button class="btn btn-sm-action" id="grokLoginBtn" onclick="openGrokLogin()" title="Grok 자동화 크롬을 띄우고 grok.com 로그인 페이지로 이동 (영상 생성 전 X 계정 로그인 권장)">🔑 그록 로그인</button>
         </div>
         <button class="btn btn-sm-action" id="startAllProjectsBtn" onclick="generateAllProjects()" title="열려있는 모든 탭을 순차적으로 자동제작 (탭1 완료 → 탭2 자동 시작 → ...)" style="width:100%; margin-bottom:8px; background:var(--accent-soft); color:var(--accent-hover); border:1px solid var(--accent); font-weight:700;">▶▶ 모든 탭 순차 자동제작</button>
+        <button class="btn btn-sm-action" id="runpodPipelineBtn" onclick="runpodOneclickPipeline()" title="RunPod 원클릭: 이미지(SDXL) → TTS → .vrew 빌드. Grok 불필요." style="width:100%; margin-bottom:8px; background:linear-gradient(135deg,#1a6b3a,#0e4d6e); color:#fff; font-weight:700; border:1px solid #2a8a5a;">🚀 RunPod 원클릭 생성</button>
         <div style="margin-bottom:8px; font-size:12px; color:var(--text-muted);">
           <label style="display:flex; align-items:center; gap:6px; cursor:pointer;" title="[▶ 자동제작] 클릭 시 도입부 그룹 이미지가 완성되는 즉시 Grok 으로 순차 영상 변환을 시작합니다. 본론은 이미지 그대로.">
             <input type="checkbox" id="autoIntroVideoToggle" checked />
@@ -1555,7 +1557,7 @@
 
         <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px;">
           <!-- Row 1 -->
-          <button class="btn btn-sm-action" onclick="generateEmptyGroupImages()" title="이미지가 비어있는 그룹만 순차적으로 Flow 로 생성">🎨 빈 그룹 이미지</button>
+          <button class="btn btn-sm-action" onclick="generateEmptyGroupImagesRunPod()" title="이미지가 비어있는 그룹만 순차적으로 RunPod ComfyUI(SDXL) 로 생성">☁ 빈 그룹 이미지</button>
           <div class="range-cell">
             <span>그룹</span>
             <input type="number" id="videoRangeFrom" min="1" placeholder="시작" title="범위 시작 그룹 번호" />
@@ -1565,11 +1567,11 @@
 
           <!-- Row 2 -->
           <button class="btn btn-sm-action" id="imageBatchAttachBtn" onclick="openImageBatchAttach()" title="외부 이미지/동영상 파일을 그룹 제목 또는 그룹 번호(예: '그룹 01_...')와 매칭해서 자동 첨부">📎 이미지·영상 첨부</button>
-          <button class="btn btn-sm-action" onclick="convertGroupRangeVideo()" title="위 입력 범위 그룹의 이미지를 Grok 으로 영상 변환">🎬 범위 영상</button>
+          <button class="btn btn-sm-action" onclick="generateEmptyGroupVideosRunPod()" title="이미지는 있지만 비디오가 없는 그룹만 RunPod ComfyUI(Wan2.2) 로 비디오 생성">☁ 빈 그룹 비디오</button>
 
           <!-- Row 3 -->
-          <button class="btn btn-sm-action" onclick="generateSelectedGroupImages()" title="좌상단 체크박스로 선택한 그룹의 이미지를 Flow 로 생성/재생성">🎨 선택 그룹 이미지</button>
-          <button class="btn btn-sm-action" onclick="convertSelectedGroupsVideo()" title="좌상단 체크박스로 선택한 그룹의 이미지를 Grok 으로 영상 변환">🎬 선택 영상</button>
+          <button class="btn btn-sm-action" onclick="generateSelectedGroupImagesRunPod()" title="좌상단 체크박스로 선택한 그룹의 이미지를 RunPod ComfyUI(SDXL) 로 생성/재생성">☁ 선택 그룹 이미지</button>
+          <button class="btn btn-sm-action" onclick="generateSelectedGroupVideosRunPod()" title="좌상단 체크박스로 선택한 그룹의 이미지를 RunPod ComfyUI(Wan2.2) 로 비디오 변환">☁ 선택 그룹 비디오</button>
 
           <!-- Row 4 -->
           <button class="btn btn-sm-action" id="batchConvertBtn" onclick="onBatchConvertClick()" title="모든 문장 TTS 변환">🎙 TTS 변환</button>
@@ -2230,6 +2232,33 @@
         <button class="btn-sm" onclick="saveApiKey('gemini')" style="flex:1; background:var(--accent); color:#fff;">💾 저장</button>
         <button class="btn-sm" onclick="deleteApiKey('gemini')" style="color:var(--danger);">삭제</button>
       </div>
+    </div>
+
+    <!-- RunPod -->
+    <div style="border:1px solid var(--border-soft); border-radius:8px; padding:14px; margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="font-size:14px; font-weight:700; color:var(--text-strong);">☁ RunPod (이미지/비디오 GPU)</div>
+        <span id="apiKey_runpod_status" style="font-size:11px; color:var(--text-muted);"></span>
+      </div>
+      <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">API 키 <span style="color:var(--text-muted); font-size:11px;">(runpod.io → Settings → API Keys)</span></label>
+      <input type="password" id="apiKey_runpod_key" placeholder="rpa_..." style="width:100%; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px; margin-bottom:8px;">
+      <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">Template ID <span style="color:var(--text-muted); font-size:11px;">(RunPod → Templates)</span></label>
+      <input type="text" id="apiKey_runpod_templateId" placeholder="zg8rrc0p6m" style="width:100%; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px; margin-bottom:8px;">
+      <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">Network Volume ID <span style="color:var(--text-muted); font-size:11px;">(모델 영구 저장)</span></label>
+      <input type="text" id="apiKey_runpod_volumeId" placeholder="lkkfxotjok" style="width:100%; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px; margin-bottom:8px;">
+      <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">Data Center <span style="color:var(--text-muted); font-size:11px;">(볼륨이 있는 지역)</span></label>
+      <input type="text" id="apiKey_runpod_dataCenterId" placeholder="EU-CZ-1" style="width:100%; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px; margin-bottom:8px;">
+      <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
+        <label style="font-size:12px; color:var(--text-soft); white-space:nowrap;">Idle 자동종료</label>
+        <input type="number" id="apiKey_runpod_idleMin" min="1" max="60" value="5" style="width:70px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 8px; border-radius:6px; font-size:13px;">
+        <span style="font-size:12px; color:var(--text-muted);">분</span>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button class="btn-sm" onclick="saveApiKey('runpod')" style="flex:1; background:var(--accent); color:#fff;">💾 저장</button>
+        <button class="btn-sm" onclick="testRunPodConnection()" style="background:#f59e0b; color:#fff;">🔥 테스트 시동</button>
+        <button class="btn-sm" onclick="deleteApiKey('runpod')" style="color:var(--danger);">삭제</button>
+      </div>
+      <div id="apiKey_runpod_log" style="display:none; margin-top:8px; font-size:11px; color:var(--text-muted); background:var(--bg-soft); padding:6px 8px; border-radius:4px; line-height:1.6;"></div>
     </div>
 
     <div style="font-size:11px; color:var(--text-muted); padding-top:8px; border-top:1px solid var(--border-soft);">
@@ -2996,6 +3025,37 @@
     </div>
     <div style="padding:16px 24px; overflow-y:auto; flex:1;">
       <div class="gallery-grid" id="galleryGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 🧪 Gemini 이미지 PoC 테스트 모달 (v1.13.49+) -->
+<div id="modalGeminiImgTest" style="display:none; position:fixed; inset:0; background:rgba(58,52,46,0.5); z-index:999; align-items:center; justify-content:center;" onclick="if(event.target===this)closeGeminiImgTest()">
+  <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:14px; width:min(92vw,980px); max-height:88vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:var(--shadow-lg);">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 24px; border-bottom:1px solid var(--border-soft);">
+      <h2 style="font-size:20px; color:var(--accent); margin:0;">🧪 Gemini 이미지 테스트 <small style="font-size:12px; color:var(--text-muted); margin-left:8px;">model: gemini-2.5-flash-image</small></h2>
+      <button class="btn-sm" onclick="closeGeminiImgTest()" style="font-size:18px;">✕</button>
+    </div>
+    <div id="gimg_apiKeyWarn" style="display:none; padding:10px 24px; background:rgba(220,80,80,0.15); border-bottom:1px solid var(--border-soft); color:#e36; font-size:13px;">
+      ⚠ <b>Gemini API 키 미설정</b> — TTS 설정 모달에서 Gemini 키를 먼저 등록한 후 다시 열어주세요.
+    </div>
+    <div style="padding:14px 24px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; border-bottom:1px solid var(--border-soft); font-size:13px;">
+      <span>현재 프로젝트의 처음</span>
+      <input id="gimg_n" type="number" min="1" max="20" value="3" style="width:60px; padding:4px 6px; background:var(--bg-input); border:1px solid var(--border); border-radius:6px; color:var(--text-strong);">
+      <span>개 그룹을 테스트</span>
+      <button class="btn-sm" id="gimg_start" onclick="_runGeminiImgTest()" style="margin-left:auto;">▶ 시작</button>
+    </div>
+    <div id="gimg_grid" style="padding:14px 24px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:10px;">
+      <div style="color:var(--text-muted); font-size:13px;">시작을 누르면 한국어 → 영어 번역 → Gemini 이미지 생성 순으로 진행됩니다. 결과 파일은 <code>~/.flow-app/gemini-image-tests/&lt;시각&gt;/</code> 에 저장됩니다.</div>
+    </div>
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:12px 24px; border-top:1px solid var(--border-soft); background:var(--bg-soft);">
+      <div style="font-size:12px; color:var(--text-muted);">
+        결과 폴더: <span id="gimg_dir">—</span>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-sm" id="gimg_openFolder" onclick="_openGeminiImgTestFolder()" disabled>📂 폴더 열기</button>
+        <button class="btn-sm" onclick="closeGeminiImgTest()">닫기</button>
+      </div>
     </div>
   </div>
 </div>
@@ -4329,6 +4389,139 @@ function openGallery() {
 }
 function closeGallery() {
   document.getElementById('galleryModal').style.display = 'none';
+}
+
+// ─── 🧪 Gemini 이미지 PoC 테스트 모달 (v1.13.49+) ─────────────────────
+// 본격 통합과 분리된 가벼운 테스트. 결과는 ~/.flow-app/gemini-image-tests/<ts>/ 에 저장.
+let _gimgLastDir = null;
+
+function openGeminiImgTest() {
+  // API 키 가드
+  try {
+    const SecretStore = require('../tts/secret-store');
+    const hasKey = SecretStore.has('gemini');
+    const warn = document.getElementById('gimg_apiKeyWarn');
+    const startBtn = document.getElementById('gimg_start');
+    if (!hasKey) {
+      warn.style.display = 'block';
+      startBtn.disabled = true;
+    } else {
+      warn.style.display = 'none';
+      startBtn.disabled = false;
+    }
+  } catch (e) {
+    console.error('[gemini-img-test] API 키 체크 실패:', e);
+  }
+
+  // 그리드 초기화 (이전 결과 잔존 방지)
+  const grid = document.getElementById('gimg_grid');
+  if (grid && !grid.dataset.dirty) {
+    // 첫 진입 시 안내문 유지. 이미 한 번 돌렸으면 그대로 두고 사용자가 다시 시작 시 갱신
+  }
+  document.getElementById('modalGeminiImgTest').style.display = 'flex';
+}
+
+function closeGeminiImgTest() {
+  document.getElementById('modalGeminiImgTest').style.display = 'none';
+}
+
+function _openGeminiImgTestFolder() {
+  if (_gimgLastDir) {
+    try { require('electron').shell.openPath(_gimgLastDir); } catch (e) { console.error(e); }
+  }
+}
+
+function _gimgCard(idx, ko) {
+  // 카드 한 개 — 한국어 / 영어번역 / PNG 미리보기 / 상태
+  return `
+    <div id="gimg_card_${idx}" style="display:grid; grid-template-columns:1fr 1fr 200px; gap:10px; padding:10px; border:1px solid var(--border-soft); border-radius:8px; background:var(--bg-card);">
+      <div>
+        <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">한국어 [${String(idx + 1).padStart(2, '0')}]</div>
+        <div style="font-size:13px; color:var(--text-base); line-height:1.5; max-height:6em; overflow:hidden;">${_escapeHtml(ko).substring(0, 200)}</div>
+      </div>
+      <div>
+        <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">영어 번역</div>
+        <div id="gimg_card_${idx}_en" style="font-size:13px; color:var(--text-base); line-height:1.5; max-height:6em; overflow:hidden;">—</div>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+        <div id="gimg_card_${idx}_status" style="font-size:12px; color:var(--text-muted);">대기 중...</div>
+        <img id="gimg_card_${idx}_img" style="display:none; max-width:200px; max-height:120px; border-radius:6px; border:1px solid var(--border-soft);">
+      </div>
+    </div>
+  `;
+}
+
+function _escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function _runGeminiImgTest() {
+  const proj = window._currentProject;
+  if (!proj || !proj.groups || proj.groups.length === 0) {
+    alert('현재 프로젝트에 그룹이 없습니다. 먼저 대본을 분할하세요.');
+    return;
+  }
+  const inputN = parseInt(document.getElementById('gimg_n').value, 10);
+  const N = Math.min(Math.max(1, isNaN(inputN) ? 3 : inputN), proj.groups.length);
+
+  // 한국어 프롬프트 추출 (기존 _buildGroupParagraph 재사용)
+  const koreanPrompts = proj.groups.slice(0, N).map(g => _buildGroupParagraph(g, proj));
+
+  // 그리드 카드 N개 생성
+  const grid = document.getElementById('gimg_grid');
+  grid.innerHTML = koreanPrompts.map((ko, i) => _gimgCard(i, ko)).join('');
+  grid.dataset.dirty = '1';
+
+  // 시작/폴더 열기 버튼 잠금
+  const startBtn = document.getElementById('gimg_start');
+  const openBtn  = document.getElementById('gimg_openFolder');
+  const oldLabel = startBtn.textContent;
+  startBtn.disabled = true;
+  startBtn.textContent = '⏳ 진행 중...';
+  openBtn.disabled = true;
+  _gimgLastDir = null;
+  document.getElementById('gimg_dir').textContent = '—';
+
+  try {
+    const Gemini = require('../image-engines/gemini-image-tester');
+    const result = await Gemini.test({
+      koreanPrompts,
+      onProgress: (i, total, status) => {
+        const s = document.getElementById(`gimg_card_${i}_status`);
+        if (s) s.textContent = status;
+      },
+      onResult: (i, { ko, en, imagePath }) => {
+        const en$ = document.getElementById(`gimg_card_${i}_en`);
+        if (en$) en$.textContent = (en || '').substring(0, 200);
+        const s = document.getElementById(`gimg_card_${i}_status`);
+        if (s) { s.textContent = '✅ 완료'; s.style.color = '#4a9d4e'; }
+        const img = document.getElementById(`gimg_card_${i}_img`);
+        if (img) {
+          // file:// 직접 사용 (Electron 안에서 동작) + 캐시 회피용 ts
+          img.src = `file:///${imagePath.replace(/\\/g, '/')}?t=${Date.now()}`;
+          img.style.display = 'block';
+        }
+      },
+      onError: (i, msg) => {
+        const s = document.getElementById(`gimg_card_${i}_status`);
+        if (s) { s.textContent = '❌ ' + msg; s.style.color = '#e36'; }
+      },
+    });
+    _gimgLastDir = result.dir;
+    document.getElementById('gimg_dir').textContent = result.dir;
+    openBtn.disabled = false;
+    addLog(`🧪 Gemini 이미지 테스트 완료 — 성공 ${result.success}/${result.count}, 폴더: ${result.dir}`, result.success > 0 ? 'ok' : 'warn');
+  } catch (err) {
+    if (err && err.code === 'API_KEY_MISSING') {
+      document.getElementById('gimg_apiKeyWarn').style.display = 'block';
+      alert('Gemini API 키가 설정되지 않았습니다. TTS 설정에서 먼저 등록해주세요.');
+    } else {
+      alert('테스트 실패: ' + (err && err.message ? err.message : err));
+    }
+  } finally {
+    startBtn.disabled = false;
+    startBtn.textContent = oldLabel;
+  }
 }
 
 // 참조음성 보관소 폴더 열기 — ~/.flow-app/ref-audio/ 를 윈도우 탐색기로
@@ -7350,6 +7543,17 @@ function openApiKeysModal() {
   document.getElementById('apiKey_gemini_status').textContent = gemini.key ? '✅ 저장됨' : '⚠ 미설정';
   document.getElementById('apiKey_gemini_status').style.color = gemini.key ? 'var(--success)' : 'var(--text-muted)';
 
+  const runpod = SecretStore.get('runpod') || {};
+  document.getElementById('apiKey_runpod_key').value = runpod.apiKey || '';
+  document.getElementById('apiKey_runpod_templateId').value = runpod.templateId || 'zg8rrc0p6m';
+  document.getElementById('apiKey_runpod_volumeId').value = runpod.networkVolumeId || '';
+  document.getElementById('apiKey_runpod_dataCenterId').value = runpod.dataCenterId || 'EU-CZ-1';
+  document.getElementById('apiKey_runpod_idleMin').value = runpod.idleShutdownMinutes || 5;
+  const hasRunpod = !!(runpod.apiKey);
+  document.getElementById('apiKey_runpod_status').textContent = hasRunpod ? '✅ 저장됨' : '⚠ 미설정';
+  document.getElementById('apiKey_runpod_status').style.color = hasRunpod ? 'var(--success)' : 'var(--text-muted)';
+  document.getElementById('apiKey_runpod_log').style.display = 'none';
+
   document.getElementById('apiKeysModal').style.display = 'flex';
 }
 
@@ -7363,9 +7567,30 @@ async function saveApiKey(provider) {
     const key = document.getElementById('apiKey_gemini_key').value.trim();
     if (!key) { alert('Gemini API 키를 입력하세요'); return; }
     SecretStore.set('gemini', { key });
+  } else if (provider === 'runpod') {
+    const apiKey = document.getElementById('apiKey_runpod_key').value.trim();
+    if (!apiKey) { alert('RunPod API 키를 입력하세요'); return; }
+    const templateId = document.getElementById('apiKey_runpod_templateId').value.trim() || 'zg8rrc0p6m';
+    const networkVolumeId = document.getElementById('apiKey_runpod_volumeId').value.trim();
+    const dataCenterId = document.getElementById('apiKey_runpod_dataCenterId').value.trim() || 'EU-CZ-1';
+    const idleShutdownMinutes = parseInt(document.getElementById('apiKey_runpod_idleMin').value, 10) || 5;
+    SecretStore.set('runpod', {
+      apiKey,
+      templateId,
+      networkVolumeId,
+      dataCenterId,
+      // EU-CZ-1 Secure Cloud 실측 가격 순(저렴+안정): A5000($0.27) → A40($0.44) → 3090($0.46) → A6000($0.49)
+      gpuTypes: ['NVIDIA RTX A5000', 'NVIDIA A40', 'NVIDIA GeForce RTX 3090', 'NVIDIA RTX 3090', 'NVIDIA RTX A6000', 'NVIDIA RTX PRO 4500', 'NVIDIA RTX 4090', 'NVIDIA GeForce RTX 4090'],
+      cloudType: 'SECURE',
+      idleShutdownMinutes,
+    });
+    document.getElementById('apiKey_runpod_status').textContent = '✅ 저장됨';
+    document.getElementById('apiKey_runpod_status').style.color = 'var(--success)';
+    addLog(`[RunPod] 설정 저장 완료 (Template: ${templateId}, Volume: ${networkVolumeId || '없음'}, DC: ${dataCenterId})`, 'ok');
+    return;
   }
 
-  // provider 즉시 재초기화
+  // provider 즉시 재초기화 (gemini 등 TTS provider)
   try {
     const { getInstance } = require('../tts/tts-manager');
     const mgr = getInstance();
@@ -7388,9 +7613,14 @@ function deleteApiKey(provider) {
   if (!confirm(`${provider} API 키 삭제?`)) return;
   const SecretStore = require('../tts/secret-store');
   SecretStore.remove(provider);
-  document.getElementById(`apiKey_${provider}_key`).value = '';
+  const keyEl = document.getElementById(`apiKey_${provider}_key`);
+  if (keyEl) keyEl.value = '';
   document.getElementById(`apiKey_${provider}_status`).textContent = '⚠ 미설정';
   document.getElementById(`apiKey_${provider}_status`).style.color = 'var(--text-muted)';
+  if (provider === 'runpod') {
+    addLog('[RunPod] API 키 삭제 완료', 'info');
+    return;
+  }
   // provider 비활성화
   try {
     const { getInstance } = require('../tts/tts-manager');
@@ -7398,6 +7628,54 @@ function deleteApiKey(provider) {
     if (typeof renderPresets === 'function') renderPresets();
   } catch {}
   addLog(`[${provider}] API 키 삭제 완료`, 'info');
+}
+
+async function testRunPodConnection() {
+  const logEl = document.getElementById('apiKey_runpod_log');
+  logEl.style.display = 'block';
+
+  function setLog(msg) {
+    logEl.textContent = msg;
+    addLog(`[RunPod] ${msg}`, 'info');
+  }
+
+  try {
+    const { PodController } = require('../runpod/pod-controller');
+    const ctrl = PodController.getInstance();
+
+    setLog('GPU 재고 확인 중...');
+    try {
+      const gpus = await ctrl.listAvailableGpus();
+      if (gpus.length === 0) {
+        setLog('⚠ Community Cloud 재고 GPU 없음\n잠시 후 다시 시도하거나 RunPod 대시보드에서 확인하세요.');
+        return;
+      }
+      const gpuList = gpus.slice(0, 6).map(g => `• ${g.id} (${g.memoryInGb}GB, $${g.communityPrice}/h)`).join('\n');
+      setLog(`재고 GPU:\n${gpuList}\n\n🔥 Pod 시동 중...`);
+    } catch {}
+
+    ctrl.on('status', ({ phase, status, elapsedSec }) => {
+      if (phase === 'pod') setLog(`🔥 Pod 부팅 중... ${status} (${elapsedSec}s 경과)`);
+      else if (phase === 'comfyui') setLog(`⏳ ComfyUI 초기화 중... (${elapsedSec}s 경과)\n첫 부팅 시 모델 다운로드로 5~15분 소요`);
+    });
+
+    const { endpointUrl, podId } = await ctrl.ensureRunning();
+
+    setLog(`✅ 준비 완료!\nPod ID: ${podId}\nEndpoint: ${endpointUrl}`);
+    addLog(`[RunPod] endpoint → ${endpointUrl}`, 'ok');
+
+    // /queue 호출로 ComfyUI 응답 확인
+    try {
+      const resp = await fetch(`${endpointUrl}/queue`);
+      const json = await resp.json();
+      setLog(`✅ ComfyUI 응답 확인!\nPod: ${podId}\n${endpointUrl}\n큐 상태: ${JSON.stringify(json).slice(0, 80)}`);
+    } catch (e) {
+      setLog(`✅ Pod 준비됨 (ComfyUI /queue 응답: ${e.message})\n${endpointUrl}`);
+    }
+  } catch (e) {
+    setLog(`❌ 오류: ${e.message}`);
+    addLog(`[RunPod] 테스트 실패: ${e.message}`, 'err');
+  }
 }
 
 // 채널 모달의 음성 프리셋 select 변경 시 — 참조음성 영역을 Clone 모드일 때 표시
@@ -11540,13 +11818,18 @@ if (document.readyState === 'loading') {
 let _grokEngineInstance = null;
 function _getGrokEngine() {
   if (!_grokEngineInstance) {
-    const { GrokEngine } = require('../grok-engine');
-    const GrokStore = require('../tts/grok-store');
-    const cfg = GrokStore.load();
-    _grokEngineInstance = new GrokEngine({
-      profileId: cfg.profileId,
-      logger: (msg) => addLog(msg, 'info'),
-    });
+    try {
+      const { GrokEngine } = require('../grok-engine');
+      const GrokStore = require('../tts/grok-store');
+      const cfg = GrokStore.load();
+      _grokEngineInstance = new GrokEngine({
+        profileId: cfg.profileId,
+        logger: (msg) => addLog(msg, 'info'),
+      });
+    } catch (e) {
+      addLog(`[Grok] 엔진 로드 실패 (아카이브됨): ${e.message}`, 'err');
+      return null;
+    }
   }
   return _grokEngineInstance;
 }
@@ -12607,6 +12890,396 @@ async function generateSelectedGroupImages() {
   }
   if (!confirm(`체크된 ${checked.length}개 그룹의 이미지를 Flow 로 생성합니다. 진행할까요?`)) return;
   await _runGroupImageGeneration(checked, '선택그룹');
+}
+
+// ─── RunPod ComfyUI 이미지 생성 (Phase 2 — Flow 대체) ──────────────────
+// 한국어 그룹 텍스트 → Google 무료 번역으로 영어화 → SDXL → PNG 다운로드 → 그룹 썸네일 갱신
+async function generateEmptyGroupImagesRunPod() {
+  const proj = window._currentProject;
+  if (!proj || !proj.groups || proj.groups.length === 0) {
+    alert('먼저 대본을 분할하세요');
+    return;
+  }
+  const fs = require('fs');
+  const empties = proj.groups.filter(g =>
+    !g.imagePath || typeof g.imagePath !== 'string' || !fs.existsSync(g.imagePath)
+  );
+  if (empties.length === 0) {
+    alert('빈 그룹이 없습니다 — 모든 그룹에 이미지가 이미 있습니다');
+    return;
+  }
+  if (!confirm(`☁ RunPod 으로 ${empties.length}개 빈 그룹 이미지 생성. 약 ${(empties.length * 3 / 60).toFixed(1)}분 + Pod 부팅 1~2분. 진행할까요?`)) return;
+  await _runRunPodImageGeneration(empties.map(g => g.id), '빈그룹');
+}
+
+async function generateSelectedGroupImagesRunPod() {
+  const proj = window._currentProject;
+  if (!proj || !proj.groups || proj.groups.length === 0) {
+    alert('먼저 대본을 분할하세요');
+    return;
+  }
+  const checked = Array.from(document.querySelectorAll('.group-select:checked'))
+    .map(cb => cb.dataset.groupId)
+    .filter(Boolean);
+  if (checked.length === 0) {
+    alert('이미지를 생성할 그룹을 좌상단 체크박스로 선택하세요');
+    return;
+  }
+  if (!confirm(`☁ RunPod 으로 체크된 ${checked.length}개 그룹 이미지 생성. 진행할까요?`)) return;
+  await _runRunPodImageGeneration(checked, '선택그룹');
+}
+
+// 무료 Google 번역 — 키 불필요. gemini-image-tester.js 의 _translateToEnglish 와 동일.
+function _translateKoToEn(koreanText) {
+  return new Promise(resolve => {
+    try {
+      const https = require('https');
+      const text = String(koreanText || '').replace(/\n/g, ' ').substring(0, 300);
+      if (!text) return resolve(null);
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ko&tl=en&dt=t&q=${encodeURIComponent(text)}`;
+      https.get(url, (res) => {
+        let data = '';
+        res.on('data', (chunk) => data += chunk);
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data);
+            resolve(parsed[0].map(s => s[0]).join(''));
+          } catch { resolve(null); }
+        });
+      }).on('error', () => resolve(null));
+    } catch { resolve(null); }
+  });
+}
+
+async function _runRunPodImageGeneration(groupIds, label) {
+  const proj = window._currentProject;
+  if (!proj) return;
+  const fs = require('fs');
+  const path = require('path');
+
+  const ChannelStore = require('../core/channel-store');
+  const channel = (typeof _activeChannelId !== 'undefined' && _activeChannelId)
+    ? ChannelStore.getById(_activeChannelId) : null;
+  const baseOutDir = _resolveOutputDir(channel);
+  if (!baseOutDir) {
+    alert('출력 폴더를 먼저 선택하세요 (또는 채널을 등록하세요)');
+    return;
+  }
+
+  // RunPod 시크릿 사전 검증
+  try {
+    const SecretStore = require('../tts/secret-store');
+    const rp = SecretStore.get('runpod');
+    if (!rp || !rp.apiKey) {
+      alert('RunPod API 키가 없습니다. 🔑 → RunPod 섹션에서 설정하세요.');
+      return;
+    }
+  } catch {}
+
+  const imagesDir = path.join(baseOutDir, 'images');
+  fs.mkdirSync(imagesDir, { recursive: true });
+
+  const targets = groupIds.map(id => proj.groups.find(g => g.id === id)).filter(Boolean);
+  if (targets.length === 0) return;
+
+  const { getInstance: getImageManager } = require('../image/image-manager');
+  const mgr = getImageManager({ logger: addLog });
+
+  addLog(`[RunPod] ${label} ${targets.length}개 그룹 이미지 생성 시작 — Pod 시동 대기 중...`, 'info');
+
+  // 시동 워밍업 (첫 그룹 시작 전 Pod 미리 켜기 — 사용자 체감 응답성 ↑)
+  try {
+    const { PodController } = require('../runpod/pod-controller');
+    const podCtrl = PodController.getInstance();
+    await podCtrl.ensureRunning();
+    addLog(`[RunPod] Pod 준비 완료`, 'ok');
+  } catch (e) {
+    addLog(`[RunPod] Pod 시동 실패: ${e.message}`, 'err');
+    return;
+  }
+
+  let success = 0, failed = 0;
+  for (let i = 0; i < targets.length; i++) {
+    const g = targets[i];
+    const num = g.num;
+    try {
+      const koreanText = _buildGroupParagraph(g, proj).slice(0, 800);
+      if (!koreanText) {
+        addLog(`[RunPod] 그룹 ${num} — 텍스트 없음, 스킵`, 'warn');
+        continue;
+      }
+
+      addLog(`[RunPod] 그룹 ${num} (${i+1}/${targets.length}) — 번역 + 생성 중...`, 'info');
+      const englishText = await _translateKoToEn(koreanText);
+      const prompt = englishText
+        ? `${englishText}, korean traditional architecture, hanok style, cinematic lighting, masterpiece, highly detailed`
+        : `${koreanText}, korean traditional architecture, cinematic lighting, masterpiece`;
+
+      const filename = `그룹${String(num).padStart(2, '0')}_${Date.now()}.png`;
+      const outputPath = path.join(imagesDir, filename);
+
+      const result = await mgr.synth({
+        prompt,
+        outputPath,
+      });
+
+      _setGroupImageThumbnail(g.id, result.path);
+      success++;
+      addLog(`[RunPod] 그룹 ${num} ✅ (${(result.durationMs / 1000).toFixed(1)}s, seed=${result.seed})`, 'ok');
+
+      // 자동저장은 _setGroupImageThumbnail 이후 onChange 통해 트리거됨
+    } catch (e) {
+      failed++;
+      addLog(`[RunPod] 그룹 ${num} ❌ ${e.message}`, 'err');
+    }
+  }
+
+  addLog(`[RunPod] ${label} 완료 — 성공 ${success}, 실패 ${failed}`, success > 0 ? 'ok' : 'err');
+}
+
+// ─── RunPod ComfyUI 비디오 생성 (Phase 3 — Wan2.2-I2V) ─────────────────
+// 그룹 이미지 → Wan2.2-I2V → mp4 (5초 720p)
+// 워크플로가 검증(플레이스홀더 제거)된 후에만 동작.
+// ───────────────────────────────────────────────────────────────────────────
+
+async function generateEmptyGroupVideosRunPod() {
+  const proj = window._currentProject;
+  if (!proj || !proj.groups || proj.groups.length === 0) {
+    alert('먼저 대본을 분할하세요');
+    return;
+  }
+  // 이미지는 있지만 비디오가 없는 그룹만 선별
+  const targets = proj.groups.filter(g => g.imagePath && !g.videoPath);
+  if (targets.length === 0) {
+    alert('비디오 생성 대상 없음 — 이미지가 있는 그룹이 없거나 모든 그룹에 이미 비디오가 있습니다');
+    return;
+  }
+  if (!confirm(`☁ RunPod Wan2.2 로 ${targets.length}개 빈 그룹 비디오 생성. 그룹당 약 5~8분. 먼저 이미지 생성 완료 후 실행하세요. 진행할까요?`)) return;
+  await _runRunPodVideoGeneration(targets.map(g => g.id), '빈그룹비디오');
+}
+
+async function generateSelectedGroupVideosRunPod() {
+  const proj = window._currentProject;
+  if (!proj || !proj.groups || proj.groups.length === 0) {
+    alert('먼저 대본을 분할하세요');
+    return;
+  }
+  const checked = _getCheckedGroupIds();
+  if (!checked || checked.length === 0) {
+    alert('체크된 그룹이 없습니다 — 그룹 카드 좌상단 체크박스를 선택하세요');
+    return;
+  }
+  const withImage = checked.filter(id => {
+    const g = proj.groups.find(g => g.id === id);
+    return g && g.imagePath;
+  });
+  if (withImage.length === 0) {
+    alert('선택한 그룹에 이미지가 없습니다 — 먼저 이미지를 생성하세요');
+    return;
+  }
+  if (!confirm(`☁ RunPod Wan2.2 로 ${withImage.length}개 그룹 비디오 생성. 진행할까요?`)) return;
+  await _runRunPodVideoGeneration(withImage, '선택그룹비디오');
+}
+
+async function _runRunPodVideoGeneration(groupIds, label) {
+  const proj = window._currentProject;
+  if (!proj) return;
+  const fs = require('fs');
+  const path = require('path');
+
+  const ChannelStore = require('../core/channel-store');
+  const channel = (typeof _activeChannelId !== 'undefined' && _activeChannelId)
+    ? ChannelStore.getById(_activeChannelId) : null;
+  const baseOutDir = _resolveOutputDir(channel);
+  if (!baseOutDir) {
+    alert('출력 폴더를 먼저 선택하세요 (또는 채널을 등록하세요)');
+    return;
+  }
+
+  try {
+    const SecretStore = require('../tts/secret-store');
+    const rp = SecretStore.get('runpod');
+    if (!rp || !rp.apiKey) {
+      alert('RunPod API 키가 없습니다. 🔑 → RunPod 섹션에서 설정하세요.');
+      return;
+    }
+  } catch {}
+
+  const videosDir = path.join(baseOutDir, 'videos');
+  fs.mkdirSync(videosDir, { recursive: true });
+
+  const targets = groupIds.map(id => proj.groups.find(g => g.id === id)).filter(g => g && g.imagePath);
+  if (targets.length === 0) return;
+
+  const { getInstance: getVideoManager } = require('../video/video-manager');
+  const mgr = getVideoManager({ logger: addLog });
+
+  addLog(`[RunPod-Vid] ${label} ${targets.length}개 그룹 비디오 생성 시작 — Pod 시동 대기 중...`, 'info');
+
+  try {
+    const { PodController } = require('../runpod/pod-controller');
+    const podCtrl = PodController.getInstance();
+    await podCtrl.ensureRunning();
+    addLog(`[RunPod-Vid] Pod 준비 완료`, 'ok');
+  } catch (e) {
+    addLog(`[RunPod-Vid] Pod 시동 실패: ${e.message}`, 'err');
+    return;
+  }
+
+  let success = 0, failed = 0;
+  for (let i = 0; i < targets.length; i++) {
+    const g = targets[i];
+    const num = g.num;
+    try {
+      addLog(`[RunPod-Vid] 그룹 ${num} (${i+1}/${targets.length}) — Wan2.2 비디오 생성 중 (약 5~8분)...`, 'info');
+
+      const filename = `그룹${String(num).padStart(2, '0')}_${Date.now()}.mp4`;
+      const outputPath = path.join(videosDir, filename);
+
+      const result = await mgr.synth({
+        inputImagePath: g.imagePath,
+        outputPath,
+        onProgress: p => {
+          if (p > 0.1) addLog(`[RunPod-Vid] 그룹 ${num} 진행 ${Math.round(p * 100)}%`, 'info');
+        },
+      });
+
+      // 그룹에 videoPath 저장
+      g.videoPath = result.path;
+      _notifyProjectChanged();
+      success++;
+      addLog(`[RunPod-Vid] 그룹 ${num} ✅ (${(result.durationMs / 1000 / 60).toFixed(1)}분, seed=${result.seed})`, 'ok');
+    } catch (e) {
+      failed++;
+      addLog(`[RunPod-Vid] 그룹 ${num} ❌ ${e.message}`, 'err');
+    }
+  }
+
+  addLog(`[RunPod-Vid] ${label} 완료 — 성공 ${success}, 실패 ${failed}`, success > 0 ? 'ok' : 'err');
+}
+
+// ─── RunPod 원클릭 파이프라인 (Phase 4) ─────────────────────────
+// 이미지(SDXL) → TTS(OmniVoice) → .vrew 빌드 — Grok 불필요.
+// 각 단계는 독립적으로 실패 허용 (이미지 실패해도 TTS→vrew 계속).
+// ────────────────────────────────────────────────────────────────
+async function runpodOneclickPipeline() {
+  const proj = window._currentProject;
+  if (!proj || !proj.groups || proj.groups.length === 0) {
+    alert('먼저 대본을 분할하세요');
+    return;
+  }
+  if (!_ensureActivePreset()) return;
+
+  // RunPod 키 확인
+  try {
+    const SecretStore = require('../tts/secret-store');
+    const rp = SecretStore.get('runpod');
+    if (!rp || !rp.apiKey) {
+      alert('RunPod API 키가 없습니다.\n🔑 버튼 → RunPod 섹션에서 설정 후 다시 시도하세요.');
+      return;
+    }
+  } catch {}
+
+  const fs = require('fs');
+  const path = require('path');
+
+  // 출력 폴더 결정
+  const ChannelStore = require('../core/channel-store');
+  const channel = (typeof _activeChannelId !== 'undefined' && _activeChannelId)
+    ? ChannelStore.getById(_activeChannelId) : null;
+  const baseOutDir = _resolveOutputDir(channel);
+  if (!baseOutDir) {
+    alert('출력 폴더를 먼저 선택하세요 (또는 채널을 등록하세요)');
+    return;
+  }
+
+  const totalGroups = proj.groups.length;
+  const emptyImgGroups = proj.groups.filter(g => !g.imagePath || !fs.existsSync(g.imagePath));
+  const emptySentences = (proj.sentences || []).filter(s => !s.ttsPath || !fs.existsSync(s.ttsPath));
+
+  const stepLines = [
+    `이미지 생성: ${emptyImgGroups.length}개 그룹 (이미 있는 ${totalGroups - emptyImgGroups.length}개 스킵)`,
+    `TTS 변환: ${emptySentences.length}개 문장`,
+    `.vrew 빌드`,
+  ].join('\n');
+
+  if (!confirm(`🚀 RunPod 원클릭 생성\n\n${stepLines}\n\n진행할까요?`)) return;
+
+  const btn = document.getElementById('runpodPipelineBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '🚀 실행 중...'; }
+
+  // ── 진행 배지 헬퍼 ──
+  function stepLog(step, total, msg, type = 'info') {
+    addLog(`[🚀 파이프라인 ${step}/${total}] ${msg}`, type);
+  }
+
+  const TOTAL = 3;
+
+  try {
+    // ── Step 1: Pod 시동 + 이미지 생성 ──
+    stepLog(1, TOTAL, 'Pod 시동 중...', 'info');
+    try {
+      const { PodController } = require('../runpod/pod-controller');
+      const podCtrl = PodController.getInstance();
+      await podCtrl.ensureRunning();
+      stepLog(1, TOTAL, 'Pod 준비 완료', 'ok');
+    } catch (e) {
+      stepLog(1, TOTAL, `Pod 시동 실패: ${e.message} — 이미지 생성 스킵, TTS→vrew 계속`, 'warn');
+    }
+
+    if (emptyImgGroups.length > 0) {
+      stepLog(1, TOTAL, `이미지 ${emptyImgGroups.length}개 생성 중...`, 'info');
+      await _runRunPodImageGeneration(emptyImgGroups.map(g => g.id), '원클릭');
+      stepLog(1, TOTAL, '이미지 생성 완료', 'ok');
+    } else {
+      stepLog(1, TOTAL, '이미지 모두 완료 — 스킵', 'ok');
+    }
+
+    // ── Step 2: TTS 변환 ──
+    stepLog(2, TOTAL, `TTS ${emptySentences.length}개 문장 변환 중...`, 'info');
+    if (emptySentences.length > 0) {
+      // convertAllSentences 가 완료 Promise 를 반환하지 않으므로
+      // _ttsConvertActive 폴링으로 완료 감지
+      window._ttsConvertActive = false;
+      await new Promise(resolve => {
+        const startActive = () => {
+          if (!_ensureActivePreset()) { resolve(); return; }
+          convertAllSentences({ silent: true });
+          // 최대 30분 대기
+          const deadline = Date.now() + 1_800_000;
+          const poll = setInterval(() => {
+            if (!window._ttsConvertActive || Date.now() > deadline) {
+              clearInterval(poll);
+              resolve();
+            }
+          }, 2000);
+        };
+        // 약간 지연 후 시작 (UI 업데이트 안정화)
+        setTimeout(startActive, 300);
+      });
+    }
+    stepLog(2, TOTAL, 'TTS 변환 완료', 'ok');
+
+    // ── Step 3: .vrew 빌드 ──
+    stepLog(3, TOTAL, '.vrew 파일 빌드 중...', 'info');
+    try {
+      proj.vrewFileName = proj.vrewFileName || require('path').basename(baseOutDir);
+      proj.imageOutputDir = proj.imageOutputDir || path.join(baseOutDir, 'images');
+      proj.ttsOutputDir   = proj.ttsOutputDir   || path.join(baseOutDir, 'tts');
+      const result = await saveVrew({ proj, silent: true });
+      if (result && result.path) {
+        stepLog(3, TOTAL, `.vrew 저장 완료: ${require('path').basename(result.path)}`, 'ok');
+      } else {
+        stepLog(3, TOTAL, '.vrew 빌드 완료 (경로 미확인)', 'ok');
+      }
+    } catch (e) {
+      stepLog(3, TOTAL, `.vrew 빌드 실패: ${e.message}`, 'err');
+    }
+
+    addLog('🚀 RunPod 원클릭 파이프라인 완료!', 'ok');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🚀 RunPod 원클릭 생성'; }
+  }
 }
 
 // ─── 통합 자동 제작 (이미지 + TTS) ──────────────────────────────

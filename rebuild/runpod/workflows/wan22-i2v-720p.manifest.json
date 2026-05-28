@@ -1,0 +1,72 @@
+{
+  "name": "wan22-i2v-720p",
+  "displayName": "Wan2.2-I2V 720p (5초)",
+  "modelType": "video",
+  "baseModel": "Wan2.2-I2V-A14B",
+  "license": "Apache-2.0",
+  "commercialOk": true,
+  "description": "이미지 1장 → 5초 720p 16fps 비디오. 인물·한복 움직임 자연스러움 우수. 81프레임 / 16fps = 약 5초.",
+  "supports": {
+    "refImage": false,
+    "inputImage": true,
+    "loras": false,
+    "negativePrompt": true
+  },
+  "defaults": {
+    "width": 1280,
+    "height": 720,
+    "frames": 81,
+    "frameRate": 16,
+    "steps": 30,
+    "cfg": 6.0,
+    "shift": 5.0,
+    "motionPrompt": "gentle camera push-in, subtle natural movement, cinematic lighting preserved",
+    "negativePrompt": "static, frozen, jittery, distorted, blurry, low quality, watermark, text, glitch"
+  },
+  "slots": {
+    "motionPrompt":   { "nodeId": "30", "inputKey": "positive_prompt" },
+    "negativePrompt": { "nodeId": "30", "inputKey": "negative_prompt" },
+    "inputImage":     { "nodeId": "20", "inputKey": "image", "uploadName": "input_image.png" },
+    "seed":           { "nodeId": "40", "inputKey": "seed" },
+    "steps":          { "nodeId": "40", "inputKey": "steps" },
+    "cfg":            { "nodeId": "40", "inputKey": "cfg" },
+    "frames":         { "nodeId": "21", "inputKey": "num_frames" },
+    "width":          { "nodeId": "21", "inputKey": "width" },
+    "height":         { "nodeId": "21", "inputKey": "height" },
+    "frameRate":      { "nodeId": "50", "inputKey": "frame_rate" }
+  },
+  "output": {
+    "nodeId": "50",
+    "type": "video",
+    "extension": "mp4"
+  },
+  "comfyExtensions": [
+    "ComfyUI-WanVideoWrapper",
+    "ComfyUI-VideoHelperSuite"
+  ],
+  "models": [
+    {
+      "type": "wan_video",
+      "repo": "Kijai/WanVideo_comfy",
+      "filename": "Wan2.2-I2V-A14B-fp8.safetensors",
+      "destPath": "models/diffusion_models/Wan2.2-I2V-A14B-fp8.safetensors",
+      "sizeGB": 17
+    },
+    {
+      "type": "vae",
+      "repo": "Kijai/WanVideo_comfy",
+      "filename": "Wan2_1_VAE_bf16.safetensors",
+      "destPath": "models/vae/Wan2_1_VAE_bf16.safetensors",
+      "sizeGB": 1
+    },
+    {
+      "type": "text_encoder",
+      "repo": "Kijai/WanVideo_comfy",
+      "filename": "umt5-xxl-enc-bf16.safetensors",
+      "destPath": "models/text_encoders/umt5-xxl-enc-bf16.safetensors",
+      "sizeGB": 10
+    }
+  ],
+  "_placeholder": true,
+  "_replaceAfterValidation": "RunPod Pod 띄운 후 ComfyUI 에서 kijai 의 i2v example_workflow 로드/실행 → Save(API Format) → 이 JSON 교체"
+}

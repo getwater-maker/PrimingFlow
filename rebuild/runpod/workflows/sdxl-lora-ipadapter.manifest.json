@@ -1,0 +1,71 @@
+{
+  "name": "sdxl-lora-ipadapter",
+  "displayName": "SDXL + 한국사 LoRA + 캐릭터 참조",
+  "modelType": "image",
+  "baseModel": "SDXL 1.0",
+  "license": "OpenRAIL-M (CreativeML)",
+  "commercialOk": true,
+  "description": "캐릭터 일관성이 중요한 채널용. IP-Adapter 로 참조 이미지의 인물 특징 유지 + LoRA 3중 체인으로 한국사 고증 보강. 한국어 프롬프트는 Gemini 로 영어 번역 후 주입.",
+  "supports": {
+    "refImage": true,
+    "loras": true,
+    "negativePrompt": true,
+    "koreanPromptDirect": false
+  },
+  "defaults": {
+    "width": 1280,
+    "height": 720,
+    "steps": 30,
+    "cfg": 7.0,
+    "negativePrompt": "blurry, low quality, watermark, text, modern clothing, neon, signature, ugly, deformed, japanese kimono, chinese hanfu"
+  },
+  "slots": {
+    "prompt":         { "nodeId": "6",  "inputKey": "text" },
+    "negativePrompt": { "nodeId": "7",  "inputKey": "text" },
+    "seed":           { "nodeId": "3",  "inputKey": "seed" },
+    "steps":          { "nodeId": "3",  "inputKey": "steps" },
+    "cfg":            { "nodeId": "3",  "inputKey": "cfg" },
+    "width":          { "nodeId": "5",  "inputKey": "width" },
+    "height":         { "nodeId": "5",  "inputKey": "height" },
+    "refImage":       { "nodeId": "20", "inputKey": "image",   "uploadName": "ref_image.png" },
+    "refStrength":    { "nodeId": "22", "inputKey": "weight",  "default": 0.7 }
+  },
+  "loras": [
+    { "nodeId": "10", "nameKey": "lora_name", "strengthKey": "strength_model", "default": { "name": "joseon-hanbok-v2.safetensors", "strength": 0.8 } },
+    { "nodeId": "11", "nameKey": "lora_name", "strengthKey": "strength_model", "default": { "name": "korean-palace.safetensors",    "strength": 0.6 } },
+    { "nodeId": "12", "nameKey": "lora_name", "strengthKey": "strength_model", "default": { "name": "kdrama-lighting.safetensors",   "strength": 0.4 } }
+  ],
+  "output": {
+    "nodeId": "9",
+    "type": "image",
+    "extension": "png"
+  },
+  "comfyExtensions": [
+    "ComfyUI_IPAdapter_plus"
+  ],
+  "models": [
+    {
+      "type": "checkpoint",
+      "repo": "stabilityai/stable-diffusion-xl-base-1.0",
+      "filename": "sd_xl_base_1.0.safetensors",
+      "destPath": "models/checkpoints/sd_xl_base_1.0.safetensors",
+      "sizeGB": 7
+    },
+    {
+      "type": "ipadapter",
+      "repo": "h94/IP-Adapter",
+      "filename": "ip-adapter-plus_sdxl_vit-h.safetensors",
+      "destPath": "models/ipadapter/ip-adapter-plus_sdxl_vit-h.safetensors",
+      "sizeGB": 1
+    },
+    {
+      "type": "clip_vision",
+      "repo": "h94/IP-Adapter",
+      "filename": "models/image_encoder/model.safetensors",
+      "destPath": "models/clip_vision/CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors",
+      "sizeGB": 4
+    }
+  ],
+  "_placeholder": true,
+  "_replaceAfterValidation": "RunPod Pod 띄운 후 ComfyUI 에서 cubiq/ComfyUI_IPAdapter_plus 의 example 워크플로 + LoraLoader 3개 추가 → Save(API Format) → 이 JSON 교체"
+}

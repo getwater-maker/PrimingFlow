@@ -1,0 +1,13 @@
+# Docker 빌드 컨텍스트에서 제외할 것들
+*.log
+.git/
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+node_modules/
+
+# LoRA 는 큰 파일이라 빌드 시점에 포함할지 결정. 기본은 포함.
+# 너무 커지면 아래 주석 해제하고 Pod 시동 후 별도 다운로드 스크립트 사용.
+# loras/*.safetensors

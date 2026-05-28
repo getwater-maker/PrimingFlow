@@ -605,14 +605,9 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
         if (realMeta.duration > 0) dur = realMeta.duration;
         log(`[Vrew] mp4 메타: ${path.basename(g.videoPath)} ${videoWidth}x${videoHeight}, ${dur.toFixed(2)}초`);
       } else {
-        try {
-          const GrokCfg = require('../tts/grok-store').load();
-          const isHd = (GrokCfg.videoResolution === '720p');
-          videoWidth = isHd ? 1280 : 854;
-          videoHeight = isHd ? 720 : 480;
-          dur = parseFloat(String(GrokCfg.videoDuration).replace('s', '')) || 6;
-        } catch {}
-        log(`[Vrew] mp4 헤더 파싱 실패 — grok-store 추정값 사용: ${videoWidth}x${videoHeight}`);
+        // mp4 헤더 파싱 실패 시 RunPod Wan2.2 기본값(720p 16:9) 사용
+        videoWidth = 1280; videoHeight = 720; dur = 5;
+        log(`[Vrew] mp4 헤더 파싱 실패 — 기본값 사용: ${videoWidth}x${videoHeight}, ${dur}초`);
       }
 
       // 비디오 자산 (사용자 샘플 vrew 형식 그대로)

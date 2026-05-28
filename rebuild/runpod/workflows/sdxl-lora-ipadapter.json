@@ -1,0 +1,140 @@
+{
+  "_comment": "PLACEHOLDER — SDXL + 한국사 LoRA 다중 + IP-Adapter (캐릭터 참조 이미지) 워크플로. 실제 검증된 JSON 으로 교체 필요. 공식 example: https://github.com/cubiq/ComfyUI_IPAdapter_plus#examples — 그 위에 LoraLoader 3개 체인 추가. SCHEMA.md 참고.",
+  "_slot_node_ids": {
+    "prompt": "6",
+    "negativePrompt": "7",
+    "seed": "3",
+    "width": "5",
+    "height": "5",
+    "refImage": "20",
+    "loras": ["10", "11", "12"],
+    "output": "9"
+  },
+  "1": {
+    "inputs": {
+      "ckpt_name": "sd_xl_base_1.0.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": { "title": "Load SDXL Base" }
+  },
+  "10": {
+    "inputs": {
+      "lora_name": "joseon-hanbok-v2.safetensors",
+      "strength_model": 0.8,
+      "strength_clip": 0.8,
+      "model": ["1", 0],
+      "clip": ["1", 1]
+    },
+    "class_type": "LoraLoader",
+    "_meta": { "title": "LoRA 1 (Hanbok)" }
+  },
+  "11": {
+    "inputs": {
+      "lora_name": "korean-palace.safetensors",
+      "strength_model": 0.6,
+      "strength_clip": 0.6,
+      "model": ["10", 0],
+      "clip": ["10", 1]
+    },
+    "class_type": "LoraLoader",
+    "_meta": { "title": "LoRA 2 (Palace)" }
+  },
+  "12": {
+    "inputs": {
+      "lora_name": "kdrama-lighting.safetensors",
+      "strength_model": 0.4,
+      "strength_clip": 0.4,
+      "model": ["11", 0],
+      "clip": ["11", 1]
+    },
+    "class_type": "LoraLoader",
+    "_meta": { "title": "LoRA 3 (Lighting)" }
+  },
+  "20": {
+    "inputs": {
+      "image": "ref_image.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": { "title": "Reference Image (injected at runtime)" }
+  },
+  "21": {
+    "inputs": {
+      "preset": "PLUS (high strength)"
+    },
+    "class_type": "IPAdapterUnifiedLoader",
+    "_meta": { "title": "IPAdapter Loader" }
+  },
+  "22": {
+    "inputs": {
+      "weight": 0.7,
+      "weight_type": "linear",
+      "combine_embeds": "concat",
+      "start_at": 0.0,
+      "end_at": 1.0,
+      "embeds_scaling": "V only",
+      "model": ["12", 0],
+      "ipadapter": ["21", 1],
+      "image": ["20", 0]
+    },
+    "class_type": "IPAdapterAdvanced",
+    "_meta": { "title": "IPAdapter (Character Reference)" }
+  },
+  "3": {
+    "inputs": {
+      "seed": 0,
+      "steps": 30,
+      "cfg": 7.0,
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 1.0,
+      "model": ["22", 0],
+      "positive": ["6", 0],
+      "negative": ["7", 0],
+      "latent_image": ["5", 0]
+    },
+    "class_type": "KSampler",
+    "_meta": { "title": "Sampler" }
+  },
+  "5": {
+    "inputs": {
+      "width": 1280,
+      "height": 720,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": { "title": "Latent (size injected at runtime)" }
+  },
+  "6": {
+    "inputs": {
+      "text": "joseon dynasty king in gyeongbokgung palace, traditional korean hanbok, royal robe, cinematic lighting, photorealistic, masterpiece, highly detailed",
+      "clip": ["12", 1]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Prompt (injected at runtime, English)" }
+  },
+  "7": {
+    "inputs": {
+      "text": "blurry, low quality, watermark, text, modern clothing, neon, signature, ugly, deformed, japanese kimono, chinese hanfu",
+      "clip": ["12", 1]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Negative" }
+  },
+  "8": {
+    "inputs": {
+      "samples": ["3", 0],
+      "vae": ["1", 2]
+    },
+    "class_type": "VAEDecode",
+    "_meta": { "title": "VAE Decode" }
+  },
+  "9": {
+    "inputs": {
+      "filename_prefix": "sdxl_korean",
+      "images": ["8", 0]
+    },
+    "class_type": "SaveImage",
+    "_meta": { "title": "Save Output" }
+  }
+}

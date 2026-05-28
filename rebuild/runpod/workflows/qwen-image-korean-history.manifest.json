@@ -1,0 +1,62 @@
+{
+  "name": "qwen-image-korean-history",
+  "displayName": "Qwen-Image (한국 역사)",
+  "modelType": "image",
+  "baseModel": "Qwen-Image",
+  "license": "Apache-2.0",
+  "commercialOk": true,
+  "description": "한국어 프롬프트 직접 입력 가능. 한복·궁궐·전통 건축 표현 양호. YouTube 수익화 안전.",
+  "supports": {
+    "refImage": false,
+    "loras": false,
+    "negativePrompt": true,
+    "koreanPromptDirect": true
+  },
+  "defaults": {
+    "width": 1280,
+    "height": 720,
+    "steps": 25,
+    "cfg": 4.0,
+    "negativePrompt": "blurry, low quality, watermark, text, modern clothing, neon, signature, ugly, deformed"
+  },
+  "slots": {
+    "prompt":         { "nodeId": "6", "inputKey": "text" },
+    "negativePrompt": { "nodeId": "7", "inputKey": "text" },
+    "seed":           { "nodeId": "3", "inputKey": "seed" },
+    "steps":          { "nodeId": "3", "inputKey": "steps" },
+    "cfg":            { "nodeId": "3", "inputKey": "cfg" },
+    "width":          { "nodeId": "5", "inputKey": "width" },
+    "height":         { "nodeId": "5", "inputKey": "height" }
+  },
+  "output": {
+    "nodeId": "9",
+    "type": "image",
+    "extension": "png"
+  },
+  "comfyExtensions": [],
+  "models": [
+    {
+      "type": "unet",
+      "repo": "Qwen/Qwen-Image",
+      "filename": "qwen-image.safetensors",
+      "destPath": "models/unet/qwen-image.safetensors",
+      "sizeGB": 20
+    },
+    {
+      "type": "clip",
+      "repo": "Qwen/Qwen-Image",
+      "filename": "qwen_text_encoder.safetensors",
+      "destPath": "models/clip/qwen_text_encoder.safetensors",
+      "sizeGB": 9
+    },
+    {
+      "type": "vae",
+      "repo": "Qwen/Qwen-Image",
+      "filename": "qwen_image_vae.safetensors",
+      "destPath": "models/vae/qwen_image_vae.safetensors",
+      "sizeGB": 1
+    }
+  ],
+  "_placeholder": true,
+  "_replaceAfterValidation": "RunPod Pod 띄운 후 ComfyUI 에서 공식 example 로드/실행 → Save(API Format) 으로 export → 이 워크플로 JSON 교체 → _placeholder 를 false 로 변경"
+}
