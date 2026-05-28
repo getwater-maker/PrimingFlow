@@ -13011,9 +13011,18 @@ async function _runRunPodImageGeneration(groupIds, label) {
 
       addLog(`[RunPod] 그룹 ${num} (${i+1}/${targets.length}) — 번역 + 생성 중...`, 'info');
       const englishText = await _translateKoToEn(koreanText);
-      const prompt = englishText
-        ? `${englishText}, korean traditional architecture, hanok style, cinematic lighting, masterpiece, highly detailed`
-        : `${koreanText}, korean traditional architecture, cinematic lighting, masterpiece`;
+      // 사용자가 선택한 스타일 prompt 자동 반영 (한옥 키워드 강제 주입 제거)
+      let stylePrompt = '';
+      try {
+        const styleObj = _getActiveStylePrompt();
+        stylePrompt = (styleObj && styleObj.prompt) ? styleObj.prompt.trim() : '';
+      } catch (_) {}
+      const parts = [];
+      if (englishText) parts.push(englishText); else parts.push(koreanText);
+      if (stylePrompt) parts.push(stylePrompt);
+      else parts.push('cinematic lighting, masterpiece, highly detailed');
+      const prompt = parts.join(', ');
+      if (i === 0) addLog(`[RunPod] 스타일 ${stylePrompt ? '✓ 적용됨' : '미선택 — 기본 품질 키워드만'}`, 'info');
 
       const filename = `그룹${String(num).padStart(2, '0')}_${Date.now()}.png`;
       const outputPath = path.join(imagesDir, filename);
