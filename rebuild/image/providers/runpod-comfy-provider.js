@@ -97,28 +97,41 @@ function _pickSdxlName(list) {
  */
 async function _registerAndWait(endpointUrl) {
     const CKPT = 'SDXL/sd_xl_base_1.0.safetensors';
+    // filename 에 경로 구분자 없어야 함 — Manager 가 Invalid 로 거부
+    const filename = 'sd_xl_base_1.0.safetensors';
+    const savePath = 'models/checkpoints/SDXL';  // 하위폴더만 (파일명 별도)
     try {
-        await fetchWithTimeout(`${endpointUrl}/manager/queue/install_model`, {
+        // Manager v2.x: /manager/queue/install_model 또는 /manager/model/install
+        const payload = JSON.stringify({
+            type: 'checkpoints',
+            url: 'https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors',
+            filename,
+            save_path: savePath,
+        });
+        const r1 = await fetchWithTimeout(`${endpointUrl}/manager/queue/install_model`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                type: 'checkpoints',
-                url: 'https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors',
-                filename: CKPT,
-                save_path: `models/checkpoints/${CKPT}`,
-            }),
+            body: payload,
         }, 15_000);
+        // 일부 버전은 /manager/model/install 사용
+        if (!r1.ok) {
+            await fetchWithTimeout(`${endpointUrl}/manager/model/install`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: payload,
+            }, 15_000).catch(() => {});
+        }
         await fetchWithTimeout(`${endpointUrl}/manager/queue/start`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: '{}',
-        }, 10_000);
+        }, 10_000).catch(() => {});
     } catch (e) {
         console.warn('[runpod-comfy] Manager API 호출 실패:', e.message);
         return null;
     }
-    // 최대 120초 대기 (볼륨에 있으면 ~30초, 없으면 타임아웃)
-    const deadline = Date.now() + 120_000;
+    // 최대 40분 대기 (17GB 다운로드 포함 — 볼륨에 이미 있으면 30초 내 완료)
+    const deadline = Date.now() + 2_400_000;
     while (Date.now() < deadline) {
         await new Promise(r => setTimeout(r, 6_000));
         const list = await _fetchCheckpoints(endpointUrl, 1).catch(() => []);
