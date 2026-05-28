@@ -14421,8 +14421,14 @@ function _setGroupImageThumbnail(groupId, imgPath) {
   const box = document.querySelector(`.group-image[data-group-id="${groupId}"]`);
   if (!box) return;
   const url = _fileUrlForImage(imgPath);
-  box.innerHTML = `<img src="${url}" alt="" style="width:100%; height:100%; object-fit:cover; border-radius:6px;">`;
+  const TRASH_STYLE = 'position:absolute; top:4px; left:4px; width:24px; height:24px; padding:0; background:rgba(0,0,0,0.55); color:#fff; border:none; border-radius:4px; font-size:13px; cursor:pointer; z-index:5; line-height:1; display:flex; align-items:center; justify-content:center;';
+  box.innerHTML =
+    `<img src="${url}" alt="" style="width:100%; height:100%; object-fit:cover; border-radius:6px;">` +
+    `<button class="group-media-trash" type="button" title="이미지 제거" style="${TRASH_STYLE}">🗑</button>`;
+  box.style.position = 'relative';
   box.classList.add('has-image');
+  const trashBtn = box.querySelector('.group-media-trash');
+  if (trashBtn) trashBtn.onclick = (e) => { e.stopPropagation(); removeGroupImage(groupId); };
 }
 
 // flow-engine 이 보내는 image-done 이벤트 → 그룹 매핑 → 카드 썸네일 자동 표시
