@@ -1557,9 +1557,10 @@
 
         <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px; font-size:12px;">
           <label style="color:var(--text-muted); white-space:nowrap;">이미지 모델</label>
-          <select id="runpodImageModel" title="SDXL=빠름/영문번역, Qwen=한국어 직접/고품질(약간 느림)" style="flex:1; padding:4px 6px; border-radius:4px;">
-            <option value="qwen-image">Qwen-Image (한국어 직접 · 고품질)</option>
-            <option value="sdxl-basic">SDXL (빠름 · 영문 번역)</option>
+          <select id="runpodImageModel" title="Lightning=한국어+빠름(8step), Qwen=한국어+최고품질(20step), SDXL=영문번역+최저비용" style="flex:1; padding:4px 6px; border-radius:4px;">
+            <option value="qwen-image-lightning">Qwen-Lightning (한국어 · 빠름 8step)</option>
+            <option value="qwen-image">Qwen-Image (한국어 · 최고품질 20step)</option>
+            <option value="sdxl-basic">SDXL (영문 번역 · 최저비용)</option>
           </select>
         </div>
 
@@ -12993,9 +12994,9 @@ async function _runRunPodImageGeneration(groupIds, label) {
   const { getInstance: getImageManager } = require('../image/image-manager');
   const mgr = getImageManager({ logger: addLog });
 
-  // 이미지 모델 선택 (Qwen=한국어 직접, SDXL=영문 번역)
-  const imageModel = (document.getElementById('runpodImageModel') || {}).value || 'qwen-image';
-  const isQwen = imageModel === 'qwen-image';
+  // 이미지 모델 선택 (Qwen 계열=한국어 직접, SDXL=영문 번역)
+  const imageModel = (document.getElementById('runpodImageModel') || {}).value || 'qwen-image-lightning';
+  const isQwen = imageModel.startsWith('qwen');
 
   addLog(`[RunPod] ${label} ${targets.length}개 그룹 이미지 생성 시작 (모델: ${imageModel}) — Pod 시동 대기 중...`, 'info');
 

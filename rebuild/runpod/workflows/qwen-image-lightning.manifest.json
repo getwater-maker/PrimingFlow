@@ -1,0 +1,39 @@
+{
+  "name": "qwen-image-lightning",
+  "displayName": "Qwen-Lightning (한국어 · 빠름)",
+  "modelType": "image",
+  "baseModel": "Qwen-Image fp8 + Lightning 8-step LoRA V2.0",
+  "license": "Apache-2.0",
+  "commercialOk": true,
+  "description": "Qwen-Image + Lightning 8-step LoRA. 한국어 직접 입력, 20→8 step 으로 생성 시간 절반. RTX 3090 OK.",
+  "supports": {
+    "refImage": false,
+    "loras": true,
+    "negativePrompt": true,
+    "koreanPromptDirect": true
+  },
+  "defaults": {
+    "width": 1024,
+    "height": 1024,
+    "steps": 8,
+    "cfg": 1.0,
+    "negativePrompt": "blurry, low quality, watermark, text, signature, deformed, ugly, modern clothing"
+  },
+  "slots": {
+    "prompt":         { "nodeId": "6", "inputKey": "text" },
+    "negativePrompt": { "nodeId": "7", "inputKey": "text" },
+    "seed":           { "nodeId": "3", "inputKey": "seed" },
+    "steps":          { "nodeId": "3", "inputKey": "steps" },
+    "cfg":            { "nodeId": "3", "inputKey": "cfg" },
+    "width":          { "nodeId": "5", "inputKey": "width" },
+    "height":         { "nodeId": "5", "inputKey": "height" },
+    "filenamePrefix": { "nodeId": "9", "inputKey": "filename_prefix" }
+  },
+  "output": {
+    "nodeId": "9",
+    "type": "image",
+    "extension": "png"
+  },
+  "_placeholder": false,
+  "_note": "Lightning LoRA 경로: loras/qwen-image-lightning/Qwen-Image-Lightning-8steps-V2.0.safetensors (node 40). 검증됨 2026-05-28."
+}
