@@ -293,11 +293,75 @@ class PodController extends EventEmitter {
     }
 
     /**
+     * 새 Pod 시동 후 SDXL 모델이 ComfyUI object_info 에 없으면
+     * Manager API 로 재등록(이미 볼륨에 있으면 다운로드 없이 15초 내 완료).
+     */
+    async _ensureSdxlModel(endpointUrl) {
+        const CKPT = 'SDXL/sd_xl_base_1.0.safetensors';
+        try {
+            // 현재 등록된 checkpoint 목록 확인
+            const info = await fetchJson(`${endpointUrl}/object_info/CheckpointLoaderSimple`, { _timeout: 15_000 });
+            const opts = info?.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
+            if (Array.isArray(opts) && opts.some(n => n === CKPT || n.endsWith('sd_xl_base_1.0.safetensors'))) {
+                console.log('[RunPod] SDXL 모델 확인 완료 — 바로 사용 가능');
+                return;
+            }
+            console.log('[RunPod] SDXL 모델 미감지 — Manager API 로 재등록 중...');
+        } catch {
+            console.log('[RunPod] object_info 확인 실패 — 재등록 시도');
+        }
+
+        // Manager API: 모델 재등록 (파일이 볼륨에 있으면 다운로드 없이 즉시 등록)
+        try {
+            await fetchJson(`${endpointUrl}/manager/queue/install_model`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'checkpoints',
+                    url: 'https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors',
+                    filename: CKPT,
+                    save_path: `models/checkpoints/${CKPT}`,
+                }),
+                _timeout: 15_000,
+            });
+            await fetchJson(`${endpointUrl}/manager/queue/start`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{}',
+                _timeout: 10_000,
+            });
+        } catch (e) {
+            console.warn('[RunPod] Manager 재등록 요청 실패 (무시):', e.message);
+            return;
+        }
+
+        // 최대 60초 대기 — 볼륨에 파일 있으면 보통 5~15초 내 완료
+        const deadline = Date.now() + 60_000;
+        while (Date.now() < deadline) {
+            await sleep(4_000);
+            try {
+                const info = await fetchJson(`${endpointUrl}/object_info/CheckpointLoaderSimple`, { _timeout: 10_000 });
+                const opts = info?.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
+                if (Array.isArray(opts) && opts.some(n => n === CKPT || n.endsWith('sd_xl_base_1.0.safetensors'))) {
+                    console.log('[RunPod] ✅ SDXL 모델 등록 완료');
+                    return;
+                }
+            } catch {}
+        }
+        console.warn('[RunPod] SDXL 모델 등록 확인 타임아웃 — 이미지 생성 시 실패할 수 있음');
+    }
+
+    /**
      * Pod 가 살아있으면 endpoint URL 즉시 반환, 아니면 시동 후 ready 까지 대기.
      * 동시 호출이 와도 첫 번째 call 이 끝날 때까지 직렬화.
      */
     async ensureRunning(opts = {}) {
         if (this._state === 'running' && this._endpointUrl) {
+            // Pod 가 이미 실행 중이지만 이 세션에서 모델 등록 확인이 안 된 경우 체크
+            if (this._podId && this._sdxlCheckedForPod !== this._podId) {
+                this._sdxlCheckedForPod = this._podId;
+                await this._ensureSdxlModel(this._endpointUrl).catch(() => {});
+            }
             this.notifyActivity();
             return { endpointUrl: this._endpointUrl, podId: this._podId };
         }
@@ -385,6 +449,11 @@ class PodController extends EventEmitter {
             // 5. ComfyUI 8188 포트 응답 대기 (최대 5분 — 첫 부팅 모델 다운로드 포함)
             console.log(`[RunPod] ComfyUI 초기화 대기... (${endpointUrl})`);
             await this._waitComfyUI(endpointUrl, 300_000);
+
+            // 6. SDXL 모델 등록 확인 — 새 Pod 는 네트워크 볼륨에 파일이 있어도
+            //    ComfyUI 가 object_info 에 반영하려면 Manager 로 재등록 필요.
+            await this._ensureSdxlModel(endpointUrl);
+            this._sdxlCheckedForPod = podId;
 
             this._podId = podId;
             this._endpointUrl = endpointUrl;
