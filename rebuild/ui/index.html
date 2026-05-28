@@ -1543,7 +1543,7 @@
           <button class="btn btn-sm-action" id="grokLoginBtn" onclick="openGrokLogin()" title="Grok 자동화 크롬을 띄우고 grok.com 로그인 페이지로 이동 (영상 생성 전 X 계정 로그인 권장)">🔑 그록 로그인</button>
         </div>
         <button class="btn btn-sm-action" id="startAllProjectsBtn" onclick="generateAllProjects()" title="열려있는 모든 탭을 순차적으로 자동제작 (탭1 완료 → 탭2 자동 시작 → ...)" style="width:100%; margin-bottom:8px; background:var(--accent-soft); color:var(--accent-hover); border:1px solid var(--accent); font-weight:700;">▶▶ 모든 탭 순차 자동제작</button>
-        <button class="btn btn-sm-action" id="runpodPipelineBtn" onclick="runpodOneclickPipeline()" title="RunPod 원클릭: 이미지(SDXL) → TTS → .vrew 빌드. Grok 불필요." style="width:100%; margin-bottom:8px; background:linear-gradient(135deg,#1a6b3a,#0e4d6e); color:#fff; font-weight:700; border:1px solid #2a8a5a;">🚀 RunPod 원클릭 생성</button>
+        <button class="btn btn-sm-action" id="runpodPipelineBtn" onclick="onRunpodPipelineClick()" title="RunPod 원클릭: 이미지 → TTS → .vrew 빌드. 실행 중 다시 누르면 중단." style="width:100%; margin-bottom:8px; background:linear-gradient(135deg,#1a6b3a,#0e4d6e); color:#fff; font-weight:700; border:1px solid #2a8a5a;">🚀 RunPod 원클릭 생성</button>
         <div style="margin-bottom:8px; font-size:12px; color:var(--text-muted);">
           <label style="display:flex; align-items:center; gap:6px; cursor:pointer;" title="[▶ 자동제작] 클릭 시 도입부 그룹 이미지가 완성되는 즉시 Grok 으로 순차 영상 변환을 시작합니다. 본론은 이미지 그대로.">
             <input type="checkbox" id="autoIntroVideoToggle" checked />
@@ -13000,6 +13000,12 @@ async function _runRunPodImageGeneration(groupIds, label) {
 
   let success = 0, failed = 0;
   for (let i = 0; i < targets.length; i++) {
+    // 파이프라인에서 중단 요청 시 그룹 사이에서 즉시 정지
+    // (standalone ☁ 버튼 호출 시엔 _runpodPipelineActive 가 undefined 라 break 안 됨)
+    if (window._runpodPipelineActive === false) {
+      addLog(`[RunPod] ⏹ 중단 — ${success}개 완료 후 정지`, 'warn');
+      break;
+    }
     const g = targets[i];
     const num = g.num;
     try {
@@ -13214,8 +13220,10 @@ async function runpodOneclickPipeline() {
 
   if (!confirm(`🚀 RunPod 원클릭 생성\n\n${stepLines}\n\n진행할까요?`)) return;
 
-  const btn = document.getElementById('runpodPipelineBtn');
-  if (btn) { btn.disabled = true; btn.textContent = '🚀 실행 중...'; }
+  // 중단 플래그 ON + 버튼을 "⏹ 중단" 으로 토글
+  window._runpodPipelineActive = true;
+  _setRunpodPipelineBtn(true);
+  const stopped = () => !window._runpodPipelineActive;
 
   // ── 진행 배지 헬퍼 ──
   function stepLog(step, total, msg, type = 'info') {
@@ -13236,6 +13244,8 @@ async function runpodOneclickPipeline() {
       stepLog(1, TOTAL, `Pod 시동 실패: ${e.message} — 이미지 생성 스킵, TTS→vrew 계속`, 'warn');
     }
 
+    if (stopped()) { addLog('⏹ 파이프라인 중단됨 (이미지 생성 전)', 'warn'); return; }
+
     if (emptyImgGroups.length > 0) {
       stepLog(1, TOTAL, `이미지 ${emptyImgGroups.length}개 생성 중...`, 'info');
       await _runRunPodImageGeneration(emptyImgGroups.map(g => g.id), '원클릭');
@@ -13243,6 +13253,8 @@ async function runpodOneclickPipeline() {
     } else {
       stepLog(1, TOTAL, '이미지 모두 완료 — 스킵', 'ok');
     }
+
+    if (stopped()) { addLog('⏹ 파이프라인 중단됨 (TTS 전)', 'warn'); return; }
 
     // ── Step 2: TTS 변환 ──
     stepLog(2, TOTAL, `TTS ${emptySentences.length}개 문장 변환 중...`, 'info');
@@ -13257,6 +13269,8 @@ async function runpodOneclickPipeline() {
           // 최대 30분 대기
           const deadline = Date.now() + 1_800_000;
           const poll = setInterval(() => {
+            // 파이프라인 중단 요청 시 TTS 도 함께 중지
+            if (stopped()) { window._ttsConvertActive = false; clearInterval(poll); resolve(); return; }
             if (!window._ttsConvertActive || Date.now() > deadline) {
               clearInterval(poll);
               resolve();
@@ -13267,6 +13281,7 @@ async function runpodOneclickPipeline() {
         setTimeout(startActive, 300);
       });
     }
+    if (stopped()) { addLog('⏹ 파이프라인 중단됨 (.vrew 빌드 전)', 'warn'); return; }
     stepLog(2, TOTAL, 'TTS 변환 완료', 'ok');
 
     // ── Step 3: .vrew 빌드 ──
@@ -13287,7 +13302,32 @@ async function runpodOneclickPipeline() {
 
     addLog('🚀 RunPod 원클릭 파이프라인 완료!', 'ok');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🚀 RunPod 원클릭 생성'; }
+    window._runpodPipelineActive = false;
+    _setRunpodPipelineBtn(false);
+  }
+}
+
+// 원클릭 버튼 토글 핸들러 — 실행 중이면 중단, 아니면 시작
+function onRunpodPipelineClick() {
+  if (window._runpodPipelineActive) {
+    window._runpodPipelineActive = false;
+    window._ttsConvertActive = false;  // 진행 중 TTS 도 중지
+    addLog('⏹ 중단 요청됨 — 현재 작업 완료 후 정지합니다...', 'warn');
+    return;
+  }
+  runpodOneclickPipeline();
+}
+
+// 버튼 외형 토글 (실행 중 = 빨강 ⏹ 중단 / 대기 = 초록 🚀 생성)
+function _setRunpodPipelineBtn(active) {
+  const btn = document.getElementById('runpodPipelineBtn');
+  if (!btn) return;
+  if (active) {
+    btn.textContent = '⏹ 중단';
+    btn.style.background = 'linear-gradient(135deg,#a83232,#6e1010)';
+  } else {
+    btn.textContent = '🚀 RunPod 원클릭 생성';
+    btn.style.background = 'linear-gradient(135deg,#1a6b3a,#0e4d6e)';
   }
 }
 
