@@ -35,10 +35,15 @@ function loadWorkflow(name) {
     if (!fs.existsSync(manifestPath)) throw new Error(`매니페스트 없음: ${manifestPath}`);
     const workflow = JSON.parse(fs.readFileSync(wfPath, 'utf-8'));
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-    if (workflow._placeholder) {
-        throw new Error('비디오 워크플로가 아직 검증되지 않았습니다. ComfyUI에서 Wan2.2 I2V 예제를 실행하여 wan22-i2v-720p.json을 교체하세요.');
+    if (manifest._placeholder || workflow._placeholder) {
+        throw new Error(`비디오 워크플로 '${name}' 가 아직 검증되지 않았습니다 (_placeholder). ComfyUI 에서 예제를 export 해서 교체하세요.`);
     }
-    return { workflow: JSON.parse(JSON.stringify(workflow)), manifest };
+    const clone = JSON.parse(JSON.stringify(workflow));
+    // ComfyUI 에 제출 전 _ 로 시작하는 메타 키(_comment 등) 제거 — 노드로 오인 방지
+    for (const k of Object.keys(clone)) {
+        if (k.startsWith('_')) delete clone[k];
+    }
+    return { workflow: clone, manifest };
 }
 
 function injectSlot(workflow, slot, value) {
@@ -126,7 +131,7 @@ class RunPodComfyVideoProvider {
             inputImagePath,
             motionPrompt,
             negativePrompt,
-            workflowName = 'wan22-i2v-720p',
+            workflowName = 'ltxv-i2v',
             width,
             height,
             frames,
