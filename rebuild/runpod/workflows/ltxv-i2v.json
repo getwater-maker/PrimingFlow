@@ -17,7 +17,7 @@
   },
   "6": {
     "inputs": {
-      "text": "gentle natural movement, subtle camera motion, cinematic, smooth",
+      "text": "dynamic cinematic motion, the subject moves naturally, hair and clothing flow, the camera slowly pushes in, lively realistic animation, atmospheric lighting shifts",
       "clip": ["38", 0]
     },
     "class_type": "CLIPTextEncode",
@@ -25,7 +25,7 @@
   },
   "7": {
     "inputs": {
-      "text": "worst quality, inconsistent motion, blurry, jittery, distorted, watermark, text",
+      "text": "static, still, frozen, motionless, worst quality, blurry, jittery, distorted, watermark, text",
       "clip": ["38", 0]
     },
     "class_type": "CLIPTextEncode",
@@ -49,7 +49,7 @@
       "height": 512,
       "length": 97,
       "batch_size": 1,
-      "strength": 1.0
+      "strength": 0.9
     },
     "class_type": "LTXVImgToVideo",
     "_meta": { "title": "LTXV Image to Video" }

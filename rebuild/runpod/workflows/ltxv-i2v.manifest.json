@@ -19,8 +19,8 @@
     "frameRate": 25,
     "steps": 30,
     "cfg": 3.0,
-    "motionPrompt": "gentle natural movement, subtle camera motion, cinematic, smooth",
-    "negativePrompt": "worst quality, inconsistent motion, blurry, jittery, distorted, watermark, text"
+    "motionPrompt": "dynamic cinematic motion, the subject moves naturally, hair and clothing flow, the camera slowly pushes in, lively realistic animation, atmospheric lighting shifts",
+    "negativePrompt": "static, still, frozen, motionless, worst quality, blurry, jittery, distorted, watermark, text"
   },
   "slots": {
     "motionPrompt":   { "nodeId": "6",  "inputKey": "text" },
