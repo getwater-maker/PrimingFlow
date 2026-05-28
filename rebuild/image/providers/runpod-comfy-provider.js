@@ -52,24 +52,51 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 30_000) {
 }
 
 /**
- * ComfyUI Manager API 로 SDXL 모델 재등록.
- * 네트워크 볼륨에 파일이 있으면 다운로드 없이 15~30초 내 완료.
- * Manager 가 없거나 실패해도 예외 없이 리턴 (이미 등록된 경우 포함).
+ * ComfyUI 가 인식하는 checkpoint 목록을 조회.
+ * ComfyUI 가 시작 직후 모델 스캔 중일 수 있으므로 최대 waitMs 동안 재시도.
+ * 목록이 비어있지 않으면 즉시 반환.
  */
-async function _registerSdxlViaManager(endpointUrl) {
-    const CKPT = 'SDXL/sd_xl_base_1.0.safetensors';
-    try {
-        // 1) 현재 등록 목록 확인
-        const infoResp = await fetchWithTimeout(`${endpointUrl}/object_info/CheckpointLoaderSimple`, {}, 10_000);
-        const info = await infoResp.json();
-        const list = info?.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
-        if (list.some(n => n === CKPT || n.endsWith('sd_xl_base_1.0.safetensors'))) {
-            console.log('[runpod-comfy] SDXL 이미 등록됨 — 재등록 불필요');
-            return;
-        }
-    } catch {}
+async function _fetchCheckpoints(endpointUrl, waitMs = 120_000) {
+    const deadline = Date.now() + waitMs;
+    let lastList = [];
+    while (Date.now() < deadline) {
+        try {
+            const r = await fetchWithTimeout(`${endpointUrl}/object_info/CheckpointLoaderSimple`, {}, 10_000);
+            const j = await r.json();
+            lastList = j?.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
+            if (lastList.length > 0) {
+                console.log('[runpod-comfy] checkpoints:', lastList);
+                return lastList;
+            }
+        } catch {}
+        await new Promise(r => setTimeout(r, 6_000));
+    }
+    console.warn('[runpod-comfy] checkpoint 목록 조회 타임아웃 — 목록:', lastList);
+    return lastList;
+}
 
-    console.log('[runpod-comfy] Manager API 로 SDXL 재등록 요청...');
+/** checkpoint 목록에서 SDXL base 모델명 찾기 (경로 형식 무관) */
+function _pickSdxlName(list) {
+    if (!list || list.length === 0) return null;
+    // 1) 정확히 일치
+    const exact = list.find(n => n === 'SDXL/sd_xl_base_1.0.safetensors');
+    if (exact) return exact;
+    // 2) 파일명 부분 일치
+    const byFile = list.find(n => n.replace(/\\/g, '/').includes('sd_xl_base_1.0'));
+    if (byFile) return byFile;
+    // 3) sdxl 키워드 — base 우선
+    const sdxlBase = list.find(n => /sdxl.*base/i.test(n) || /stable.diffusion.xl.base/i.test(n));
+    if (sdxlBase) return sdxlBase;
+    return null;
+}
+
+/**
+ * Manager API 로 SDXL 모델 재등록 시도.
+ * 파일이 볼륨에 있으면 15~30초, 없으면 긴 다운로드 → 타임아웃 후 null 반환.
+ * 반환값: 등록 성공 시 체크포인트 이름, 실패 시 null.
+ */
+async function _registerAndWait(endpointUrl) {
+    const CKPT = 'SDXL/sd_xl_base_1.0.safetensors';
     try {
         await fetchWithTimeout(`${endpointUrl}/manager/queue/install_model`, {
             method: 'POST',
@@ -87,25 +114,18 @@ async function _registerSdxlViaManager(endpointUrl) {
             body: '{}',
         }, 10_000);
     } catch (e) {
-        console.warn('[runpod-comfy] Manager 재등록 실패 (무시):', e.message);
-        return;
+        console.warn('[runpod-comfy] Manager API 호출 실패:', e.message);
+        return null;
     }
-
-    // 최대 90초 대기 — 볼륨에 파일 있으면 15~30초
-    const deadline = Date.now() + 90_000;
+    // 최대 120초 대기 (볼륨에 있으면 ~30초, 없으면 타임아웃)
+    const deadline = Date.now() + 120_000;
     while (Date.now() < deadline) {
-        await new Promise(r => setTimeout(r, 5_000));
-        try {
-            const r = await fetchWithTimeout(`${endpointUrl}/object_info/CheckpointLoaderSimple`, {}, 10_000);
-            const j = await r.json();
-            const list = j?.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
-            if (list.some(n => n === CKPT || n.endsWith('sd_xl_base_1.0.safetensors'))) {
-                console.log('[runpod-comfy] ✅ SDXL 재등록 완료');
-                return;
-            }
-        } catch {}
+        await new Promise(r => setTimeout(r, 6_000));
+        const list = await _fetchCheckpoints(endpointUrl, 1).catch(() => []);
+        const found = _pickSdxlName(list);
+        if (found) { console.log('[runpod-comfy] ✅ 모델 등록 완료:', found); return found; }
     }
-    console.warn('[runpod-comfy] SDXL 재등록 타임아웃 — 제출 재시도');
+    return null;
 }
 
 class RunPodComfyProvider {
@@ -178,6 +198,40 @@ class RunPodComfyProvider {
         const slots = manifest.slots || {};
         const defaults = manifest.defaults || {};
 
+        // 2a. 제출 전 checkpoint 목록 확인 (ComfyUI 시작 후 모델 스캔이 끝날 때까지 최대 2분 대기)
+        progress(0.05);
+        console.log('[runpod-comfy] ComfyUI checkpoint 목록 조회 중...');
+        let ckptList = await _fetchCheckpoints(endpointUrl, 120_000);
+        let ckptName = _pickSdxlName(ckptList);
+
+        if (!ckptName) {
+            // 목록에 없음 → Manager API 로 등록 시도
+            console.log('[runpod-comfy] SDXL 없음 — Manager API 재등록 시도 (현재 목록:', ckptList, ')');
+            progress(0.07);
+            ckptName = await _registerAndWait(endpointUrl);
+            if (!ckptName) {
+                // 마지막 목록 재조회
+                ckptList = await _fetchCheckpoints(endpointUrl, 10_000);
+                ckptName = _pickSdxlName(ckptList) || ckptList[0] || null;
+            }
+        }
+
+        if (!ckptName) {
+            throw new Error(
+                `ComfyUI에 사용 가능한 checkpoint 없음.\n` +
+                `현재 목록: [${ckptList.join(', ')}]\n` +
+                `RunPod 대시보드에서 Pod에 네트워크 볼륨(lkkfxotjok)이 연결됐는지 확인 후 재시도하세요.`
+            );
+        }
+
+        console.log('[runpod-comfy] 사용할 checkpoint:', ckptName);
+
+        // 2b. 체크포인트 이름 동적 주입 (workflow 의 CheckpointLoaderSimple 노드)
+        const ckptNodeId = manifest.slots?.checkpoint?.nodeId || '4';
+        if (workflow[ckptNodeId] && workflow[ckptNodeId].class_type === 'CheckpointLoaderSimple') {
+            workflow[ckptNodeId].inputs.ckpt_name = ckptName;
+        }
+
         injectSlot(workflow, slots.prompt, prompt);
         injectSlot(workflow, slots.negativePrompt, negativePrompt || defaults.negativePrompt || '');
         const finalWidth  = width  || defaults.width  || 1024;
@@ -190,37 +244,19 @@ class RunPodComfyProvider {
         else if (defaults.cfg != null) injectSlot(workflow, slots.cfg, defaults.cfg);
         const finalSeed = (seed == null || seed === -1) ? Math.floor(Math.random() * 1e9) : seed;
         injectSlot(workflow, slots.seed, finalSeed);
-        // 파일명 prefix — 충돌 방지용 시드 포함
         if (slots.filenamePrefix) {
             injectSlot(workflow, slots.filenamePrefix, `pf_${Date.now()}_${finalSeed}`);
         }
 
-        // 3. 제출 (모델 미등록 시 자동 재등록 후 재시도)
+        // 3. 제출
         progress(0.08);
         const clientId = `pf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-        let submit = await (async () => {
-            const r = await fetchWithTimeout(`${endpointUrl}/prompt`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: workflow, client_id: clientId }),
-            }, 30_000);
-            return r.json();
-        })();
-
-        // prompt_outputs_failed_validation = 모델 미등록 → Manager API 로 재등록 후 1회 재시도
-        if (submit.error?.type === 'prompt_outputs_failed_validation') {
-            console.log('[runpod-comfy] 모델 미등록 감지 — Manager API 재등록 시도...');
-            progress(0.1);
-            await _registerSdxlViaManager(endpointUrl);
-            progress(0.13);
-            const retryR = await fetchWithTimeout(`${endpointUrl}/prompt`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: workflow, client_id: clientId + '_r' }),
-            }, 30_000);
-            submit = await retryR.json();
-        }
+        const submitResp2 = await fetchWithTimeout(`${endpointUrl}/prompt`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: workflow, client_id: clientId }),
+        }, 30_000);
+        let submit = await submitResp2.json();
 
         if (submit.error) {
             throw new Error(`ComfyUI 제출 거부: ${JSON.stringify(submit.error)}`);
