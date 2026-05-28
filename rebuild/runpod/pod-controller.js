@@ -21,17 +21,19 @@ const GRAPHQL_URL = 'https://api.runpod.io/graphql';
 const STATE_PATH = path.join(os.homedir(), '.flow-app', 'runpod-state.json');
 const STATE_DIR = path.join(os.homedir(), '.flow-app');
 
-// EU-CZ-1 Secure Cloud 실측 가격 오름차순 (2026-05-28 기준)
+// EU-CZ-1 Secure Cloud — Wan2.2 비디오를 위해 48GB GPU 우선 (2026-05-28 기준)
+// fp8 양자화로도 RTX 3090 24GB 는 81프레임 720p latent 추론에서 OOM 위험.
+// A40/A6000 48GB 는 거의 같은 가격에 여유롭게 작동.
 const DEFAULT_GPU_TYPES = [
-    'NVIDIA RTX A5000',         // $0.27/h, 24GB ★ 최저가
-    'NVIDIA A40',                // $0.44/h, 48GB (비디오 여유)
-    'NVIDIA GeForce RTX 3090',   // $0.46/h, 24GB
+    'NVIDIA A40',                // $0.44/h, 48GB ★ Wan2.2 최적 (3090보다 저렴 + VRAM 2배)
+    'NVIDIA RTX A6000',          // $0.49/h, 48GB (A40 재고 없을 때)
+    'NVIDIA L40S',               // $0.86/h, 48GB (신형, 빠름)
+    'NVIDIA GeForce RTX 3090',   // $0.46/h, 24GB (이미지 전용, 비디오는 OOM 위험)
     'NVIDIA RTX 3090',
-    'NVIDIA RTX A6000',          // $0.49/h, 48GB
-    'NVIDIA RTX PRO 4500',       // $0.74/h, 32GB (HIGH 재고)
+    'NVIDIA RTX A5000',          // $0.27/h, 24GB (이미지만 안전)
     'NVIDIA RTX 4090',           // $0.69/h, 24GB
     'NVIDIA GeForce RTX 4090',
-    'NVIDIA L40S',
+    'NVIDIA RTX PRO 4500',       // $0.74/h, 32GB
 ];
 // 이미지/비디오 모델이 요구하는 최소 VRAM (GB). 이 미만 GPU는 자동 제외.
 const MIN_VRAM_GB = 20;
