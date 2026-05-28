@@ -13159,9 +13159,12 @@ async function _runRunPodVideoGeneration(groupIds, label) {
         },
       });
 
-      // 그룹에 videoPath 저장
+      // 그룹에 videoPath 저장 + UI 갱신 + 자동저장 (첨부 흐름과 동일 패턴)
       g.videoPath = result.path;
-      _notifyProjectChanged();
+      g.videoStatus = 'done';
+      g.videoSourceImage = g.imagePath || null;
+      try { if (typeof renderTaskList === 'function') renderTaskList(proj); } catch (_) {}
+      try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch (_) {}
       success++;
       addLog(`[RunPod-Vid] 그룹 ${num} ✅ (${(result.durationMs / 1000 / 60).toFixed(1)}분, seed=${result.seed})`, 'ok');
     } catch (e) {
