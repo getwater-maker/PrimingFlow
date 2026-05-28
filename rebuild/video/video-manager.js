@@ -38,7 +38,7 @@ class VideoManager {
             const ok = await p.init();
             if (ok) {
                 this.providers.set('runpod-comfy', p);
-                this.logger('[Video] RunPod ComfyUI (Wan2.2) provider 초기화 완료');
+                this.logger('[Video] RunPod ComfyUI (LTX-Video) provider 초기화 완료');
             } else {
                 this.logger('[Video] RunPod ComfyUI provider 초기화 실패 — RunPod 설정 확인');
             }

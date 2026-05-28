@@ -48,7 +48,8 @@
       "width": 768,
       "height": 512,
       "length": 97,
-      "batch_size": 1
+      "batch_size": 1,
+      "strength": 1.0
     },
     "class_type": "LTXVImgToVideo",
     "_meta": { "title": "LTXV Image to Video" }

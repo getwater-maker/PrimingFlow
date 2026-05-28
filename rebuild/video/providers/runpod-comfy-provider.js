@@ -92,7 +92,7 @@ async function uploadImageToComfy(endpointUrl, imagePath, uploadName) {
 class RunPodComfyVideoProvider {
     constructor(opts = {}) {
         this.ready = false;
-        this.label = 'RunPod ComfyUI (Wan2.2)';
+        this.label = 'RunPod ComfyUI (LTX-Video)';
         this.opts = opts;
     }
 

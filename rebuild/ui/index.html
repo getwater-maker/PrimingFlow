@@ -13146,7 +13146,7 @@ async function _runRunPodVideoGeneration(groupIds, label) {
     const g = targets[i];
     const num = g.num;
     try {
-      addLog(`[RunPod-Vid] 그룹 ${num} (${i+1}/${targets.length}) — Wan2.2 비디오 생성 중 (약 5~8분)...`, 'info');
+      addLog(`[RunPod-Vid] 그룹 ${num} (${i+1}/${targets.length}) — LTX-Video 비디오 생성 중 (약 1~2분)...`, 'info');
 
       const filename = `그룹${String(num).padStart(2, '0')}_${Date.now()}.mp4`;
       const outputPath = path.join(videosDir, filename);
