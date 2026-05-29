@@ -193,11 +193,11 @@
     to   { transform: translateX(120%); opacity: 0; }
   }
 
-  /* 메인 통합 작업 영역 — 3열 grid: 작업목록 | 보조패널 | 작업흐름 */
+  /* 메인 통합 작업 영역 — 2열 grid: 작업목록 | 마법사 */
   .workspace {
     display: grid;
-    grid-template-columns: minmax(0,1fr) 320px 440px;
-    grid-template-areas: "task aux flow";
+    grid-template-columns: minmax(0,1fr) 480px;
+    grid-template-areas: "task wiz";
     gap: 12px;
     flex: 1;
     overflow: hidden;
@@ -206,11 +206,20 @@
   }
   .workspace > * { min-width: 0; }
 
-  /* 3열 컬럼 wrapper — grid-area로 위치 명시 (마크업 순서와 무관) */
+  /* 컬럼 wrapper — grid-area로 위치 명시 (마크업 순서와 무관) */
   .col { min-width: 0; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
   .col-task { grid-area: task; overflow: hidden; }
-  .col-flow { grid-area: flow; overflow-y: auto; padding-right: 4px; }
-  .col-aux  { grid-area: aux;  overflow: hidden; }
+  /* 마법사 컬럼 — 탭바(고정) + 패널(스크롤) + 푸터(고정) 세로 스택 */
+  .col-wiz { grid-area: wiz; display: flex; flex-direction: column; min-height: 0; overflow: hidden; gap: 0; }
+  .col-wiz > .wiz-footer {
+    flex: none;
+    border-top: 1px solid var(--border);
+    padding: 10px 4px 4px;
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
 
   /* 보조 패널 탭 (③ 컬럼) */
   .aux-tabs {
@@ -245,6 +254,10 @@
   .aux-panel > .preset-area { flex: 1; overflow-y: auto; }
   .aux-panel > .log-panel   { flex: 1; min-height: 0; }
   .aux-panel > .advanced    { flex: 1; overflow-y: auto; }
+  .aux-panel > .wiz-step    { flex: 1; overflow-y: auto; padding-right: 4px; }
+  /* 탭바 6개 — 좁으면 줄바꿈 허용 */
+  .aux-tabs { flex-wrap: wrap; }
+  .col-wiz .aux-tab { flex: 1 1 auto; min-width: 56px; padding: 8px 4px; font-size: 12px; }
 
   /* 작업 목록 검색 — 매치된 sentence row 강조 */
   .sentence-row.search-match  { background: rgba(212, 165, 116, 0.10); }
@@ -457,6 +470,7 @@
   .auth-loading { color:var(--text-soft); font-size:14px; }
   .auth-loading .spinner { display:inline-block; width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; vertical-align:middle; margin-right:8px; }
   @keyframes spin { to { transform:rotate(360deg); } }
+  .pf-img-spin { display:inline-block; width:26px; height:26px; border:3px solid rgba(255,255,255,0.4); border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite; }
   .auth-error {
     background:rgba(217,126,126,0.10); border:1px solid rgba(217,126,126,0.30);
     border-radius:8px; padding:14px 16px; color:var(--danger); font-size:14px;
@@ -545,6 +559,21 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+
+  /* 헤더에 박히는 컴팩트 모니터 — 단일행 인라인 칩 */
+  .monitor-bar--header {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 7px;
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    border-radius: 999px;
+    line-height: 1.2;
+    max-width: 360px;
+  }
+  .monitor-bar--header .monitor-status { margin-bottom: 0; }
+  .monitor-bar--header .monitor-detail::before { content: '· '; }
 
   /* 좌측 — 프리셋 영역 (75%) */
   .preset-area {
@@ -876,9 +905,9 @@
     padding: 12px 14px;
   }
   .group-image {
-    width: 220px;
-    height: 124px;           /* 16:9 비율 — 생성된 이미지 식별 가능한 크기 */
-    flex: 0 0 220px;
+    width: 440px;
+    height: 248px;           /* 16:9 비율 — 2배 확대 (생성 이미지 크게 식별) */
+    flex: 0 0 440px;
     background: var(--bg-soft);
     border: 1px dashed var(--border);
     border-radius: var(--radius-sm);
@@ -1230,14 +1259,19 @@
 
 <div class="header">
   <h1>Priming Flow</h1>
-  <span class="badge" id="appVersionBadge">v? / Google Flow</span>
+  <span class="badge" id="appVersionBadge">v?</span>
+  <!-- OmniVoice 서버 모니터링 (헤더 — 항상 표시) -->
+  <div class="monitor-bar monitor-bar--header off" id="omnivoiceMonitor"
+       onclick="openTtsServerModal()" title="클릭 — TTS 서버 설정 열기">
+    <div class="monitor-status" id="omnivoiceMonitorStatus">🔴 omnivoice 서버 확인 중…</div>
+    <div class="monitor-detail" id="omnivoiceMonitorDetail">설정을 확인합니다</div>
+  </div>
   <span id="userNameDisplay" style="display:none"></span>
   <button id="headerLogoutBtn" class="btn-sm" onclick="doHeaderLogout()" style="display:none">로그아웃</button>
   <button class="btn-sm" onclick="openVideoToText()" style="font-size:12px; margin-left:auto;">🎬 영상→텍스트</button>
   <button class="btn-sm" onclick="openRecToRef()" style="font-size:12px;">🎤 녹음→참조음성</button>
   <button class="btn-sm" onclick="openRefAudioVault()" style="font-size:12px;" title="~/.flow-app/ref-audio/ — 녹음→참조음성에서 저장된 WAV+TXT 묶음 폴더를 탐색기로 엽니다">📂 참조음성 폴더</button>
   <button class="btn-sm" onclick="openGallery()" style="font-size:12px;">🖼 갤러리</button>
-  <button class="btn-sm" onclick="openGeminiImgTest()" style="font-size:12px;" title="현재 프로젝트의 그룹 N개로 Gemini 이미지 생성 PoC 테스트 (gemini-2.5-flash-image)">🧪 Gemini 이미지</button>
   <button class="btn-sm" onclick="document.getElementById('helpModal').style.display='flex'" style="font-size:12px;">📖 사용법</button>
 </div>
 
@@ -1394,6 +1428,7 @@
               <span id="taskSearchCount" style="font-size:11px; color:var(--text-muted); min-width:28px; text-align:center;"></span>
               <span id="taskListTotalDuration" title="변환된 전체 음성 재생 시간" style="font-size:12px; color:var(--text-muted); padding:4px 8px; background:var(--bg-soft); border-radius:6px; min-width:48px; text-align:center; white-space:nowrap;">⏱ 00:00</span>
               <div class="task-list-progress" id="taskListProgress" style="white-space:nowrap;">0 / 0</div>
+              <span id="taskStatusBadge" title="작업 진행 상태 (이미지 · TTS · 영상)" style="font-size:11px; color:var(--accent); font-weight:600; white-space:nowrap;"></span>
             </div>
             <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
               <select id="previewSpeedSelect" onchange="_onPreviewSpeedChange()" title="미리듣기 배속 (단일·전체 공통)" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:4px 6px; font-size:12px; border-radius:4px;">
@@ -1429,296 +1464,12 @@
       </div>
     </div>
 
-    <!-- ② 작업 흐름 (col-flow, 340px) -->
-    <div class="col col-flow">
-    <!-- 통합: 작업 시작 + 분할 옵션 -->
-    <div class="section">
-      <div class="section-title">📂 작업 시작<span id="rtfBadge" class="section-title-badge" title="Real-Time Factor — 작업시간 / 오디오길이. 낮을수록 빠름">RTF —</span></div>
-
-      <!-- 작업 시작 버튼 5개 — 한 grid 3-col 로 묶어 모두 같은 너비 강제 (첫 줄 3개 / 둘째 줄 2개) -->
-      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin-bottom:6px;">
-        <button class="btn-sm" onclick="openFile()" style="padding:6px 10px;">📂 대본 첨부</button>
-        <button class="btn-sm" onclick="openScriptInputModal()" style="padding:6px 10px;">✏️ 직접 입력</button>
-        <button class="btn-sm" onclick="openCurrentOutputFolder()" id="folderBtn" title="현재 활성 프리셋의 출력 폴더를 윈도우 탐색기로 열기" style="padding:6px 10px;">📂 저장폴더 보기</button>
-        <button class="btn-sm" onclick="saveProjectFile()" id="projectSaveBtn" title="현재 작업 상태(분할/sentence/그룹/자산 경로)를 출력 폴더 안 project.pflow 로 저장" style="padding:6px 10px;">💾 저장</button>
-        <button class="btn-sm" onclick="loadProjectFile()" title="저장한 project.pflow 를 열어 작업 이어가기" style="padding:6px 10px;">📂 불러오기</button>
-        <button class="btn-sm" onclick="openScriptCopyModal()" title="현재 분할된 도입부/그룹별 대본을 클립명과 함께 한 번에 복사" style="padding:6px 10px;">📋 대본 복사</button>
-      </div>
-
-      <!-- 자동저장 상태 라벨 — 그룹 안 중앙 정렬 -->
-      <div style="text-align:center; margin-bottom:8px;">
-        <span id="autoSaveIndicator" title="자동 저장 상태" style="font-size:11px; color:var(--text-muted); white-space:nowrap;">— 미저장</span>
-      </div>
-
-      <!-- 채널 영역은 좌측 프리셋으로 통합됨 (2026-05) — 드롭다운/버튼 폐기 -->
-
-      <!-- Google 계정 프로필 — [셀렉트] [로그인] | [+추가] [삭제] 한 줄 -->
-      <div style="display:flex; gap:6px; margin-bottom:14px; align-items:center;">
-        <select id="profileSelect" style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 8px; border-radius:6px; font-size:13px;">
-          <option value="default">기본 계정</option>
-        </select>
-        <button class="btn-sm btn-login" onclick="flowLogin()" style="flex:none; padding:6px 10px;">로그인</button>
-        <button class="btn-sm" onclick="addProfile()" style="flex:none;">+추가</button>
-        <button class="btn-sm" onclick="removeProfile()" style="flex:none; color:var(--danger);">삭제</button>
-      </div>
-
-      <!-- 분할 옵션 — 변경 시 자동 재분할 -->
-      <div style="border-top:1px solid var(--border-soft); padding-top:10px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <span style="font-size:12px; font-weight:700; color:var(--text-strong);">⚙ 분할 옵션 (변경 시 자동 재분할)</span>
-          <label style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-soft); cursor:pointer; white-space:nowrap;" title="🤖 AI 분할 (Gemini) — 의미 분할이 더 자연스러움. API 키 필요. API 실패·텍스트 변형 시 algo 폴백 자동.">
-            <input type="checkbox" id="useAiSplitter" checked onchange="autoSplitDebounced()" style="cursor:pointer;">
-            <span>🤖 AI 분할</span>
-          </label>
-        </div>
-
-        <!-- 그룹 크기 — 도입부 / 본론 분리 -->
-        <div class="setting" style="display:flex; align-items:center; gap:6px; margin-bottom:4px; flex-wrap:wrap;">
-          <label style="font-size:13px; color:var(--info); font-weight:600; white-space:nowrap;">📘 도입부</label>
-          <input type="number" id="introSentenceSize" min="1" max="20" value="3" oninput="autoSplitDebounced()"
-                 style="width:50px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
-          <span style="font-size:12px; color:var(--text-muted); white-space:nowrap;">문장씩</span>
-          <span style="color:var(--border); margin:0 4px;">|</span>
-          <label style="font-size:13px; color:var(--text-soft); white-space:nowrap;">📕 본론</label>
-          <input type="number" id="mainSentenceSize" min="1" max="20" value="7" oninput="autoSplitDebounced()"
-                 title="본론 문장 수를 늘리면 그룹이 줄어 이미지 생성 시간이 단축됩니다 (Flow 호출 횟수↓). 켄번스 패턴 10개가 그룹마다 다르게 적용되어 단조롭지 않습니다. 권장 7~10."
-                 style="width:50px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
-          <span style="font-size:12px; color:var(--text-muted); white-space:nowrap;">문장씩</span>
-        </div>
-        <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px; line-height:1.4;">
-          💡 본론을 7~10 문장으로 늘리면 이미지 생성 횟수가 줄어 작업 시간이 단축됩니다. 켄번스 10패턴이 자동 순회되어 영상은 단조롭지 않습니다.
-        </div>
-
-        <!-- 기존 stages 시스템 (UI 비표시 — autoSplit 분기 호환용) -->
-        <div id="groupStagesList" style="display:none;"></div>
-        <span id="groupStagesNote" style="display:none; font-size:11px; color:var(--warning, #d4a574); font-weight:600; margin-top:3px;">⚠ 섹션 마커 감지 — 그룹 크기 무시</span>
-
-        <!-- 짧은 문장 + 긴 문장 한 줄 -->
-        <div class="setting" style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
-          <label style="font-size:13px; color:var(--text-soft);">짧은</label>
-          <input type="number" id="shortLen" min="1" max="50" value="10" oninput="autoSplitDebounced()"
-                 style="width:50px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
-          <span style="font-size:12px; color:var(--text-muted); white-space:nowrap;">자 미만</span>
-          <span style="color:var(--border); margin:0 4px;">|</span>
-          <label style="font-size:13px; color:var(--text-soft);">긴</label>
-          <input type="number" id="longLen" min="10" max="100" value="20" oninput="autoSplitDebounced()"
-                 style="width:50px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
-          <span style="font-size:12px; color:var(--text-muted); white-space:nowrap;">자 초과</span>
-        </div>
-
-        <div id="splitGroupCountPreview" style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--border-soft); font-size:12px; font-weight:600; color:var(--text-strong);"></div>
-      </div>
-
-      <!-- 🎬 도입부 비디오 준비 — 도입부 sentence 일괄 TTS + 음성 9초 기준 재배치 -->
-      <div style="border-top:1px solid var(--border-soft); padding-top:10px; margin-top:10px;">
-        <div style="font-size:12px; font-weight:700; color:var(--text-strong); margin-bottom:4px;">🎬 도입부 비디오 준비</div>
-        <div style="font-size:11px; color:var(--text-muted); margin-bottom:6px; line-height:1.4;">
-          도입부 sentence 들을 일괄 TTS 합성한 뒤 음성 길이 9초 기준으로 그룹을 자동 재배치합니다 (1 그룹 = 1 비디오 클립 ≤ 10초).
-        </div>
-        <button class="btn-sm" id="prepareIntroVideosBtn" onclick="prepareIntroVideos()" title="도입부 sentence 전체 TTS 합성 후 실제 음성 길이 9초 한도로 그룹을 다시 묶습니다. 자산이 이미 있으면 확인 후 초기화."
-                style="width:100%; padding:8px 12px; background:var(--accent-soft); color:var(--accent-hover); border:1px solid var(--accent); font-weight:600;">
-          🎙 도입부 TTS + 9초 재배치
-        </button>
-        <div id="prepareIntroProgress" style="font-size:11px; color:var(--text-muted); margin-top:6px; text-align:center;">—</div>
-      </div>
-
-      <!-- 실행 + 일괄 액션 (통합: 작업시작 섹션 내부) -->
-      <div id="actionPanel" style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:12px;">
-        <!-- 🎬 Grok 비디오 모션 프롬프트 — 이미지를 애니메이션으로 만들 때 Grok 에 전달되는 문구 -->
-        <!--    값은 ~/.flow-app/grok-config.json 의 defaultMotionPrompt 로 영구 저장. -->
-        <!--    빈 값이면 Grok 자체 디폴트 동작. -->
-        <div style="margin-bottom:8px;">
-          <label for="grokMotionPromptInput" style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:3px;">
-            🎬 Grok 비디오 모션 프롬프트 <span style="color:var(--text-soft); font-size:10px;">(이미지 → 애니메이션 변환 시 사용)</span>
-          </label>
-          <textarea id="grokMotionPromptInput" rows="2"
-            style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 8px; border-radius:6px; font-size:12px; resize:vertical;"
-            placeholder="예: natural slow motion, cinematic feel"
-            title="이 문구가 Grok 비디오 생성 시 모션 프롬프트로 전달됩니다. 입력 끝낼 때 자동 저장 (~/.flow-app/grok-config.json)."
-            onchange="onGrokMotionPromptChange()"></textarea>
-        </div>
-
-        <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px; margin-bottom:6px;">
-          <button class="btn btn-sm-action" id="startBtn" onclick="generateAll()" title="현재 활성 탭의 대본만 자동 제작 (이미지 + TTS + 도입부 영상 + .vrew)" style="font-weight:700;">▶ 자동제작</button>
-          <button class="btn btn-sm-action" id="grokLoginBtn" onclick="openGrokLogin()" title="Grok 자동화 크롬을 띄우고 grok.com 로그인 페이지로 이동 (영상 생성 전 X 계정 로그인 권장)">🔑 그록 로그인</button>
-        </div>
-        <button class="btn btn-sm-action" id="startAllProjectsBtn" onclick="generateAllProjects()" title="열려있는 모든 탭을 순차적으로 자동제작 (탭1 완료 → 탭2 자동 시작 → ...)" style="width:100%; margin-bottom:8px; background:var(--accent-soft); color:var(--accent-hover); border:1px solid var(--accent); font-weight:700;">▶▶ 모든 탭 순차 자동제작</button>
-        <button class="btn btn-sm-action" id="runpodPipelineBtn" onclick="onRunpodPipelineClick()" title="RunPod 원클릭: 이미지 → TTS → .vrew 빌드. 실행 중 다시 누르면 중단." style="width:100%; margin-bottom:8px; background:linear-gradient(135deg,#1a6b3a,#0e4d6e); color:#fff; font-weight:700; border:1px solid #2a8a5a;">🚀 RunPod 원클릭 생성</button>
-        <div style="margin-bottom:8px; font-size:12px; color:var(--text-muted);">
-          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;" title="[▶ 자동제작] 클릭 시 도입부 그룹 이미지가 완성되는 즉시 Grok 으로 순차 영상 변환을 시작합니다. 본론은 이미지 그대로.">
-            <input type="checkbox" id="autoIntroVideoToggle" checked />
-            <span>도입부 자동 영상화 (이미지 완성 시 Grok 으로 순차 변환)</span>
-          </label>
-        </div>
-        <div style="display:flex; gap:6px; margin-bottom:8px;">
-          <button class="btn" id="pauseBtn" onclick="pauseGeneration()" style="flex:1; padding:8px 12px; background:var(--warning); color:#fff; display:none; white-space:nowrap;">일시정지</button>
-          <button class="btn" id="stopBtn" onclick="stopGeneration()" style="flex:1; padding:8px 12px; background:var(--danger); color:#fff; display:none; white-space:nowrap;">중지</button>
-        </div>
-
-        <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px; font-size:12px;">
-          <label style="color:var(--text-muted); white-space:nowrap;">이미지 모델</label>
-          <select id="runpodImageModel" title="Lightning=한국어+빠름(8step), Qwen=한국어+최고품질(20step), SDXL=영문번역+최저비용" style="flex:1; padding:4px 6px; border-radius:4px;">
-            <option value="qwen-image-lightning">Qwen-Lightning (한국어 · 빠름 8step)</option>
-            <option value="qwen-image">Qwen-Image (한국어 · 최고품질 20step)</option>
-            <option value="sdxl-basic">SDXL (영문 번역 · 최저비용)</option>
-          </select>
-        </div>
-
-        <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px;">
-          <!-- Row 1 -->
-          <button class="btn btn-sm-action" onclick="generateEmptyGroupImagesRunPod()" title="이미지가 비어있는 그룹만 순차적으로 RunPod ComfyUI 로 생성 (모델은 위 드롭다운)">☁ 빈 그룹 이미지</button>
-          <div class="range-cell">
-            <span>그룹</span>
-            <input type="number" id="videoRangeFrom" min="1" placeholder="시작" title="범위 시작 그룹 번호" />
-            <span>~</span>
-            <input type="number" id="videoRangeTo" min="1" placeholder="끝" title="범위 끝 그룹 번호 (빈칸=끝까지)" />
-          </div>
-
-          <!-- Row 2 -->
-          <button class="btn btn-sm-action" id="imageBatchAttachBtn" onclick="openImageBatchAttach()" title="외부 이미지/동영상 파일을 그룹 제목 또는 그룹 번호(예: '그룹 01_...')와 매칭해서 자동 첨부">📎 이미지·영상 첨부</button>
-          <button class="btn btn-sm-action" onclick="generateEmptyGroupVideosRunPod()" title="이미지는 있지만 비디오가 없는 그룹만 RunPod ComfyUI(Wan2.2) 로 비디오 생성">☁ 빈 그룹 비디오</button>
-
-          <!-- Row 3 -->
-          <button class="btn btn-sm-action" onclick="generateSelectedGroupImagesRunPod()" title="좌상단 체크박스로 선택한 그룹의 이미지를 RunPod ComfyUI(SDXL) 로 생성/재생성">☁ 선택 그룹 이미지</button>
-          <button class="btn btn-sm-action" onclick="generateSelectedGroupVideosRunPod()" title="좌상단 체크박스로 선택한 그룹의 이미지를 RunPod ComfyUI(Wan2.2) 로 비디오 변환">☁ 선택 그룹 비디오</button>
-
-          <!-- Row 4 -->
-          <button class="btn btn-sm-action" id="batchConvertBtn" onclick="onBatchConvertClick()" title="모든 문장 TTS 변환">🎙 TTS 변환</button>
-          <!-- 실패 영상 재시도: 평소엔 숨김, videoStatus='fail' 인 그룹 1개 이상일 때만 표시.
-               다른 탭 TTS 자리로 이동 + 그리드 셀 폭(절반) 으로 자동 축소. -->
-          <button class="btn btn-sm-action" id="retryFailedVideoBtn"
-            onclick="retryFailedVideos()"
-            title="비디오 생성에 실패한 그룹만 골라서 다시 시도 (도입부/본론 모두)"
-            style="display:none; padding:6px 8px; font-size:12px; background:var(--warning, #c87000); color:#fff; font-weight:700;">
-            🔁 실패 영상 재시도 (<span id="retryFailedCount">0</span>)
-          </button>
-
-          <!-- Row 5: Vrew 풀폭 -->
-          <button class="btn btn-sm-action" onclick="saveVrew()" title="현재 프로젝트를 Vrew 4.0.1 호환 .vrew 파일로 저장" style="grid-column: span 2;">💾 Vrew</button>
-
-          <!-- Row 5: Adobe Premiere Pro 호환 XML (FCP7 XMEML v5) 풀폭 -->
-          <button class="btn btn-sm-action" onclick="savePremiereXml()" title="Adobe Premiere Pro (FCP7 XML) 형식으로 시퀀스 저장 + 자막 .srt 동봉. 이미지·오디오·자막 트랙 정렬된 상태로 프리미어 가져오기 가능" style="grid-column: span 2;">🎬 프리미어 XML 저장</button>
-        </div>
-        <input type="file" id="imageBatchInput" multiple accept="image/jpeg,image/png,image/jpg,image/webp,video/mp4,video/webm,video/x-matroska,video/quicktime" style="display:none;">
-      </div>
-    </div>
-
-    <!-- 미디어 설정 -->
-    <div class="section">
-      <div class="section-title">미디어 설정</div>
-      <div class="chip-group" id="mediaTypeChips" style="margin-bottom:12px;">
-        <div class="chip active" data-val="image" style="flex:1; text-align:center;">이미지</div>
-        <div class="chip" data-val="video" style="flex:1; text-align:center;">동영상</div>
-      </div>
-
-      <!-- 사전 설정 구문 -->
-      <div class="setting">
-        <label>사전 설정 <span style="color:var(--text-muted); font-size:11px;">(모든 장면에 공통 적용)</span></label>
-        <textarea id="presetPrompt" rows="2" style="width:100%; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); border-radius:6px; padding:8px; font-size:13px; resize:vertical;" placeholder="예: 30대 한국 남성, 짧은 머리, 회색 양복, 현대 사무실 배경, 따뜻한 조명"></textarea>
-      </div>
-
-      <!-- 이미지 설정 -->
-      <div id="imageSettings">
-        <div class="setting">
-          <label>스타일</label>
-          <div style="display:flex; gap:6px; flex:1;">
-            <select id="styleSelect" style="flex:1;"></select>
-            <button class="btn-sm" type="button" onclick="openStyleManager()" title="스타일 추가/수정/삭제" style="white-space:nowrap;">⚙ 관리</button>
-          </div>
-        </div>
-
-        <!-- 비율 + 매수 한 줄 (Flow UI 변경으로 자동 설정 실패 — Flow 창에서 직접 설정) -->
-        <div style="display:flex; gap:12px; opacity:0.55;">
-          <div class="setting" style="flex:1;">
-            <label>비율</label>
-            <div class="chip-group" id="ratioChips" style="pointer-events:none;">
-              <div class="chip active" data-val="16:9">16:9</div>
-            </div>
-          </div>
-          <div class="setting" style="flex:1;">
-            <label>매수</label>
-            <div class="chip-group" id="countChips" style="pointer-events:none;">
-              <div class="chip active" data-val="x1">x1</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="setting" style="opacity:0.55;">
-          <label>모델</label>
-          <select id="modelSelect" disabled>
-            <option value="Nano Banana 2">Nano Banana 2</option>
-            <option value="Nano Banana Pro">Nano Banana Pro</option>
-            <option value="Imagen 4">Imagen 4</option>
-          </select>
-        </div>
-
-        <div style="font-size:11px; color:var(--warning); line-height:1.5; padding:8px 10px; border:1px dashed var(--warning); border-radius:6px; margin-top:6px;">
-          ⚠ <b>비율 / 매수 / 모델</b>은 Google Flow UI 변경으로 자동 설정이 끊겼습니다.<br>
-          → <b>Flow Chrome 창에서 직접 한 번만 설정</b>해 주세요 (Flow 가 기억합니다).
-        </div>
-
-      </div>
-
-      <!-- 동영상 설정 -->
-      <div id="videoSettings" style="display:none;">
-        <div class="setting">
-          <label>스타일</label>
-          <div style="display:flex; gap:6px; flex:1;">
-            <select id="videoStyleSelect" style="flex:1;"></select>
-            <button class="btn-sm" type="button" onclick="openStyleManager()" title="스타일 추가/수정/삭제" style="white-space:nowrap;">⚙ 관리</button>
-          </div>
-        </div>
-
-        <!-- 비율 + 매수 한 줄 (Flow UI 변경으로 자동 설정 실패 — Flow 창에서 직접 설정) -->
-        <div style="display:flex; gap:12px; opacity:0.55;">
-          <div class="setting" style="flex:1;">
-            <label>비율</label>
-            <div class="chip-group" id="videoRatioChips" style="pointer-events:none;">
-              <div class="chip active" data-val="16:9">16:9</div>
-              <div class="chip" data-val="9:16">9:16</div>
-            </div>
-          </div>
-          <div class="setting" style="flex:1;">
-            <label>매수</label>
-            <div class="chip-group" id="videoCountChips" style="pointer-events:none;">
-              <div class="chip active" data-val="x1">x1</div>
-              <div class="chip" data-val="x2">x2</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="setting" style="opacity:0.55;">
-          <label>모델</label>
-          <select id="videoModelSelect" disabled>
-            <option value="Veo 3.1 - Fast">Veo 3.1 Fast</option>
-            <option value="Veo 3.1">Veo 3.1</option>
-          </select>
-        </div>
-
-        <div style="font-size:11px; color:var(--warning); line-height:1.5; padding:8px 10px; border:1px dashed var(--warning); border-radius:6px; margin-top:6px;">
-          ⚠ <b>비율 / 매수 / 모델</b>은 Google Flow UI 변경으로 자동 설정이 끊겼습니다.<br>
-          → <b>Flow Chrome 창에서 직접 한 번만 설정</b>해 주세요 (Flow 가 기억합니다).
-        </div>
-
-        <div style="font-size:12px; color:var(--warning); margin-top:8px;">
-          동영상 생성은 크레딧을 사용합니다 (1건당 약 20크레딧)
-        </div>
-      </div>
-    </div>
-
-    </div>
-
-    <!-- ③ 보조 패널 (col-aux, 300px) -->
-    <div class="col col-aux">
-    <!-- OmniVoice 서버 모니터링 -->
-    <div class="monitor-bar off" id="omnivoiceMonitor"
-         onclick="openTtsServerModal()" title="클릭 — TTS 서버 설정 열기">
-      <div class="monitor-status" id="omnivoiceMonitorStatus">🔴 omnivoice 서버 확인 중…</div>
-      <div class="monitor-detail" id="omnivoiceMonitorDetail">설정을 확인합니다</div>
-    </div>
-
+    <!-- ② 마법사 (col-wiz) — 1 프리셋 → 2 대본 → 3 이미지 → 4 동영상 + 로그/고급 -->
+    <div class="col col-wiz">
       <div class="aux-tabs">
-        <button class="aux-tab active" data-tab="preset">🎙 프리셋</button>
+        <button class="aux-tab active" data-tab="preset">1 🎙 프리셋</button>
+        <button class="aux-tab" data-tab="script">2 📝 대본</button>
+        <button class="aux-tab" data-tab="image">3 🎬 제작</button>
         <button class="aux-tab" data-tab="log">📋 로그</button>
         <button class="aux-tab" data-tab="adv">⚙ 고급</button>
       </div>
@@ -1746,10 +1497,201 @@
     </div>
       </div>
 
+      <!-- ▣ Step 2 — 대본 입력 · 분할 -->
+      <div class="aux-panel" id="auxScript" hidden>
+        <div class="wiz-step">
+          <div style="font-size:13px; font-weight:700; color:var(--text-strong); margin-bottom:8px;">📝 2단계 — 대본 입력 · 분할</div>
+
+          <!-- 작업 시작 버튼 6개 (3-col) -->
+          <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin-bottom:6px;">
+            <button class="btn-sm" onclick="openFile()" style="padding:6px 10px;">📂 대본 첨부</button>
+            <button class="btn-sm" onclick="openScriptInputModal()" style="padding:6px 10px;">✏️ 직접 입력</button>
+            <button class="btn-sm" onclick="openCurrentOutputFolder()" id="folderBtn" title="현재 활성 프리셋의 출력 폴더를 윈도우 탐색기로 열기" style="padding:6px 10px;">📂 저장폴더 보기</button>
+            <button class="btn-sm" onclick="saveProjectFile()" id="projectSaveBtn" title="현재 작업 상태(분할/sentence/그룹/자산 경로)를 출력 폴더 안 project.pflow 로 저장" style="padding:6px 10px;">💾 저장</button>
+            <button class="btn-sm" onclick="loadProjectFile()" title="저장한 project.pflow 를 열어 작업 이어가기" style="padding:6px 10px;">📂 불러오기</button>
+            <button class="btn-sm" onclick="openScriptCopyModal()" title="현재 분할된 도입부/그룹별 대본을 클립명과 함께 한 번에 복사" style="padding:6px 10px;">📋 대본 복사</button>
+          </div>
+
+          <!-- 자동저장 상태 라벨 -->
+          <div style="text-align:center; margin-bottom:8px;">
+            <span id="autoSaveIndicator" title="자동 저장 상태" style="font-size:11px; color:var(--text-muted); white-space:nowrap;">— 미저장</span>
+          </div>
+
+          <!-- 분할 옵션 — 변경 시 자동 재분할 -->
+          <div style="border-top:1px solid var(--border-soft); padding-top:10px;">
+            <div style="display:flex; align-items:center; margin-bottom:8px;">
+              <span style="font-size:12px; font-weight:700; color:var(--text-strong);">⚙ 분할 옵션 (변경 시 자동 재분할)</span>
+            </div>
+
+            <!-- 그룹 크기 — 도입부 / 본론 분리 -->
+            <div class="setting" style="display:flex; align-items:center; gap:6px; margin-bottom:4px; flex-wrap:wrap;">
+              <label style="font-size:13px; color:var(--info); font-weight:600; white-space:nowrap;">📘 도입부</label>
+              <input type="number" id="introSentenceSize" min="1" max="20" value="3" oninput="autoSplitDebounced()"
+                     style="width:50px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
+              <span style="font-size:12px; color:var(--text-muted); white-space:nowrap;">문장씩</span>
+              <span style="color:var(--border); margin:0 4px;">|</span>
+              <label style="font-size:13px; color:var(--text-soft); white-space:nowrap;">📕 본론</label>
+              <input type="number" id="mainSentenceSize" min="1" max="20" value="7" oninput="autoSplitDebounced()"
+                     title="본론 문장 수를 늘리면 그룹이 줄어 이미지 생성 시간이 단축됩니다 (Flow 호출 횟수↓). 켄번스 패턴 10개가 그룹마다 다르게 적용되어 단조롭지 않습니다. 권장 7~10."
+                     style="width:50px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
+              <span style="font-size:12px; color:var(--text-muted); white-space:nowrap;">문장씩</span>
+            </div>
+            <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px; line-height:1.4;">
+              💡 본론을 7~10 문장으로 늘리면 이미지 생성 횟수가 줄어 작업 시간이 단축됩니다. 켄번스 10패턴이 자동 순회되어 영상은 단조롭지 않습니다.
+            </div>
+
+            <!-- 기존 stages 시스템 (UI 비표시 — autoSplit 분기 호환용) -->
+            <div id="groupStagesList" style="display:none;"></div>
+            <span id="groupStagesNote" style="display:none; font-size:11px; color:var(--warning, #d4a574); font-weight:600; margin-top:3px;">⚠ 섹션 마커 감지 — 그룹 크기 무시</span>
+
+            <!-- 짧은 문장 + 긴 문장 한 줄 -->
+            <div class="setting" style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+              <label style="font-size:13px; color:var(--text-soft);">짧은</label>
+              <input type="number" id="shortLen" min="1" max="50" value="10" oninput="autoSplitDebounced()"
+                     style="width:50px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
+              <span style="font-size:12px; color:var(--text-muted); white-space:nowrap;">자 미만</span>
+              <span style="color:var(--border); margin:0 4px;">|</span>
+              <label style="font-size:13px; color:var(--text-soft);">긴</label>
+              <input type="number" id="longLen" min="10" max="100" value="20" oninput="autoSplitDebounced()"
+                     style="width:50px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
+              <span style="font-size:12px; color:var(--text-muted); white-space:nowrap;">자 초과</span>
+            </div>
+
+            <div id="splitGroupCountPreview" style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--border-soft); font-size:12px; font-weight:600; color:var(--text-strong);"></div>
+          </div>
+
+          <!-- 🎬 도입부 비디오 준비 — 도입부 TTS + 9초 재배치 (동영상 탭에서 이동) -->
+          <div style="border-top:1px solid var(--border-soft); padding-top:10px; margin-top:10px;">
+            <div style="font-size:12px; font-weight:700; color:var(--text-strong); margin-bottom:4px;">🎬 도입부 비디오 준비</div>
+            <div style="font-size:11px; color:var(--text-muted); margin-bottom:6px; line-height:1.4;">
+              도입부 sentence 들을 일괄 TTS 합성한 뒤 음성 길이 9초 기준으로 그룹을 자동 재배치합니다 (1 그룹 = 1 비디오 클립 ≤ 10초). 완료되면 제작 탭으로 이동합니다.
+            </div>
+            <button class="btn-sm" id="prepareIntroVideosBtn" onclick="prepareIntroVideos()" title="도입부 sentence 전체 TTS 합성 후 실제 음성 길이 9초 한도로 그룹을 다시 묶습니다. 자산이 이미 있으면 확인 후 초기화."
+                    style="width:100%; padding:8px 12px; background:var(--accent-soft); color:var(--accent-hover); border:1px solid var(--accent); font-weight:600;">
+              🎙 도입부 TTS + 9초 재배치
+            </button>
+            <div id="prepareIntroProgress" style="font-size:11px; color:var(--text-muted); margin-top:6px; text-align:center;">—</div>
+          </div>
+
+          <!-- 🤖 AI 이미지 프롬프트 (클로드 왕복) — 대본 맥락 반영해 인물/성별 일관성 강화 -->
+          <div style="border-top:1px solid var(--border-soft); padding-top:10px; margin-top:10px;">
+            <div style="font-size:12px; font-weight:700; color:var(--text-strong); margin-bottom:4px;">🤖 AI 이미지 프롬프트 (선택)</div>
+            <div style="font-size:11px; color:var(--text-muted); margin-bottom:6px; line-height:1.4;">
+              대본을 내보내 클로드(claude.ai)에서 그룹별 영어 이미지 프롬프트를 받아 다시 가져오면, 이미지 생성 시 그 프롬프트를 사용합니다 (성별·인물 일관성↑, 비용 0).
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+              <button class="btn-sm" onclick="exportGroupPromptsForClaude()" title="그룹별 대본을 ai-prompts.md 로 내보내고 클립보드에도 복사 — 클로드에 붙여넣기">📤 내보내기(.md)</button>
+              <button class="btn-sm" onclick="openImportPromptsModal()" title="클로드가 만든 영어 프롬프트를 붙여넣거나 파일로 가져와 그룹에 저장">📥 가져오기</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ▣ Step 3 — 제작 (이미지 + 영상) -->
+      <div class="aux-panel" id="auxImage" hidden>
+        <div class="wiz-step">
+          <div style="font-size:13px; font-weight:700; color:var(--text-strong); margin-bottom:8px;">🎬 3단계 — 제작 (이미지 · 영상)</div>
+
+          <!-- Google Flow 계정 프로필 (Flow 이미지 생성용 로그인) -->
+          <div style="display:flex; gap:6px; margin-bottom:12px; align-items:center;">
+            <select id="profileSelect" style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 8px; border-radius:6px; font-size:13px;">
+              <option value="default">기본 계정</option>
+            </select>
+            <button class="btn-sm btn-login" onclick="flowLogin()" style="flex:none; padding:6px 10px;">로그인</button>
+            <button class="btn-sm" onclick="addProfile()" style="flex:none;">+추가</button>
+            <button class="btn-sm" onclick="removeProfile()" style="flex:none; color:var(--danger);">삭제</button>
+          </div>
+
+          <!-- 사전 설정 구문 -->
+          <div class="setting">
+            <label>사전 설정 <span style="color:var(--text-muted); font-size:11px;">(모든 장면에 공통 적용)</span></label>
+            <textarea id="presetPrompt" rows="2" style="width:100%; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); border-radius:6px; padding:8px; font-size:13px; resize:vertical;" placeholder="예: 30대 한국 남성, 짧은 머리, 회색 양복, 현대 사무실 배경, 따뜻한 조명"></textarea>
+          </div>
+
+          <!-- 이미지 설정 -->
+          <div id="imageSettings">
+            <div class="setting">
+              <label>스타일</label>
+              <div style="display:flex; gap:6px; flex:1;">
+                <select id="styleSelect" style="flex:1;"></select>
+                <button class="btn-sm" type="button" onclick="openStyleManager()" title="스타일 추가/수정/삭제" style="white-space:nowrap;">⚙ 관리</button>
+              </div>
+            </div>
+
+            <div class="setting">
+              <label>이미지 모델</label>
+              <select id="runpodImageModel" onchange="_onImageModelChange()" title="Flow=브라우저 자동화(기본·무료), Nano Banana 2=Gemini API 직접(유료 크레딧)" style="flex:1; padding:6px 8px; border-radius:6px;">
+                <option value="flow" selected>🌐 Flow (브라우저 자동화 · 무료 · 기본)</option>
+                <option value="gemini-nano-banana-2">🍌 Nano Banana 2 (API · 유료 크레딧)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 이미지 생성 버튼 -->
+          <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px; margin-top:10px;">
+            <button class="btn btn-sm-action" onclick="generateEmptyGroupImagesRunPod()" title="이미지가 비어있는 그룹만 순차적으로 생성 (모델은 위 드롭다운: Flow / Nano Banana 2)">🖼 빈 그룹 이미지</button>
+            <button class="btn btn-sm-action" id="imageBatchAttachBtn" onclick="openImageBatchAttach()" title="외부 이미지/동영상 파일을 그룹 제목 또는 그룹 번호(예: '그룹 01_...')와 매칭해서 자동 첨부">📎 이미지·영상 첨부</button>
+            <button class="btn btn-sm-action" onclick="generateSelectedGroupImagesRunPod()" title="좌상단 체크박스로 선택한 그룹의 이미지를 생성/재생성 (모델은 위 드롭다운: Flow / Nano Banana 2)" style="grid-column:span 2;">🖼 선택 그룹 이미지</button>
+          </div>
+          <input type="file" id="imageBatchInput" multiple accept="image/jpeg,image/png,image/jpg,image/webp,video/mp4,video/webm,video/x-matroska,video/quicktime" style="display:none;">
+
+          <!-- ── 영상 (Grok) ───────────────────────────────── -->
+          <div style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:14px;">
+            <div style="font-size:12px; font-weight:700; color:var(--text-strong); margin-bottom:8px;">🎬 영상 변환 (Grok)</div>
+
+            <!-- 🎬 Grok 비디오 모션 프롬프트 -->
+            <div style="margin-bottom:8px;">
+              <label for="grokMotionPromptInput" style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:3px;">
+                모션 프롬프트 <span style="color:var(--text-soft); font-size:10px;">(이미지 → 애니메이션 변환 시 사용)</span>
+              </label>
+              <textarea id="grokMotionPromptInput" rows="2"
+                style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 8px; border-radius:6px; font-size:12px; resize:vertical;"
+                placeholder="예: natural slow motion, cinematic feel"
+                title="이 문구가 Grok 비디오 생성 시 모션 프롬프트로 전달됩니다. 입력 끝낼 때 자동 저장 (~/.flow-app/grok-config.json)."
+                onchange="onGrokMotionPromptChange()"></textarea>
+            </div>
+
+            <!-- 영상 범위 + 변환 버튼 -->
+            <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px;">
+              <div class="range-cell">
+                <span>그룹</span>
+                <input type="number" id="videoRangeFrom" min="1" placeholder="시작" title="범위 시작 그룹 번호" />
+                <span>~</span>
+                <input type="number" id="videoRangeTo" min="1" placeholder="끝" title="범위 끝 그룹 번호 (빈칸=끝까지)" />
+              </div>
+              <button class="btn btn-sm-action" onclick="convertGroupRangeVideo()" title="위 입력 범위 그룹의 이미지를 Grok 으로 영상 변환">🎬 범위 영상</button>
+              <button class="btn btn-sm-action" id="grokLoginBtn" onclick="openGrokLogin()" title="Grok 자동화 크롬을 띄우고 grok.com 로그인 페이지로 이동 (영상 생성 전 X 계정 로그인 권장)">🔑 그록 로그인</button>
+              <button class="btn btn-sm-action" onclick="convertSelectedGroupsVideo()" title="좌상단 체크박스로 선택한 그룹의 이미지를 Grok 으로 영상 변환">🎬 선택 영상</button>
+            </div>
+
+            <!-- 자동 영상화 토글 -->
+            <div style="margin:8px 0; font-size:12px; color:var(--text-muted);">
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer;" title="[▶ 자동제작] 시 기본으로 도입부 그룹 전체를 Grok 으로 순차 영상 변환합니다. 위 '그룹 시작~끝' 범위를 수정하면 그 범위만 변환합니다.">
+                <input type="checkbox" id="autoIntroVideoToggle" checked />
+                <span>자동 영상화 (도입부 기본 · 범위 수정 가능 · Grok)</span>
+              </label>
+            </div>
+            <button class="btn" id="grokStopBtn" onclick="stopGrokVideoConversion()" title="진행 중인 Grok 이미지→비디오 변환을 모두 중단" style="width:100%; margin-bottom:8px; background:var(--danger); color:#fff; font-weight:700; display:none;">⏹ 영상 변환 중단</button>
+            <button class="btn btn-sm-action" id="retryFailedVideoBtn"
+              onclick="retryFailedVideos()"
+              title="비디오 생성에 실패한 그룹만 골라서 다시 시도 (도입부/본론 모두)"
+              style="display:none; width:100%; padding:6px 8px; font-size:12px; background:var(--warning, #c87000); color:#fff; font-weight:700;">
+              🔁 실패 영상 재시도 (<span id="retryFailedCount">0</span>)
+            </button>
+          </div>
+
+          <!-- 저장 (.vrew / 프리미어 XML) -->
+          <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px; margin-top:12px;">
+            <button class="btn btn-sm-action" onclick="saveVrew()" title="현재 프로젝트를 Vrew 4.0.1 호환 .vrew 파일로 저장">💾 Vrew</button>
+            <button class="btn btn-sm-action" onclick="savePremiereXml()" title="Adobe Premiere Pro (FCP7 XML) 형식으로 시퀀스 저장 + 자막 .srt 동봉. 이미지·오디오·자막 트랙 정렬된 상태로 프리미어 가져오기 가능">🎬 프리미어 XML</button>
+          </div>
+        </div>
+      </div>
+
       <div class="aux-panel" id="auxLog" hidden>
     <div class="log-panel">
       <div class="log-panel-header" style="display:flex; justify-content:space-between; align-items:center;">
-        <span>📋 로그</span>
+        <span>📋 로그 <span id="rtfBadge" class="section-title-badge" title="Real-Time Factor — 작업시간 / 오디오길이. 낮을수록 빠름" style="margin-left:6px;">RTF —</span></span>
         <div style="display:flex; gap:4px;">
           <button class="btn-sm" onclick="copyLogs()" style="font-size:11px; padding:2px 8px;" title="로그 전체 복사">📋 복사</button>
           <button class="btn-sm" onclick="clearLogs()" style="font-size:11px; padding:2px 8px;" title="로그 비우기">지우기</button>
@@ -1783,7 +1725,8 @@
       </div>
       <div id="charImageList" style="font-size:12px; color:var(--text-soft); max-height:80px; overflow-y:auto;">
         파일명 = 등장인물 이름 (예: 사관.png, 왕비.png)<br>
-        대본에서 자동 매칭하여 장면별 참조 (최대 5명/장면)
+        대본에서 자동 매칭하여 장면별 참조 (최대 5명/장면)<br>
+        <span style="color:var(--warning);">⚠ Flow 모델 전용 — Nano Banana 2(Gemini)는 미지원</span>
       </div>
     </div>
 
@@ -1839,20 +1782,17 @@
       </div>
     </div>
 
-    <!-- 최대 글자수 (클립 자동 분할) -->
-    <div class="section">
-      <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
-        <span>최대 글자수</span>
-        <span id="maxCharsValue" style="background:var(--bg-card); color:var(--accent); padding:2px 10px; border-radius:10px; font-size:12px; font-weight:600;">30</span>
-      </div>
-      <input type="range" id="maxCharsSlider" min="12" max="54" value="30"
-             style="width:100%; margin:8px 0 4px 0; accent-color:var(--accent);">
-      <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted);">
-        <span>짧게</span><span>보통</span><span>분할 안 함</span>
-      </div>
-      <div style="font-size:11px; color:var(--text-muted); margin-top:4px;" id="maxCharsHint">30자 기준 분할 (Vrew 추가 분할 방지, 검은화면 방지)</div>
-    </div>
     </div><!-- .advanced 닫기 -->
+      </div>
+
+      <!-- 고정 푸터 — 전체 자동제작 / 실행 제어 (모든 단계에서 표시) -->
+      <div class="wiz-footer">
+        <button class="btn btn-sm-action" id="startBtn" onclick="generateAll()" title="현재 활성 탭의 대본만 자동 제작 (이미지 + TTS + 도입부 영상 + .vrew)" style="font-weight:700;">▶ 자동제작</button>
+        <button class="btn btn-sm-action" id="startAllProjectsBtn" onclick="generateAllProjects()" title="열려있는 모든 탭을 순차적으로 자동제작 (탭1 완료 → 탭2 자동 시작 → ...)" style="background:var(--accent-soft); color:var(--accent-hover); border:1px solid var(--accent); font-weight:700;">▶▶ 모든 탭 순차 자동제작</button>
+        <div style="display:flex; gap:6px;">
+          <button class="btn" id="pauseBtn" onclick="pauseGeneration()" style="flex:1; padding:8px 12px; background:var(--warning); color:#fff; display:none; white-space:nowrap;">일시정지</button>
+          <button class="btn" id="stopBtn" onclick="stopGeneration()" style="flex:1; padding:8px 12px; background:var(--danger); color:#fff; display:none; white-space:nowrap;">중지</button>
+        </div>
       </div>
     </div>
 
@@ -1896,6 +1836,29 @@
       <span style="font-size:11px; color:var(--text-muted);" id="styleManagerCount"></span>
       <button class="btn-sm" type="button" onclick="openStyleAddForm()" style="background:var(--info); color:#fff; font-weight:600;">+ 새 스타일 추가</button>
     </div>
+  </div>
+</div>
+
+<!-- AI 프롬프트 가져오기 모달 — 클로드 답변 붙여넣기/파일 -->
+<div id="importPromptsModal" style="display:none; position:fixed; inset:0; background:rgba(58,52,46,0.5); z-index:1000; align-items:center; justify-content:center;" onclick="if(event.target===this)closeImportPromptsModal()">
+  <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:14px; width:640px; max-width:94vw; max-height:88vh; box-shadow:var(--shadow-lg); display:flex; flex-direction:column; overflow:hidden;">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid var(--border-soft);">
+      <h3 style="margin:0; font-size:16px; color:var(--text-strong);">📥 AI 프롬프트 가져오기</h3>
+      <button class="btn-sm" onclick="closeImportPromptsModal()" style="font-size:16px;">✕</button>
+    </div>
+    <div style="padding:14px 20px; font-size:12px; color:var(--text-muted); line-height:1.6;">
+      클로드(claude.ai)에 <b>📤 내보내기</b>로 받은 요청서를 붙여넣고 받은 답변을 아래에 그대로 붙여넣으세요.
+      <code>## [번호] …</code> 헤더가 있어야 그룹에 매칭됩니다. (성별·인물 일관성은 클로드 프롬프트가 담당)
+    </div>
+    <textarea id="importPromptsTextarea" placeholder="여기에 클로드 답변 전체를 붙여넣기…&#10;&#10;## [1] 도입부 01&#10;cinematic illustration of King Jeongjo, a middle-aged Korean king in royal robes, ..." style="flex:1; min-height:260px; margin:0 20px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); border-radius:8px; padding:12px; font-size:13px; line-height:1.6; resize:vertical; font-family:'Cascadia Code',monospace;"></textarea>
+    <div style="display:flex; gap:8px; justify-content:space-between; padding:16px 20px;">
+      <button class="btn-sm" onclick="document.getElementById('importPromptsFileInput').click()" title=".md/.txt 파일에서 불러오기">📂 파일에서 열기</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-sm" onclick="closeImportPromptsModal()">취소</button>
+        <button class="btn btn-sm-action" onclick="applyImportedPrompts()" style="font-weight:700;">✓ 그룹에 적용</button>
+      </div>
+    </div>
+    <input type="file" id="importPromptsFileInput" accept=".md,.txt,text/plain,text/markdown" style="display:none;" onchange="_onImportPromptsFile(this)">
   </div>
 </div>
 
@@ -2044,6 +2007,47 @@
         <button class="btn-sm" onclick="closeScriptInputModal()" style="white-space:nowrap; min-width:64px;">취소</button>
         <button class="btn btn-primary" onclick="confirmScriptInputModal()" style="padding:8px 18px; white-space:nowrap;">확인 (자동 분할)</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- 🎬 도입부 비디오 준비 — 진행 상황 팝업 (TTS 합성 → 9초 재배치 → 저장) -->
+<div id="introPrepareModal" style="display:none; position:fixed; inset:0; background:rgba(58,52,46,0.55); z-index:1001; align-items:center; justify-content:center;">
+  <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:14px; width:440px; max-width:92vw; box-shadow:var(--shadow-lg); display:flex; flex-direction:column; overflow:hidden;">
+    <!-- 헤더 -->
+    <div style="flex:none; padding:18px 22px 12px 22px; display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="font-size:17px; color:var(--accent); margin:0;">🎬 도입부 비디오 준비</h2>
+      <button id="introModalCloseBtn" class="btn-sm" onclick="closeIntroPrepareModal()" style="font-size:15px; display:none;">✕</button>
+    </div>
+
+    <!-- 단계 표시 -->
+    <div style="flex:none; padding:0 22px; display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600;">
+      <span id="introStep1" class="intro-step" style="flex:1; text-align:center; padding:6px 4px; border-radius:6px; background:var(--bg-input); color:var(--text-muted);">① TTS 합성</span>
+      <span style="color:var(--text-muted);">→</span>
+      <span id="introStep2" class="intro-step" style="flex:1; text-align:center; padding:6px 4px; border-radius:6px; background:var(--bg-input); color:var(--text-muted);">② 9초 재배치</span>
+      <span style="color:var(--text-muted);">→</span>
+      <span id="introStep3" class="intro-step" style="flex:1; text-align:center; padding:6px 4px; border-radius:6px; background:var(--bg-input); color:var(--text-muted);">③ 저장</span>
+    </div>
+
+    <!-- 진행 바 + 본문 -->
+    <div style="flex:none; padding:16px 22px 8px 22px;">
+      <div style="height:12px; border-radius:6px; background:var(--bg-input); overflow:hidden; border:1px solid var(--border-soft);">
+        <div id="introProgressBar" style="height:100%; width:0%; background:var(--accent); transition:width 0.2s ease;"></div>
+      </div>
+      <div id="introProgressCount" style="font-size:12px; color:var(--text-muted); text-align:right; margin-top:4px;">—</div>
+      <div id="introProgressText" style="font-size:13px; color:var(--text-strong); margin-top:8px; min-height:20px; line-height:1.5; word-break:break-all; white-space:pre-line;">준비 중…</div>
+    </div>
+
+    <!-- 카운트 -->
+    <div style="flex:none; padding:6px 22px 14px 22px; display:flex; gap:18px; font-size:13px; font-weight:600;">
+      <span style="color:var(--success, #4caf50);">✅ 성공 <span id="introCountOk">0</span></span>
+      <span style="color:var(--danger, #e57373);">❌ 실패 <span id="introCountFail">0</span></span>
+    </div>
+
+    <!-- 푸터 버튼 -->
+    <div style="flex:none; padding:0 22px 18px 22px; display:flex; justify-content:center;">
+      <button id="introStopBtn" class="btn-sm" onclick="_stopIntroPrepare()" style="padding:8px 22px; background:var(--danger-soft, #4a2a2a); color:var(--danger, #e57373); border:1px solid var(--danger, #e57373); font-weight:600;">⏹ 중지</button>
+      <button id="introDoneBtn" class="btn-sm" onclick="closeIntroPrepareModal()" style="display:none; padding:8px 28px; background:var(--accent-soft); color:var(--accent-hover); border:1px solid var(--accent); font-weight:600;">닫기</button>
     </div>
   </div>
 </div>
@@ -2241,33 +2245,6 @@
         <button class="btn-sm" onclick="saveApiKey('gemini')" style="flex:1; background:var(--accent); color:#fff;">💾 저장</button>
         <button class="btn-sm" onclick="deleteApiKey('gemini')" style="color:var(--danger);">삭제</button>
       </div>
-    </div>
-
-    <!-- RunPod -->
-    <div style="border:1px solid var(--border-soft); border-radius:8px; padding:14px; margin-bottom:12px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <div style="font-size:14px; font-weight:700; color:var(--text-strong);">☁ RunPod (이미지/비디오 GPU)</div>
-        <span id="apiKey_runpod_status" style="font-size:11px; color:var(--text-muted);"></span>
-      </div>
-      <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">API 키 <span style="color:var(--text-muted); font-size:11px;">(runpod.io → Settings → API Keys)</span></label>
-      <input type="password" id="apiKey_runpod_key" placeholder="rpa_..." style="width:100%; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px; margin-bottom:8px;">
-      <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">Template ID <span style="color:var(--text-muted); font-size:11px;">(RunPod → Templates)</span></label>
-      <input type="text" id="apiKey_runpod_templateId" placeholder="zg8rrc0p6m" style="width:100%; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px; margin-bottom:8px;">
-      <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">Network Volume ID <span style="color:var(--text-muted); font-size:11px;">(모델 영구 저장)</span></label>
-      <input type="text" id="apiKey_runpod_volumeId" placeholder="lkkfxotjok" style="width:100%; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px; margin-bottom:8px;">
-      <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">Data Center <span style="color:var(--text-muted); font-size:11px;">(볼륨이 있는 지역)</span></label>
-      <input type="text" id="apiKey_runpod_dataCenterId" placeholder="EU-CZ-1" style="width:100%; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:7px 10px; border-radius:6px; font-size:13px; margin-bottom:8px;">
-      <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
-        <label style="font-size:12px; color:var(--text-soft); white-space:nowrap;">Idle 자동종료</label>
-        <input type="number" id="apiKey_runpod_idleMin" min="1" max="60" value="5" style="width:70px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 8px; border-radius:6px; font-size:13px;">
-        <span style="font-size:12px; color:var(--text-muted);">분</span>
-      </div>
-      <div style="display:flex; gap:6px;">
-        <button class="btn-sm" onclick="saveApiKey('runpod')" style="flex:1; background:var(--accent); color:#fff;">💾 저장</button>
-        <button class="btn-sm" onclick="testRunPodConnection()" style="background:#f59e0b; color:#fff;">🔥 테스트 시동</button>
-        <button class="btn-sm" onclick="deleteApiKey('runpod')" style="color:var(--danger);">삭제</button>
-      </div>
-      <div id="apiKey_runpod_log" style="display:none; margin-top:8px; font-size:11px; color:var(--text-muted); background:var(--bg-soft); padding:6px 8px; border-radius:4px; line-height:1.6;"></div>
     </div>
 
     <div style="font-size:11px; color:var(--text-muted); padding-top:8px; border-top:1px solid var(--border-soft);">
@@ -3042,7 +3019,7 @@
 <div id="modalGeminiImgTest" style="display:none; position:fixed; inset:0; background:rgba(58,52,46,0.5); z-index:999; align-items:center; justify-content:center;" onclick="if(event.target===this)closeGeminiImgTest()">
   <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:14px; width:min(92vw,980px); max-height:88vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:var(--shadow-lg);">
     <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 24px; border-bottom:1px solid var(--border-soft);">
-      <h2 style="font-size:20px; color:var(--accent); margin:0;">🧪 Gemini 이미지 테스트 <small style="font-size:12px; color:var(--text-muted); margin-left:8px;">model: gemini-2.5-flash-image</small></h2>
+      <h2 style="font-size:20px; color:var(--accent); margin:0;">🧪 Gemini 이미지 테스트 <small style="font-size:12px; color:var(--text-muted); margin-left:8px;">Nano Banana 2 · gemini-3.1-flash-image-preview</small></h2>
       <button class="btn-sm" onclick="closeGeminiImgTest()" style="font-size:18px;">✕</button>
     </div>
     <div id="gimg_apiKeyWarn" style="display:none; padding:10px 24px; background:rgba(220,80,80,0.15); border-bottom:1px solid var(--border-soft); color:#e36; font-size:13px;">
@@ -3076,7 +3053,7 @@ const { ipcRenderer } = require('electron');
 try {
   const _ver = require('../package.json').version;
   const _badge = document.getElementById('appVersionBadge');
-  if (_badge) _badge.textContent = `v${_ver} / Google Flow`;
+  if (_badge) _badge.textContent = `v${_ver}`;
   const _helpVer = document.getElementById('helpModalVersion');
   if (_helpVer) _helpVer.textContent = `v${_ver}`;
 } catch (_) {}
@@ -3206,19 +3183,8 @@ let selectedVideoRatio = '16:9';
 let selectedVideoCount = 'x1';
 let selectedKenburnsMode = 'uniform';
 let selectedKenburnsSpeed = 'normal';
-let mediaType = 'image';
+let mediaType = 'image';  // 마법사 재구성 후 고정값(이미지=Flow/Nano Banana, 동영상=Grok 별도 경로). 칩 토글 제거됨.
 let outputDir = '';
-
-// 미디어 타입 탭 전환
-document.getElementById('mediaTypeChips').querySelectorAll('.chip').forEach(chip => {
-  chip.addEventListener('click', () => {
-    document.getElementById('mediaTypeChips').querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-    chip.classList.add('active');
-    mediaType = chip.dataset.val;
-    document.getElementById('imageSettings').style.display = mediaType === 'image' ? '' : 'none';
-    document.getElementById('videoSettings').style.display = mediaType === 'video' ? '' : 'none';
-  });
-});
 
 // 칩 선택
 document.querySelectorAll('.chip-group').forEach(group => {
@@ -4015,7 +3981,7 @@ async function startGeneration() {
     mediaType,
     style: isVideo ? document.getElementById('videoStyleSelect').value : document.getElementById('styleSelect').value,
     ratio: isVideo ? selectedVideoRatio : selectedRatio,
-    model: isVideo ? document.getElementById('videoModelSelect').value : document.getElementById('modelSelect').value,
+    model: isVideo ? (document.getElementById('videoModelSelect')?.value || 'Veo 3.1 - Fast') : (document.getElementById('modelSelect')?.value || 'Nano Banana 2'),
     count: isVideo ? selectedVideoCount : selectedCount,
     withSubtitle: false,  // .vrew 자막 트랙만 사용 (이미지에 합성 안 함)
     outputDir: finalDir,
@@ -4024,7 +3990,7 @@ async function startGeneration() {
     characterMap: characterMap,
     kenburnsMode: selectedKenburnsMode,
     kenburnsSpeed: selectedKenburnsSpeed,
-    maxChars: parseInt(document.getElementById('maxCharsSlider').value, 10) || 30,
+    maxChars: 30,  // 최대 글자수 UI 제거됨 — 기본 30자 (필요 시 longLen 으로 조절)
     presetPrompt: document.getElementById('presetPrompt').value.trim(),
     antiDetect: {
       enabled:        document.getElementById('antiDetectEnabled').checked,
@@ -4145,14 +4111,7 @@ ipcRenderer.on('flow-skip-group', (_, payload) => {
   }
 });
 
-// 최대 글자수 슬라이더 값 실시간 반영
-document.getElementById('maxCharsSlider').addEventListener('input', (e) => {
-  const v = parseInt(e.target.value);
-  document.getElementById('maxCharsValue').textContent = v >= 54 ? '안 함' : v;
-  document.getElementById('maxCharsHint').textContent = v >= 54
-    ? '단락을 나누지 않습니다 (TTS 오디오 끊김 방지)'
-    : '단락이 ' + v + '자보다 길면 자동으로 여러 클립으로 나눕니다';
-});
+// 최대 글자수 UI 제거됨 — 자막 클립 분할은 longLen(긴 문장) 기준 algo-splitter 가 처리
 
 // 로그 전체 복사 (클립보드)
 function copyLogs() {
@@ -5399,16 +5358,46 @@ function loadGallery(targetPath) {
 
 }
 
+// 진행 중이던 이미지/영상 상태(생성중·대기) 시각 정리 — 중지 시 스피너/오버레이 제거
+function _clearInProgressVisuals() {
+  try {
+    const projs = (window._projects && window._projects.length) ? window._projects : [window._currentProject];
+    for (const proj of projs) {
+      if (!proj || !Array.isArray(proj.groups)) continue;
+      let touched = false;
+      for (const g of proj.groups) {
+        if (g.imageStatus === 'generating' || g.imageStatus === 'queued') { g.imageStatus = 'idle'; touched = true; }
+        if (g.videoStatus === 'generating') { g.videoStatus = 'idle'; touched = true; }
+      }
+      if (touched && proj === window._currentProject) {
+        try { renderTaskList(proj); } catch (_) {}
+      }
+    }
+  } catch (_) {}
+}
+
+// 마스터 중지 — 이미지(Flow/Gemini)·동영상(Grok)·TTS·자동제작·vrew 진입을 모두 중단.
 async function stopGeneration() {
-  await ipcRenderer.invoke('stop-generation', getSelectedProfile());
-  addLog('중지 요청됨', 'err');
-  document.getElementById('stopBtn').style.display = 'none';
+  addLog('🛑 중지 요청 — 모든 작업(이미지·영상·TTS·자동제작) 중단', 'err');
+  // 모든 중단 플래그 set
+  window._autoCancelRequested = true;
+  window._autoPollActive = false;
+  window._grokConvertActive = false;
+  window._ttsAbortRequested = true;
+  window._ttsConvertActive = false;
+  window._runpodPipelineActive = false;
+  window._imageGenStop = true;
+  // Flow 이미지 생성 중단 (flow-engine stop-generation IPC)
+  try { await ipcRenderer.invoke('stop-generation', getSelectedProfile()); } catch (_) {}
+  // 진행 중 시각 상태 정리 (이미지 생성중 오버레이 제거)
+  _clearInProgressVisuals();
+  // 버튼 정리
+  const stopBtn = document.getElementById('stopBtn'); if (stopBtn) stopBtn.style.display = 'none';
   const pb = document.getElementById('pauseBtn');
-  pb.style.display = 'none';
-  pb.textContent = '일시정지';
-  pb.style.background = 'var(--warning)';
+  if (pb) { pb.style.display = 'none'; pb.textContent = '일시정지'; pb.style.background = 'var(--warning)'; }
   isPaused = false;
-  document.getElementById('startBtn').disabled = false;
+  const sb = document.getElementById('startBtn'); if (sb) sb.disabled = false;
+  const gsb = document.getElementById('grokStopBtn'); if (gsb) gsb.style.display = 'none';
 }
 
 let isPaused = false;
@@ -5456,7 +5445,7 @@ function clearCharacterImages() {
 function updateCharImageList() {
   const el = document.getElementById('charImageList');
   if (characterMap.length === 0) {
-    el.innerHTML = '파일명 = 등장인물 이름 (예: 사관.png, 왕비.png)<br>대본에서 자동 매칭하여 장면별 참조 (최대 5명/장면)';
+    el.innerHTML = '파일명 = 등장인물 이름 (예: 사관.png, 왕비.png)<br>대본에서 자동 매칭하여 장면별 참조 (최대 5명/장면)<br><span style="color:var(--warning);">⚠ Flow 모델 전용 — Nano Banana 2(Gemini)는 미지원</span>';
     return;
   }
   el.innerHTML = characterMap.map(c =>
@@ -5659,6 +5648,138 @@ function _buildScriptCopyText(project, startIdx, endIdx) {
   const header = _buildScriptCopyHeader();
   const body = _buildScriptCopyBody(project, startIdx, endIdx);
   return header ? `${header}\n\n${body}` : body;
+}
+
+// ─── 클로드 왕복 이미지 프롬프트 (내보내기 / 가져오기) ─────────────────
+// 대본을 .md 요청서로 내보내 → 클로드가 그룹별 영어 프롬프트 작성 → 다시 가져와 g.imagePrompt 에 저장.
+// 생성 시 (Flow/Nano) "앱 스타일 + Claude 본문 + 품질태그" 로 사용. 비용 0 (수동 왕복).
+function exportGroupPromptsForClaude() {
+  const proj = window._currentProject;
+  if (!proj || !Array.isArray(proj.groups) || proj.groups.length === 0) {
+    alert('먼저 대본을 분할하세요 (대본 탭 → 직접 입력/첨부 → 도입부 TTS+9초 재배치).');
+    return;
+  }
+  const sentMap = new Map((proj.sentences || []).map(x => [x.id, x]));
+  let styleName = '';
+  try { styleName = (_getActiveStylePrompt() || {}).name || ''; } catch (_) {}
+  const presetKo = (document.getElementById('presetPrompt')?.value || '').trim();
+
+  const L = [];
+  L.push('# 이미지 프롬프트 요청 — PrimingFlow');
+  L.push('');
+  L.push('아래 각 그룹(= 이미지 1장)에 대해 **영어 이미지 생성 프롬프트**를 작성해 주세요. **(영상)** 표시 그룹은 **영어 영상 모션 프롬프트**도 함께 작성합니다.');
+  L.push('');
+  L.push('규칙:');
+  if (presetKo) {
+    L.push(`- **공통 설정 (모든 그룹에 반영)**: 모든 프롬프트에 다음 공통 설정을 반드시 포함하세요 → \`${presetKo}\``);
+  }
+  L.push('- 전체 대본의 맥락을 고려해 **등장인물의 성별·나이·외모·복장을 명시**하고, 모든 그룹에서 **동일 인물은 동일하게** 유지하세요.');
+  L.push('- 각 프롬프트는 그 그룹 장면을 시각적으로 묘사하세요 (인물·배경·구도·분위기·조명). 영어로 작성.');
+  L.push(`- 화풍(스타일)은 앱이 자동으로 입힙니다${styleName ? ` (현재 스타일: "${styleName}")` : ''} — 화풍 키워드는 생략해도 됩니다.`);
+  L.push('- **(영상)** 표시가 있는 그룹은 이미지를 영상으로 변환합니다. 이 그룹은 `영상:` 줄에 **영어 영상 모션 프롬프트**(카메라 움직임·인물 동작·속도감·분위기)도 작성하세요. 표시 없는 그룹의 `영상:` 줄은 비워두거나 생략해도 됩니다.');
+  L.push('- **출력 형식**: 아래 `## [번호] 라벨` 헤더를 그대로 두고, 각 헤더 아래에 다음 두 줄로 적어 주세요. 다른 설명/번호는 넣지 마세요.');
+  L.push('    이미지: <영어 이미지 프롬프트>');
+  L.push('    영상: <영어 영상 모션 프롬프트 — (영상) 그룹만>');
+  L.push('');
+  L.push('---');
+  L.push('');
+  for (const g of proj.groups) {
+    const gnum2 = String(g.num).padStart(2, '0');
+    const baseLabel = g.isIntro ? `도입부 ${gnum2}` : `그룹 ${gnum2}`;
+    const label = baseLabel + (g.isIntro ? ' (영상)' : '') + (g.title ? ` — ${g.title}` : '');
+    L.push(`## [${g.num}] ${label}`);
+    const full = (g.sentenceIds || []).map(sid => {
+      const x = sentMap.get(sid); return x ? String(x.text || '').replace(/\s+/g, ' ').trim() : '';
+    }).filter(Boolean).join(' ');
+    L.push(`- 대본: ${full}`);
+    L.push('');
+    L.push('이미지: (여기에 영어 이미지 프롬프트)');
+    if (g.isIntro) L.push('영상: (여기에 영어 영상 모션 프롬프트)');
+    L.push('');
+  }
+  const md = L.join('\n');
+
+  // 파일 생성·폴더 열기·팝업 없이 — 클립보드 복사만 (간단). 클로드에 바로 붙여넣기.
+  let ok = false;
+  try { require('electron').clipboard.writeText(md); ok = true; }
+  catch (_) { try { navigator.clipboard.writeText(md); ok = true; } catch (_) {} }
+  addLog(ok ? '📤 AI 프롬프트 요청서 클립보드 복사 완료 — claude.ai 에 붙여넣으세요' : '⚠ 클립보드 복사 실패', ok ? 'ok' : 'err');
+}
+
+function openImportPromptsModal() {
+  const proj = window._currentProject;
+  if (!proj || !Array.isArray(proj.groups) || proj.groups.length === 0) { alert('먼저 대본을 분할하세요.'); return; }
+  const ta = document.getElementById('importPromptsTextarea');
+  if (ta) ta.value = '';
+  const m = document.getElementById('importPromptsModal'); if (m) m.style.display = 'flex';
+}
+function closeImportPromptsModal() {
+  const m = document.getElementById('importPromptsModal'); if (m) m.style.display = 'none';
+}
+function _onImportPromptsFile(input) {
+  const f = input && input.files && input.files[0];
+  if (!f) return;
+  try {
+    const fs = require('fs');
+    const txt = fs.readFileSync(f.path, 'utf-8');
+    const ta = document.getElementById('importPromptsTextarea');
+    if (ta) ta.value = txt;
+    addLog(`파일 로드: ${f.name}`, 'info');
+  } catch (e) { alert('파일 읽기 실패: ' + e.message); }
+  input.value = '';
+}
+// 클로드 답변 텍스트 → 그룹별 imagePrompt/videoPrompt 매핑. num 기준.
+// "이미지:" / "영상:" (Image:/Video:) 라벨 분리. 라벨 없으면 본문 전체=이미지(하위호환).
+// 반환: { groups, img, vid } 적용 개수.
+function _applyClaudePrompts(text) {
+  const proj = window._currentProject;
+  if (!proj) return { groups: 0, img: 0, vid: 0 };
+  const strip = s => String(s || '').replace(/^["'`*\s]+|["'`*\s]+$/g, '').trim();
+  const isPlaceholder = s => !s || /여기에|placeholder|<.*프롬프트.*>/i.test(s);
+  const re = /##\s*\[(\d+)\][^\n]*\n([\s\S]*?)(?=\n##\s*\[\d+\]|$)/g;
+  let m, groups = 0, img = 0, vid = 0;
+  while ((m = re.exec(text)) !== null) {
+    const num = parseInt(m[1], 10);
+    const lines = (m[2] || '').split('\n').map(l => l.trim());
+    let imgP = '', vidP = '', mm;
+    for (const l of lines) {
+      if ((mm = l.match(/^[-*]?\s*(?:이미지|image)\s*[:：]\s*(.+)$/i))) imgP = strip(mm[1]);
+      else if ((mm = l.match(/^[-*]?\s*(?:영상|비디오|video|motion)\s*[:：]\s*(.+)$/i))) vidP = strip(mm[1]);
+    }
+    // 라벨이 전혀 없으면 본문 전체를 이미지 프롬프트로 (하위호환)
+    if (!imgP && !vidP) {
+      const cleaned = lines.filter(l =>
+        l && !/^[-*]?\s*대본\s*[:：]/.test(l) && !/여기에.*프롬프트/.test(l)
+        && l !== '---' && !/^```/.test(l) && !/^##/.test(l)
+      );
+      imgP = strip(cleaned.join(' '));
+    }
+    if (isPlaceholder(imgP)) imgP = '';
+    if (isPlaceholder(vidP)) vidP = '';
+    const g = proj.groups.find(x => x.num === num);
+    if (!g) continue;
+    let did = false;
+    if (imgP) { g.imagePrompt = imgP; img++; did = true; }
+    if (vidP) { g.videoPrompt = vidP; vid++; did = true; }
+    if (did) groups++;
+  }
+  return { groups, img, vid };
+}
+function applyImportedPrompts() {
+  const ta = document.getElementById('importPromptsTextarea');
+  const text = ta ? ta.value : '';
+  if (!text || !text.trim()) { alert('붙여넣은 내용이 없습니다.'); return; }
+  const r = _applyClaudePrompts(text);
+  if (r.groups > 0) {
+    addLog(`📥 AI 프롬프트 적용 — ${r.groups}개 그룹 (🖼 이미지 ${r.img} · 🎬 영상 ${r.vid})`, 'ok');
+    try { _autoSaveProject(); } catch (_) {}
+    try { renderTaskList(window._currentProject); } catch (_) {}
+    closeImportPromptsModal();
+    // 적용 완료 → 제작 탭으로 이동 (팝업 없이)
+    setTimeout(() => { try { document.querySelector('.aux-tab[data-tab="image"]')?.click(); } catch (_) {} }, 300);
+  } else {
+    alert('인식된 프롬프트가 없습니다.\n클로드 답변에 "## [번호] …" 헤더와 "이미지:" 줄이 있는지 확인하세요.');
+  }
 }
 
 // 모달의 스타일 select 옵션을 StyleStore 에서 직접 채움 — prompt 도 dataset 에 함께 저장
@@ -6624,8 +6745,8 @@ function _splitScriptImpl() {
   const _oldProj = window._currentProject;
   if (_oldProj) {
     const carriedSentence = ['ttsStatus', 'ttsAudioPath', 'ttsDurationSec', 'ttsPresetId', 'vrewClips'];
-    const carriedGroup = ['imageStatus', 'imagePath', 'promptKo', 'promptEn',
-                          'videoStatus', 'videoPath', 'videoSourceImage', 'videoMotionPrompt', 'kenburns'];
+    const carriedGroup = ['imageStatus', 'imagePath', 'promptKo', 'promptEn', 'imagePrompt',
+                          'videoStatus', 'videoPath', 'videoSourceImage', 'videoMotionPrompt', 'videoPrompt', 'kenburns'];
     const oldSMap = new Map((_oldProj.sentences || []).map(s => [s.id, s]));
     const oldGMap = new Map((_oldProj.groups   || []).map(g => [g.id, g]));
     let carriedSCount = 0, carriedGCount = 0;
@@ -6699,75 +6820,14 @@ function _splitScriptImpl() {
     }
   }
 
-  // 그룹 범위 입력 자동 채움 — 도입부 그룹이 있으면 그 범위, 없으면 전체
+  // 그룹 범위 입력 자동 채움 — 기본은 도입부 그룹 전체 (도입부 없으면 1~10)
   const fromEl = document.getElementById('videoRangeFrom');
   const toEl   = document.getElementById('videoRangeTo');
   if (fromEl && toEl && groups.length > 0) {
-    const introGroups = groups.filter(g => g.isIntro);
-    if (introGroups.length > 0) {
-      fromEl.value = introGroups[0].num;
-      toEl.value   = introGroups[introGroups.length - 1].num;
-    } else {
-      fromEl.value = groups[0].num;
-      toEl.value   = groups[groups.length - 1].num;
-    }
-  }
-
-  // 8-C: AI 분할 토글 — 긴 문장의 vrewClips 를 Gemini 로 재분할 (백그라운드, 비동기)
-  const useAi = document.getElementById('useAiSplitter');
-  if (useAi && useAi.checked) {
-    _refineLongSentencesWithAI(window._currentProject, longLen);
-  }
-}
-
-// 긴 문장만 AI 분할로 vrewClips 갱신. 백그라운드 진행 + 진행률 로그.
-async function _refineLongSentencesWithAI(project, longLen) {
-  // 활성 프리셋의 '긴 문장 분할 끄기' 옵션 ON 이면 AI 분할도 skip — 한 문장 = 한 자막 줄 유지
-  if (_isLongSplitDisabled()) {
-    addLog('[AI 분할] 활성 프리셋의 "긴 문장 분할 끄기" 옵션 ON → 스킵', 'info');
-    return;
-  }
-  const SecretStore = require('../tts/secret-store');
-  const gem = SecretStore.get('gemini');
-  if (!gem || !gem.key) {
-    addLog('[AI 분할] Gemini API 키 없음 — 알고리즘 분할만 사용', 'info');
-    return;
-  }
-
-  const longs = project.sentences.filter(s => s.isLong);
-  if (longs.length === 0) return;
-
-  const { splitLongSentenceAI } = require('../core/long-sentence-splitter/ai-splitter');
-  addLog(`[AI 분할] 긴 문장 ${longs.length}개 Gemini 재분할 시작 (백그라운드)`, 'info');
-
-  let done = 0, changed = 0;
-  for (const s of longs) {
-    if (project !== window._currentProject) return; // 사용자가 다시 분할하면 중단
-    try {
-      const aiClips = await splitLongSentenceAI(s.text, {
-        maxChars: longLen,
-        apiKey: gem.key,
-        logger: () => {},
-      });
-      if (aiClips && aiClips.length > 0) {
-        // AI 가 1개로만 답해도 그것을 사용 (algo 보다 자연스러울 수 있음)
-        s.vrewClips = aiClips;
-        changed++;
-      }
-    } catch (e) {
-      // 한 문장 실패 시 algo 결과 유지하고 계속
-    }
-    done++;
-    if (done % 10 === 0 || done === longs.length) {
-      addLog(`  [AI 분할] 진행 ${done}/${longs.length}`, 'info');
-    }
-  }
-  addLog(`[AI 분할] 완료 — ${changed}개 갱신, saveVrew 시 사용`, 'ok');
-
-  // 화면 갱신 — 자막 미리보기 + 클립 수 배지 업데이트
-  // 사용자가 그동안 인라인 편집하지 않은 sentence 만 갱신 영향
-  if (project === window._currentProject) {
-    try { renderTaskList(project); } catch (e) { console.error('[AI 분할 후 렌더 실패]', e); }
+    const introNums = groups.filter(g => g.isIntro).map(g => g.num);
+    const lastNum = groups[groups.length - 1].num;
+    fromEl.value = introNums.length > 0 ? Math.min(...introNums) : 1;
+    toEl.value   = introNums.length > 0 ? Math.max(...introNums) : Math.min(10, lastNum);
   }
 }
 
@@ -6803,10 +6863,11 @@ function _refreshGroupRangeInputs(project) {
   const fromEmpty = !String(fromEl.value || '').trim();
   const toEmpty   = !String(toEl.value || '').trim();
   if (!fromEmpty && !toEmpty) return;
-  const introGroups = project.groups.filter(g => g.isIntro);
-  const target = introGroups.length > 0 ? introGroups : project.groups;
-  if (fromEmpty) fromEl.value = target[0].num;
-  if (toEmpty)   toEl.value   = target[target.length - 1].num;
+  // 자동 영상화 기본 범위 1~10 (사용자가 직접 입력한 값은 보존)
+  const lastNum = project.groups[project.groups.length - 1].num;
+  const introNums = project.groups.filter(g => g.isIntro).map(g => g.num);
+  if (fromEmpty) fromEl.value = introNums.length > 0 ? Math.min(...introNums) : 1;
+  if (toEmpty)   toEl.value   = introNums.length > 0 ? Math.max(...introNums) : Math.min(10, lastNum);
 }
 
 function renderTaskList(project) {
@@ -6887,7 +6948,7 @@ function renderTaskList(project) {
       `<span style="color:var(--text-muted); font-weight:400; font-size:12px;">` +
       `(${g.sentenceIds.length} 문장${clipBadge}${charBadge})</span>${overBadge}${mergeBtnHtml}</span></label>` +
       `<span style="display:flex; align-items:center;">${durBadge}` +
-      `<span class="group-img-status" data-group-id="${g.id}" style="font-size:11px; color:var(--text-muted);">🖼 미생성</span></span>`;
+      `<span class="group-img-status" data-group-id="${g.id}" style="font-size:11px; color:${g.imageStatus === 'fail' ? 'var(--danger)' : g.imageStatus === 'generating' ? 'var(--accent)' : 'var(--text-muted)'};">${g.imageStatus === 'generating' ? '⏳ 생성중' : g.imageStatus === 'fail' ? '❌ 실패' : g.imagePath ? '✅ 완료' : '🖼 미생성'}</span></span>`;
     card.appendChild(header);
 
     // 본문 (이미지 썸네일 + 문장 행)
@@ -6944,6 +7005,21 @@ function renderTaskList(project) {
         `<div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(240,180,60,0.4); border-radius:6px; color:#fff; font-size:12px; font-weight:600; text-align:center; padding:6px;">⏳<br>비디오 생성중</div>`;
       img.style.position = 'relative';
       img.classList.add('has-image');
+    } else if (g.imageStatus === 'generating') {
+      // 이미지 생성 중 — 파란 오버레이 + 스피너 (재생성이면 기존 이미지 흐리게)
+      const url = g.imagePath ? ((typeof _fileUrlForImage === 'function') ? _fileUrlForImage(g.imagePath) : 'file:///' + encodeURI(g.imagePath.replace(/\\/g, '/'))) : '';
+      img.innerHTML = (url ? `<img src="${url}" alt="" style="width:100%; height:100%; object-fit:cover; border-radius:6px; opacity:0.35;">` : '') +
+        `<div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(60,120,200,0.32); border-radius:6px; color:#fff; font-size:12px; font-weight:600; text-align:center; gap:8px;"><span class="pf-img-spin"></span>이미지 생성중</div>`;
+      img.style.position = 'relative';
+      img.classList.add('has-image');
+    } else if (g.imageStatus === 'fail') {
+      // 이미지 생성 실패 — 빨간 오버레이. 클릭 시 파일 첨부/재시도 안내.
+      img.innerHTML =
+        `<div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(200,60,60,0.28); border-radius:6px; color:#fff; font-size:12px; font-weight:600; text-align:center; padding:6px; gap:2px;">❌ 생성 실패<span style="font-size:10px; font-weight:400;">클릭하여 첨부 / 다시 생성</span></div>`;
+      img.style.position = 'relative';
+      img.style.cursor = 'pointer';
+      img.title = '클릭하여 이미지(jpg/png/webp) 또는 동영상 파일 첨부';
+      img.onclick = (e) => { e.stopPropagation(); attachGroupMedia(g.id); };
     } else if (g.imagePath) {
       const url = (typeof _fileUrlForImage === 'function') ? _fileUrlForImage(g.imagePath) : 'file:///' + encodeURI(g.imagePath.replace(/\\/g, '/'));
       img.innerHTML =
@@ -7298,6 +7374,8 @@ function renderPresets() {
       _applyActivePresetToMainScreen(p);
       renderPresets();
       addLog(`기본 프리셋 선택: ${p.name}`, 'ok');
+      // 프리셋 선택 1초 후 대본 탭으로 자동 이동
+      setTimeout(() => { try { document.querySelector('.aux-tab[data-tab="script"]')?.click(); } catch (_) {} }, 500);
     };
 
     // ⚙ 편집 아이콘 클릭 → 편집 모달
@@ -7552,17 +7630,6 @@ function openApiKeysModal() {
   document.getElementById('apiKey_gemini_status').textContent = gemini.key ? '✅ 저장됨' : '⚠ 미설정';
   document.getElementById('apiKey_gemini_status').style.color = gemini.key ? 'var(--success)' : 'var(--text-muted)';
 
-  const runpod = SecretStore.get('runpod') || {};
-  document.getElementById('apiKey_runpod_key').value = runpod.apiKey || '';
-  document.getElementById('apiKey_runpod_templateId').value = runpod.templateId || 'zg8rrc0p6m';
-  document.getElementById('apiKey_runpod_volumeId').value = runpod.networkVolumeId || '';
-  document.getElementById('apiKey_runpod_dataCenterId').value = runpod.dataCenterId || 'EU-CZ-1';
-  document.getElementById('apiKey_runpod_idleMin').value = runpod.idleShutdownMinutes || 5;
-  const hasRunpod = !!(runpod.apiKey);
-  document.getElementById('apiKey_runpod_status').textContent = hasRunpod ? '✅ 저장됨' : '⚠ 미설정';
-  document.getElementById('apiKey_runpod_status').style.color = hasRunpod ? 'var(--success)' : 'var(--text-muted)';
-  document.getElementById('apiKey_runpod_log').style.display = 'none';
-
   document.getElementById('apiKeysModal').style.display = 'flex';
 }
 
@@ -7576,27 +7643,6 @@ async function saveApiKey(provider) {
     const key = document.getElementById('apiKey_gemini_key').value.trim();
     if (!key) { alert('Gemini API 키를 입력하세요'); return; }
     SecretStore.set('gemini', { key });
-  } else if (provider === 'runpod') {
-    const apiKey = document.getElementById('apiKey_runpod_key').value.trim();
-    if (!apiKey) { alert('RunPod API 키를 입력하세요'); return; }
-    const templateId = document.getElementById('apiKey_runpod_templateId').value.trim() || 'zg8rrc0p6m';
-    const networkVolumeId = document.getElementById('apiKey_runpod_volumeId').value.trim();
-    const dataCenterId = document.getElementById('apiKey_runpod_dataCenterId').value.trim() || 'EU-CZ-1';
-    const idleShutdownMinutes = parseInt(document.getElementById('apiKey_runpod_idleMin').value, 10) || 5;
-    SecretStore.set('runpod', {
-      apiKey,
-      templateId,
-      networkVolumeId,
-      dataCenterId,
-      // Wan2.2 비디오를 위해 48GB GPU 우선 — A40($0.44,48GB) → A6000($0.49,48GB) → L40S → 3090(24GB,이미지전용)
-      gpuTypes: ['NVIDIA A40', 'NVIDIA RTX A6000', 'NVIDIA L40S', 'NVIDIA GeForce RTX 3090', 'NVIDIA RTX 3090', 'NVIDIA RTX A5000', 'NVIDIA RTX 4090', 'NVIDIA GeForce RTX 4090'],
-      cloudType: 'SECURE',
-      idleShutdownMinutes,
-    });
-    document.getElementById('apiKey_runpod_status').textContent = '✅ 저장됨';
-    document.getElementById('apiKey_runpod_status').style.color = 'var(--success)';
-    addLog(`[RunPod] 설정 저장 완료 (Template: ${templateId}, Volume: ${networkVolumeId || '없음'}, DC: ${dataCenterId})`, 'ok');
-    return;
   }
 
   // provider 즉시 재초기화 (gemini 등 TTS provider)
@@ -7626,10 +7672,6 @@ function deleteApiKey(provider) {
   if (keyEl) keyEl.value = '';
   document.getElementById(`apiKey_${provider}_status`).textContent = '⚠ 미설정';
   document.getElementById(`apiKey_${provider}_status`).style.color = 'var(--text-muted)';
-  if (provider === 'runpod') {
-    addLog('[RunPod] API 키 삭제 완료', 'info');
-    return;
-  }
   // provider 비활성화
   try {
     const { getInstance } = require('../tts/tts-manager');
@@ -7637,54 +7679,6 @@ function deleteApiKey(provider) {
     if (typeof renderPresets === 'function') renderPresets();
   } catch {}
   addLog(`[${provider}] API 키 삭제 완료`, 'info');
-}
-
-async function testRunPodConnection() {
-  const logEl = document.getElementById('apiKey_runpod_log');
-  logEl.style.display = 'block';
-
-  function setLog(msg) {
-    logEl.textContent = msg;
-    addLog(`[RunPod] ${msg}`, 'info');
-  }
-
-  try {
-    const { PodController } = require('../runpod/pod-controller');
-    const ctrl = PodController.getInstance();
-
-    setLog('GPU 재고 확인 중...');
-    try {
-      const gpus = await ctrl.listAvailableGpus();
-      if (gpus.length === 0) {
-        setLog('⚠ Community Cloud 재고 GPU 없음\n잠시 후 다시 시도하거나 RunPod 대시보드에서 확인하세요.');
-        return;
-      }
-      const gpuList = gpus.slice(0, 6).map(g => `• ${g.id} (${g.memoryInGb}GB, $${g.communityPrice}/h)`).join('\n');
-      setLog(`재고 GPU:\n${gpuList}\n\n🔥 Pod 시동 중...`);
-    } catch {}
-
-    ctrl.on('status', ({ phase, status, elapsedSec }) => {
-      if (phase === 'pod') setLog(`🔥 Pod 부팅 중... ${status} (${elapsedSec}s 경과)`);
-      else if (phase === 'comfyui') setLog(`⏳ ComfyUI 초기화 중... (${elapsedSec}s 경과)\n첫 부팅 시 모델 다운로드로 5~15분 소요`);
-    });
-
-    const { endpointUrl, podId } = await ctrl.ensureRunning();
-
-    setLog(`✅ 준비 완료!\nPod ID: ${podId}\nEndpoint: ${endpointUrl}`);
-    addLog(`[RunPod] endpoint → ${endpointUrl}`, 'ok');
-
-    // /queue 호출로 ComfyUI 응답 확인
-    try {
-      const resp = await fetch(`${endpointUrl}/queue`);
-      const json = await resp.json();
-      setLog(`✅ ComfyUI 응답 확인!\nPod: ${podId}\n${endpointUrl}\n큐 상태: ${JSON.stringify(json).slice(0, 80)}`);
-    } catch (e) {
-      setLog(`✅ Pod 준비됨 (ComfyUI /queue 응답: ${e.message})\n${endpointUrl}`);
-    }
-  } catch (e) {
-    setLog(`❌ 오류: ${e.message}`);
-    addLog(`[RunPod] 테스트 실패: ${e.message}`, 'err');
-  }
 }
 
 // 채널 모달의 음성 프리셋 select 변경 시 — 참조음성 영역을 Clone 모드일 때 표시
@@ -8253,6 +8247,16 @@ window.addEventListener('DOMContentLoaded', () => {
   renderPresets();
   renderChannelSelect();
   renderGroupStages();
+
+  // 이미지 모델 드롭다운 초기 상태 (원클릭 버튼 표시/안내문)
+  try { _onImageModelChange(); } catch (e) { console.warn('[init image model]', e); }
+  // Grok 영상 변환 중단 버튼 — 변환 중일 때만 표시되도록 주기 감시
+  try {
+    setInterval(() => {
+      const b = document.getElementById('grokStopBtn');
+      if (b) b.style.display = window._grokConvertActive ? '' : 'none';
+    }, 800);
+  } catch (e) { console.warn('[init grok stop watcher]', e); }
 
   // OmniVoice 자동 탐색/연결 — 3초 후 첫 시도, 이후 15초마다 반복
   setTimeout(() => {
@@ -10886,6 +10890,8 @@ function _finishAutoProgress(summary) {
   const sumEl = document.getElementById('autoProgressSummary');
   // 중지 버튼 숨김 — 작업 종료된 시점이라 무의미
   if (stopBtn) stopBtn.style.display = 'none';
+  // 팝업 미표시 모드 — footer 중지 버튼도 함께 숨김
+  try { const _fsb = document.getElementById('stopBtn'); if (_fsb) _fsb.style.display = 'none'; } catch (_) {}
   if (closeBtn) {
     closeBtn.disabled = false;
     closeBtn.style.opacity = '1';
@@ -11284,11 +11290,17 @@ async function cancelAutoGeneration() {
     addLog('[중지] Grok 비디오 변환 중단 신호', 'info');
   } catch (_) {}
 
-  // 4. TTS 일괄 변환 중단 신호 (convertAllSentences 측에서 폴링 시 사용)
+  // 4. TTS 일괄 변환 중단 신호 (convertAllSentences/도입부 측에서 폴링 시 사용)
   try {
     window._ttsAbortRequested = true;
+    window._ttsConvertActive = false;
+    window._runpodPipelineActive = false;
+    window._imageGenStop = true;  // Gemini 이미지 루프 중단
     addLog('[중지] TTS 일괄 변환 중단 신호', 'info');
   } catch (_) {}
+
+  // 4-b. 진행 중이던 이미지/영상 시각 상태 정리 (생성중 오버레이 제거)
+  _clearInProgressVisuals();
 
   // 5. 진행 모달 종료 — 사용자가 ✓확인 누를 수 있게 X 활성화
   try { _finishAutoProgress('🛑 사용자 중지'); } catch (_) {}
@@ -11893,8 +11905,9 @@ async function _convertGroupVideoBody(projectId, groupId, opts = {}) {
       return false;
     }
 
-    const motion = (opts.motion || g.videoMotionPrompt || '').trim();
-    // (입력 받기는 grok-engine 내부에서 빈 값이면 store 기본값 사용)
+    // 우선순위: opts.motion > 가져온 AI 영상 프롬프트(g.videoPrompt) > 수동 모션(g.videoMotionPrompt)
+    //          > (빈 값이면 grok-engine 내부에서 store 기본값 "natural slow motion, cinematic feel")
+    const motion = (opts.motion || g.videoPrompt || g.videoMotionPrompt || '').trim();
 
     // 비디오도 통합 폴더의 videos/ 하위 (이미지·TTS·.vrew 와 같은 부모 폴더)
     const path = require('path');
@@ -12053,6 +12066,41 @@ function _toggleGroupCheck(groupId, checked) {
   if (!proj) return;
   const g = proj.groups.find(x => x.id === groupId);
   if (g) g._uiChecked = !!checked;
+}
+
+// 자동 영상화 대상 그룹 — '그룹 시작~끝' 범위 입력 기준 (기본 1~10).
+// 기존엔 isIntro 그룹 전체였으나, 정책 변경으로 번호 범위(편집 가능)로 선택.
+function _getAutoVideoTargetGroups(proj) {
+  if (!proj || !Array.isArray(proj.groups) || proj.groups.length === 0) return [];
+  const fromEl = document.getElementById('videoRangeFrom');
+  const toEl   = document.getElementById('videoRangeTo');
+  const from = parseInt(fromEl && fromEl.value, 10);
+  const to   = parseInt(toEl && toEl.value, 10);
+  // 범위가 유효하게 입력돼 있으면 그 범위만 (사용자가 그룹 범위를 수정한 경우)
+  if (Number.isFinite(from) && from >= 1 && Number.isFinite(to) && to >= from) {
+    return proj.groups.filter(g => g.num >= from && g.num <= to);
+  }
+  // 기본값: 도입부 그룹 전체 (도입부 없으면 1~10 폴백)
+  const intro = proj.groups.filter(g => g.isIntro);
+  if (intro.length > 0) return intro;
+  const lastNum = proj.groups[proj.groups.length - 1].num;
+  return proj.groups.filter(g => g.num <= Math.min(10, lastNum));
+}
+
+// Grok 이미지→비디오 변환 전체 중단.
+// 도입부 자동/선택 그룹/범위/단일 변환 모두 window._grokConvertActive 플래그를 공유하며,
+// grok-engine 에도 abortSignal: ()=>!_grokConvertActive 로 연결되어 진행 중인 클립도 중단된다.
+function stopGrokVideoConversion() {
+  if (!window._grokConvertActive) {
+    addLog('진행 중인 영상 변환이 없습니다', 'info');
+    const b = document.getElementById('grokStopBtn');
+    if (b) b.style.display = 'none';
+    return;
+  }
+  window._grokConvertActive = false;
+  addLog('⏹ 영상 변환 중단 요청 — 현재 클립 완료 후 정지합니다', 'warn');
+  const b = document.getElementById('grokStopBtn');
+  if (b) b.style.display = 'none';
 }
 
 async function _convertIntroGroupsProgressively(proj, introGroups) {
@@ -12294,6 +12342,99 @@ async function convertGroupSentences(groupId) {
 // ─── 도입부 일괄 TTS + 9초 재배치 ──────────────────────────────────
 // 도입부 sentence 전부 TTS 합성 → 실제 TTS 길이 9초 한도로 도입부 그룹 재구성.
 // 비디오 클립 최대 10초 제약에 안전 마진 1초 적용.
+// ─── 도입부 비디오 준비 진행 팝업 제어 ──────────────────────────────
+function _openIntroPrepareModal(totalSentences) {
+  const m = document.getElementById('introPrepareModal');
+  if (!m) return;
+  // 초기화
+  _setIntroStep(1);
+  _updateIntroProgress({ current: 0, total: totalSentences, ok: 0, fail: 0, text: `TTS 합성 준비 (${totalSentences}문장)` });
+  const stopBtn = document.getElementById('introStopBtn');
+  const doneBtn = document.getElementById('introDoneBtn');
+  const closeBtn = document.getElementById('introModalCloseBtn');
+  if (stopBtn) { stopBtn.style.display = ''; stopBtn.disabled = false; stopBtn.style.opacity = ''; stopBtn.textContent = '⏹ 중지'; }
+  if (doneBtn) doneBtn.style.display = 'none';
+  if (closeBtn) closeBtn.style.display = 'none';
+  const txt = document.getElementById('introProgressText');
+  if (txt) txt.style.color = 'var(--text-strong)';
+  m.style.display = 'flex';
+}
+
+function closeIntroPrepareModal() {
+  const m = document.getElementById('introPrepareModal');
+  if (m) m.style.display = 'none';
+}
+
+// 단계 하이라이트 (1=TTS, 2=재배치, 3=저장)
+function _setIntroStep(stepNum) {
+  for (let i = 1; i <= 3; i++) {
+    const el = document.getElementById('introStep' + i);
+    if (!el) continue;
+    if (i < stepNum) {
+      // 완료된 단계
+      el.style.background = 'var(--success, #4caf50)';
+      el.style.color = '#fff';
+    } else if (i === stepNum) {
+      // 현재 단계
+      el.style.background = 'var(--accent)';
+      el.style.color = '#fff';
+    } else {
+      // 대기 단계
+      el.style.background = 'var(--bg-input)';
+      el.style.color = 'var(--text-muted)';
+    }
+  }
+}
+
+function _updateIntroProgress({ current, total, text, ok, fail }) {
+  const bar = document.getElementById('introProgressBar');
+  const count = document.getElementById('introProgressCount');
+  const txt = document.getElementById('introProgressText');
+  const okEl = document.getElementById('introCountOk');
+  const failEl = document.getElementById('introCountFail');
+  if (bar && typeof current === 'number' && typeof total === 'number' && total > 0) {
+    bar.style.width = Math.min(100, Math.round((current / total) * 100)) + '%';
+  }
+  if (count && typeof current === 'number' && typeof total === 'number') {
+    count.textContent = `${current} / ${total} 문장`;
+  }
+  if (txt && typeof text === 'string') txt.textContent = text;
+  if (okEl && typeof ok === 'number') okEl.textContent = String(ok);
+  if (failEl && typeof fail === 'number') failEl.textContent = String(fail);
+}
+
+// 진행 바를 특정 퍼센트로 강제 (재배치/저장 단계)
+function _setIntroProgressBar(pct) {
+  const bar = document.getElementById('introProgressBar');
+  if (bar) bar.style.width = Math.min(100, Math.max(0, pct)) + '%';
+}
+
+// 완료/실패/중지 — 중지 버튼 숨기고 닫기 버튼 노출
+function _finishIntroPrepareModal(text, opts) {
+  opts = opts || {};
+  const txt = document.getElementById('introProgressText');
+  if (txt && typeof text === 'string') {
+    txt.textContent = text;
+    txt.style.color = opts.isError ? 'var(--danger, #e57373)' : 'var(--success, #4caf50)';
+  }
+  if (!opts.isError) _setIntroProgressBar(100);
+  const stopBtn = document.getElementById('introStopBtn');
+  const doneBtn = document.getElementById('introDoneBtn');
+  const closeBtn = document.getElementById('introModalCloseBtn');
+  if (stopBtn) stopBtn.style.display = 'none';
+  if (doneBtn) doneBtn.style.display = '';
+  if (closeBtn) closeBtn.style.display = '';
+}
+
+// 중지 버튼 — 기존 TTS 루프 플래그에 연결
+function _stopIntroPrepare() {
+  try { _setTtsConvertActive(false); } catch (_) { window._ttsConvertActive = false; }
+  const txt = document.getElementById('introProgressText');
+  if (txt) txt.textContent = '중지 요청됨 — 현재 문장 완료 후 멈춥니다…';
+  const stopBtn = document.getElementById('introStopBtn');
+  if (stopBtn) { stopBtn.disabled = true; stopBtn.style.opacity = '0.5'; stopBtn.textContent = '중지 중…'; }
+}
+
 async function prepareIntroVideos() {
   const proj = window._currentProject;
   if (!proj || !Array.isArray(proj.sentences) || !Array.isArray(proj.groups)) {
@@ -12348,6 +12489,8 @@ async function prepareIntroVideos() {
 
   setBtnDisabled(true);
   setProgress(`도입부 TTS 합성 준비 (${introSentences.length}문장)`);
+  _openIntroPrepareModal(introSentences.length);
+  _setIntroStep(1);
   addLog(`[도입부] 일괄 TTS 시작 — ${introSentences.length}문장`, 'info');
   _setTtsConvertActive(true);
 
@@ -12356,14 +12499,19 @@ async function prepareIntroVideos() {
   for (const s of introSentences) {
     idx++;
     if (!window._ttsConvertActive) { stopped = true; break; }
-    setProgress(`합성 중 ${idx}/${introSentences.length} — "${(s.text || '').slice(0, 24)}"`);
+    const preview = (s.text || '').slice(0, 30);
+    setProgress(`합성 중 ${idx}/${introSentences.length} — "${preview}"`);
+    _updateIntroProgress({ current: idx - 1, total: introSentences.length, ok: success, fail, text: `합성 중 — "${preview}…"` });
     const ok = await convertSentence(s.id, { silent: true });
     if (ok) success++; else fail++;
+    _updateIntroProgress({ current: idx, total: introSentences.length, ok: success, fail });
   }
   _setTtsConvertActive(false);
 
   if (stopped) {
     setProgress(`중지됨 — 성공 ${success} / 실패 ${fail}`);
+    _updateIntroProgress({ ok: success, fail });
+    _finishIntroPrepareModal(`⏹ 중지됨 — 성공 ${success} / 실패 ${fail}`, { isError: true });
     addLog(`[도입부] TTS 중지 — 성공 ${success} / 실패 ${fail}`, 'err');
     setBtnDisabled(false);
     if (btn) btn.innerHTML = origBtnText;
@@ -12378,6 +12526,9 @@ async function prepareIntroVideos() {
 
   // Phase B — 9초 기준 재배치
   setProgress('9초 기준 재배치 중…');
+  _setIntroStep(2);
+  _setIntroProgressBar(100);
+  _updateIntroProgress({ ok: success, fail, text: '9초 기준으로 그룹 재배치 중…' });
   let regroupResult;
   try {
     const GB = require('../core/group-builder');
@@ -12385,6 +12536,7 @@ async function prepareIntroVideos() {
   } catch (e) {
     addLog(`[도입부] 재배치 실패: ${e.message}`, 'err');
     setProgress('재배치 실패');
+    _finishIntroPrepareModal(`❌ 재배치 실패: ${e.message}`, { isError: true });
     setBtnDisabled(false);
     if (btn) btn.innerHTML = origBtnText;
     return;
@@ -12397,15 +12549,20 @@ async function prepareIntroVideos() {
   }
 
   // Phase C — 저장 + UI 갱신
+  _setIntroStep(3);
+  _updateIntroProgress({ ok: success, fail, text: '저장 및 화면 갱신 중…' });
   try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch (_) {}
   try { if (typeof renderTaskList === 'function') renderTaskList(proj); } catch (_) {}
 
   const newIntroGroupCount = proj.groups.filter(g => g.isIntro).length;
   const overCount = overSet.size;
-  setProgress(`완료 — ${introSentences.length}문장 → ${newIntroGroupCount}그룹` + (overCount ? ` (⚠ 9초 초과 ${overCount})` : ''));
+  const summary = `완료 — ${introSentences.length}문장 → ${newIntroGroupCount}그룹` + (overCount ? ` (⚠ 9초 초과 ${overCount})` : '');
+  setProgress(summary);
+  _finishIntroPrepareModal(`✅ ${summary}` + (fail > 0 ? `\n(TTS 실패 ${fail}문장 — 재배치는 진행됨)` : ''), { isError: false });
   addLog(`[도입부] 재배치 완료 — ${introSentences.length}문장 → ${newIntroGroupCount}그룹 (9초 한도, 초과 ${overCount})`, 'ok');
   setBtnDisabled(false);
   if (btn) btn.innerHTML = origBtnText;
+  // (탭 자동 이동 제거됨 — 가져오기 '그룹에 적용' 시 제작 탭으로 이동)
 }
 
 // ─── 그룹 구조 변경 Undo 스택 ────────────────────────────────────
@@ -12901,8 +13058,26 @@ async function generateSelectedGroupImages() {
   await _runGroupImageGeneration(checked, '선택그룹');
 }
 
-// ─── RunPod ComfyUI 이미지 생성 (Phase 2 — Flow 대체) ──────────────────
-// 한국어 그룹 텍스트 → Google 무료 번역으로 영어화 → SDXL → PNG 다운로드 → 그룹 썸네일 갱신
+// ─── 이미지 모델 드롭다운 변경 핸들러 ─────────────────────────────────
+// - 모델별 안내문 갱신 (Flow / Nano Banana 2 두 가지).
+function _onImageModelChange() {
+  const sel = document.getElementById('runpodImageModel');
+  const model = (sel && sel.value) || 'flow';
+  const isGemini = model.startsWith('gemini');
+
+  const hint = document.getElementById('imageModelHint');
+  if (hint) {
+    hint.style.display = '';
+    if (isGemini) {
+      hint.textContent = '🍌 Nano Banana 2 — Gemini API 직접 호출. GPU 불필요 · 16:9 자동 · 유료 크레딧 차감 (대량이면 비용 주의).';
+    } else {
+      hint.textContent = '🌐 Flow — Google Flow 브라우저 자동화 (무료 · 기본). 프로필 로그인 필요.';
+    }
+  }
+}
+
+// ─── 그룹 이미지 생성 (Flow 브라우저 자동화 / Nano Banana 2 API) ──────────
+// Flow = 브라우저 자동화 위임 · Gemini = 한국어→영문 번역 후 API 생성 → 썸네일 갱신
 async function generateEmptyGroupImagesRunPod() {
   const proj = window._currentProject;
   if (!proj || !proj.groups || proj.groups.length === 0) {
@@ -12917,7 +13092,11 @@ async function generateEmptyGroupImagesRunPod() {
     alert('빈 그룹이 없습니다 — 모든 그룹에 이미지가 이미 있습니다');
     return;
   }
-  if (!confirm(`☁ RunPod 으로 ${empties.length}개 빈 그룹 이미지 생성. 약 ${(empties.length * 3 / 60).toFixed(1)}분 + Pod 부팅 1~2분. 진행할까요?`)) return;
+  const _m1 = (document.getElementById('runpodImageModel') || {}).value || 'flow';
+  const _msg1 = _m1.startsWith('gemini')
+    ? `🍌 Nano Banana 2(API)로 ${empties.length}개 빈 그룹 이미지 생성 (유료 크레딧). 진행할까요?`
+    : `🌐 Flow(브라우저 자동화)로 ${empties.length}개 빈 그룹 이미지 생성. Chrome 자동화 창이 열립니다. 진행할까요?`;
+  if (!confirm(_msg1)) return;
   await _runRunPodImageGeneration(empties.map(g => g.id), '빈그룹');
 }
 
@@ -12934,7 +13113,11 @@ async function generateSelectedGroupImagesRunPod() {
     alert('이미지를 생성할 그룹을 좌상단 체크박스로 선택하세요');
     return;
   }
-  if (!confirm(`☁ RunPod 으로 체크된 ${checked.length}개 그룹 이미지 생성. 진행할까요?`)) return;
+  const _m2 = (document.getElementById('runpodImageModel') || {}).value || 'flow';
+  const _msg2 = _m2.startsWith('gemini')
+    ? `🍌 Nano Banana 2(API)로 체크된 ${checked.length}개 그룹 이미지 생성 (유료 크레딧). 진행할까요?`
+    : `🌐 Flow(브라우저 자동화)로 체크된 ${checked.length}개 그룹 이미지 생성. Chrome 자동화 창이 열립니다. 진행할까요?`;
+  if (!confirm(_msg2)) return;
   await _runRunPodImageGeneration(checked, '선택그룹');
 }
 
@@ -12943,7 +13126,7 @@ function _translateKoToEn(koreanText) {
   return new Promise(resolve => {
     try {
       const https = require('https');
-      const text = String(koreanText || '').replace(/\n/g, ' ').substring(0, 300);
+      const text = String(koreanText || '').replace(/\n/g, ' ').substring(0, 500);
       if (!text) return resolve(null);
       const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ko&tl=en&dt=t&q=${encodeURIComponent(text)}`;
       https.get(url, (res) => {
@@ -12960,7 +13143,7 @@ function _translateKoToEn(koreanText) {
   });
 }
 
-async function _runRunPodImageGeneration(groupIds, label) {
+async function _runRunPodImageGeneration(groupIds, label, modelOverride) {
   const proj = window._currentProject;
   if (!proj) return;
   const fs = require('fs');
@@ -12975,12 +13158,22 @@ async function _runRunPodImageGeneration(groupIds, label) {
     return;
   }
 
-  // RunPod 시크릿 사전 검증
+  // 이미지 모델 선택 — Flow(브라우저 자동화) 또는 Nano Banana 2(Gemini API).
+  // modelOverride 가 있으면 그것을 우선 사용.
+  const imageModel = modelOverride || (document.getElementById('runpodImageModel') || {}).value || 'flow';
+  const isGemini = imageModel.startsWith('gemini');
+
+  // Flow(기본) — 브라우저 자동화 경로로 위임 (main.js start-generation → FlowAutomator)
+  if (!isGemini) {
+    return await _runGroupImageGeneration(groupIds, label);
+  }
+
+  // ── 이하 Nano Banana 2 (Gemini API) ──
   try {
     const SecretStore = require('../tts/secret-store');
-    const rp = SecretStore.get('runpod');
-    if (!rp || !rp.apiKey) {
-      alert('RunPod API 키가 없습니다. 🔑 → RunPod 섹션에서 설정하세요.');
+    const gm = SecretStore.get('gemini');
+    if (!gm || !gm.key) {
+      alert('Gemini API 키가 없습니다. 🔑 → Google Gemini 섹션에서 설정하세요.');
       return;
     }
   } catch {}
@@ -12994,41 +13187,23 @@ async function _runRunPodImageGeneration(groupIds, label) {
   const { getInstance: getImageManager } = require('../image/image-manager');
   const mgr = getImageManager({ logger: addLog });
 
-  // 이미지 모델 선택 (Qwen 계열=한국어 직접, SDXL=영문 번역)
-  const imageModel = (document.getElementById('runpodImageModel') || {}).value || 'qwen-image-lightning';
-  const isQwen = imageModel.startsWith('qwen');
+  addLog(`[Gemini] ${label} ${targets.length}개 그룹 이미지 생성 시작 (Nano Banana 2 · GPU 불필요)`, 'info');
 
-  addLog(`[RunPod] ${label} ${targets.length}개 그룹 이미지 생성 시작 (모델: ${imageModel}) — Pod 시동 대기 중...`, 'info');
-
-  // 시동 워밍업 (첫 그룹 시작 전 Pod 미리 켜기 — 사용자 체감 응답성 ↑)
-  try {
-    const { PodController } = require('../runpod/pod-controller');
-    const podCtrl = PodController.getInstance();
-    await podCtrl.ensureRunning();
-    addLog(`[RunPod] Pod 준비 완료`, 'ok');
-  } catch (e) {
-    addLog(`[RunPod] Pod 시동 실패: ${e.message}`, 'err');
-    return;
-  }
-
+  window._imageGenStop = false;  // 진입 시 중단 플래그 리셋
+  window._autoCancelRequested = false;
+  try { const _sb = document.getElementById('stopBtn'); if (_sb) _sb.style.display = ''; } catch (_) {}
   let success = 0, failed = 0;
   for (let i = 0; i < targets.length; i++) {
-    // 파이프라인에서 중단 요청 시 그룹 사이에서 즉시 정지
-    // (standalone ☁ 버튼 호출 시엔 _runpodPipelineActive 가 undefined 라 break 안 됨)
-    if (window._runpodPipelineActive === false) {
-      addLog(`[RunPod] ⏹ 중단 — ${success}개 완료 후 정지`, 'warn');
-      break;
-    }
+    if (window._imageGenStop) { addLog('[Gemini] ⏹ 중지 — 이미지 생성 중단', 'warn'); break; }
     const g = targets[i];
     const num = g.num;
     try {
       const koreanText = _buildGroupParagraph(g, proj).slice(0, 800);
       if (!koreanText) {
-        addLog(`[RunPod] 그룹 ${num} — 텍스트 없음, 스킵`, 'warn');
+        addLog(`[Gemini] 그룹 ${num} — 텍스트 없음, 스킵`, 'warn');
         continue;
       }
 
-      // 스타일 prompt (SDXL=영문 스타일, Qwen=그대로 결합)
       let stylePrompt = '';
       try {
         const styleObj = _getActiveStylePrompt();
@@ -13036,328 +13211,75 @@ async function _runRunPodImageGeneration(groupIds, label) {
       } catch (_) {}
 
       let prompt;
-      if (isQwen) {
-        // Qwen-Image: 한국어 직접 입력 (번역 불필요)
-        addLog(`[RunPod] 그룹 ${num} (${i+1}/${targets.length}) — Qwen 한국어 직접 생성 중...`, 'info');
-        const parts = [koreanText];
-        if (stylePrompt) parts.push(stylePrompt);
-        prompt = parts.join(', ');
+      if (g.imagePrompt && g.imagePrompt.trim()) {
+        // 클로드 왕복 프롬프트: 앱 스타일 + Claude 본문 + 품질태그 (자동번역 scene 대체).
+        addLog(`[Gemini] 그룹 ${num} (${i+1}/${targets.length}) — 🤖 AI 프롬프트 사용`, 'info');
+        // 사전설정(시대/배경)을 반드시 부착 — Claude 프롬프트가 시대를 빠뜨려도 보장
+        let _pen = '';
+        try {
+          const _pk = (document.getElementById('presetPrompt')?.value || '').trim();
+          if (_pk) _pen = (await _translateKoToEn(_pk)) || _pk;
+        } catch (_) {}
+        const cparts = [];
+        if (stylePrompt) cparts.push(stylePrompt);
+        cparts.push(g.imagePrompt.trim());
+        if (_pen) cparts.push(_pen);
+        cparts.push('cinematic, highly detailed, no text, no watermark');
+        prompt = cparts.join(', ');
       } else {
-        // SDXL: 한국어 → 영문 번역
-        addLog(`[RunPod] 그룹 ${num} (${i+1}/${targets.length}) — 번역 + 생성 중...`, 'info');
-        const englishText = await _translateKoToEn(koreanText);
+        // Gemini(Nano Banana 2): 한국어 → 영문 번역 (안전필터 회피). 번역 실패 시 1회 재시도.
+        // Flow 경로와 동일하게 scene(대본)/setting(사전설정) 구조로 조립 → 대본·의도 반영 강화.
+        addLog(`[Gemini] 그룹 ${num} (${i+1}/${targets.length}) — 번역 + 생성 중...`, 'info');
+        let englishText = await _translateKoToEn(koreanText);
+        if (!englishText) englishText = await _translateKoToEn(koreanText);
+        // 사전 설정(공통 장면 의도) — 번역해 setting 으로 반영.
+        let presetEn = '';
+        try {
+          const _presetKo = (document.getElementById('presetPrompt')?.value || '').trim();
+          if (_presetKo) presetEn = (await _translateKoToEn(_presetKo)) || _presetKo;
+        } catch (_) {}
         const parts = [];
-        if (englishText) parts.push(englishText); else parts.push(koreanText);
         if (stylePrompt) parts.push(stylePrompt);
-        else parts.push('cinematic lighting, masterpiece, highly detailed');
+        parts.push(`scene: ${englishText || koreanText}`);
+        if (presetEn) parts.push(`setting: ${presetEn}`);
+        parts.push('cinematic, highly detailed, no text, no watermark');
         prompt = parts.join(', ');
+        if (i === 0) addLog(`[Gemini] 스타일 ${stylePrompt ? '✓ 적용됨' : '미선택'} · 사전설정 ${presetEn ? '✓' : '없음'}`, 'info');
       }
-      if (i === 0) addLog(`[RunPod] 스타일 ${stylePrompt ? '✓ 적용됨' : '미선택'} · 모델 ${imageModel}`, 'info');
 
       const filename = `그룹${String(num).padStart(2, '0')}_${Date.now()}.png`;
       const outputPath = path.join(imagesDir, filename);
 
+      // 진행 표시 — 카드에 즉시 스피너
+      g.imageStatus = 'generating';
+      _markGroupImageGenerating(g.id);
+
       const result = await mgr.synth({
         prompt,
         outputPath,
-        workflowName: imageModel,
+        provider: 'gemini',
+        aspectRatio: '16:9',
       });
 
+      g.imageStatus = 'done';
       _setGroupImageThumbnail(g.id, result.path);
       success++;
-      addLog(`[RunPod] 그룹 ${num} ✅ (${(result.durationMs / 1000).toFixed(1)}s, seed=${result.seed})`, 'ok');
+      addLog(`[Gemini] 그룹 ${num} ✅ (${(result.durationMs / 1000).toFixed(1)}s)`, 'ok');
 
       // 자동저장은 _setGroupImageThumbnail 이후 onChange 통해 트리거됨
     } catch (e) {
       failed++;
-      addLog(`[RunPod] 그룹 ${num} ❌ ${e.message}`, 'err');
+      try { g.imageStatus = 'fail'; _markGroupImageFailed(g.id); } catch (_) {}
+      addLog(`[Gemini] 그룹 ${num} ❌ ${e.message}`, 'err');
     }
   }
 
-  addLog(`[RunPod] ${label} 완료 — 성공 ${success}, 실패 ${failed}`, success > 0 ? 'ok' : 'err');
+  addLog(`[Gemini] ${label} 완료 — 성공 ${success}, 실패 ${failed}`, success > 0 ? 'ok' : 'err');
+  try { const _sb = document.getElementById('stopBtn'); if (_sb) _sb.style.display = 'none'; } catch (_) {}
 }
 
-// ─── RunPod ComfyUI 비디오 생성 (Phase 3 — Wan2.2-I2V) ─────────────────
-// 그룹 이미지 → Wan2.2-I2V → mp4 (5초 720p)
-// 워크플로가 검증(플레이스홀더 제거)된 후에만 동작.
-// ───────────────────────────────────────────────────────────────────────────
-
-async function generateEmptyGroupVideosRunPod() {
-  const proj = window._currentProject;
-  if (!proj || !proj.groups || proj.groups.length === 0) {
-    alert('먼저 대본을 분할하세요');
-    return;
-  }
-  // 이미지는 있지만 비디오가 없는 그룹만 선별
-  const targets = proj.groups.filter(g => g.imagePath && !g.videoPath);
-  if (targets.length === 0) {
-    alert('비디오 생성 대상 없음 — 이미지가 있는 그룹이 없거나 모든 그룹에 이미 비디오가 있습니다');
-    return;
-  }
-  if (!confirm(`☁ RunPod Wan2.2 로 ${targets.length}개 빈 그룹 비디오 생성. 그룹당 약 5~8분. 먼저 이미지 생성 완료 후 실행하세요. 진행할까요?`)) return;
-  await _runRunPodVideoGeneration(targets.map(g => g.id), '빈그룹비디오');
-}
-
-async function generateSelectedGroupVideosRunPod() {
-  const proj = window._currentProject;
-  if (!proj || !proj.groups || proj.groups.length === 0) {
-    alert('먼저 대본을 분할하세요');
-    return;
-  }
-  const checked = _getCheckedGroupIds();
-  if (!checked || checked.length === 0) {
-    alert('체크된 그룹이 없습니다 — 그룹 카드 좌상단 체크박스를 선택하세요');
-    return;
-  }
-  const withImage = checked.filter(id => {
-    const g = proj.groups.find(g => g.id === id);
-    return g && g.imagePath;
-  });
-  if (withImage.length === 0) {
-    alert('선택한 그룹에 이미지가 없습니다 — 먼저 이미지를 생성하세요');
-    return;
-  }
-  if (!confirm(`☁ RunPod Wan2.2 로 ${withImage.length}개 그룹 비디오 생성. 진행할까요?`)) return;
-  await _runRunPodVideoGeneration(withImage, '선택그룹비디오');
-}
-
-async function _runRunPodVideoGeneration(groupIds, label) {
-  const proj = window._currentProject;
-  if (!proj) return;
-  const fs = require('fs');
-  const path = require('path');
-
-  const ChannelStore = require('../core/channel-store');
-  const channel = (typeof _activeChannelId !== 'undefined' && _activeChannelId)
-    ? ChannelStore.getById(_activeChannelId) : null;
-  const baseOutDir = _resolveOutputDir(channel);
-  if (!baseOutDir) {
-    alert('출력 폴더를 먼저 선택하세요 (또는 채널을 등록하세요)');
-    return;
-  }
-
-  try {
-    const SecretStore = require('../tts/secret-store');
-    const rp = SecretStore.get('runpod');
-    if (!rp || !rp.apiKey) {
-      alert('RunPod API 키가 없습니다. 🔑 → RunPod 섹션에서 설정하세요.');
-      return;
-    }
-  } catch {}
-
-  const videosDir = path.join(baseOutDir, 'videos');
-  fs.mkdirSync(videosDir, { recursive: true });
-
-  const targets = groupIds.map(id => proj.groups.find(g => g.id === id)).filter(g => g && g.imagePath);
-  if (targets.length === 0) return;
-
-  const { getInstance: getVideoManager } = require('../video/video-manager');
-  const mgr = getVideoManager({ logger: addLog });
-
-  addLog(`[RunPod-Vid] ${label} ${targets.length}개 그룹 비디오 생성 시작 — Pod 시동 대기 중...`, 'info');
-
-  try {
-    const { PodController } = require('../runpod/pod-controller');
-    const podCtrl = PodController.getInstance();
-    await podCtrl.ensureRunning();
-    addLog(`[RunPod-Vid] Pod 준비 완료`, 'ok');
-  } catch (e) {
-    addLog(`[RunPod-Vid] Pod 시동 실패: ${e.message}`, 'err');
-    return;
-  }
-
-  let success = 0, failed = 0;
-  for (let i = 0; i < targets.length; i++) {
-    const g = targets[i];
-    const num = g.num;
-    try {
-      addLog(`[RunPod-Vid] 그룹 ${num} (${i+1}/${targets.length}) — LTX-Video 비디오 생성 중 (약 1~2분)...`, 'info');
-
-      const filename = `그룹${String(num).padStart(2, '0')}_${Date.now()}.mp4`;
-      const outputPath = path.join(videosDir, filename);
-
-      const result = await mgr.synth({
-        inputImagePath: g.imagePath,
-        outputPath,
-        onProgress: p => {
-          if (p > 0.1) addLog(`[RunPod-Vid] 그룹 ${num} 진행 ${Math.round(p * 100)}%`, 'info');
-        },
-      });
-
-      // 그룹에 videoPath 저장 + UI 갱신 + 자동저장 (첨부 흐름과 동일 패턴)
-      g.videoPath = result.path;
-      g.videoStatus = 'done';
-      g.videoSourceImage = g.imagePath || null;
-      try { if (typeof renderTaskList === 'function') renderTaskList(proj); } catch (_) {}
-      try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch (_) {}
-      success++;
-      addLog(`[RunPod-Vid] 그룹 ${num} ✅ (${(result.durationMs / 1000 / 60).toFixed(1)}분, seed=${result.seed})`, 'ok');
-    } catch (e) {
-      failed++;
-      addLog(`[RunPod-Vid] 그룹 ${num} ❌ ${e.message}`, 'err');
-    }
-  }
-
-  addLog(`[RunPod-Vid] ${label} 완료 — 성공 ${success}, 실패 ${failed}`, success > 0 ? 'ok' : 'err');
-}
-
-// ─── RunPod 원클릭 파이프라인 (Phase 4) ─────────────────────────
-// 이미지(SDXL) → TTS(OmniVoice) → .vrew 빌드 — Grok 불필요.
-// 각 단계는 독립적으로 실패 허용 (이미지 실패해도 TTS→vrew 계속).
-// ────────────────────────────────────────────────────────────────
-async function runpodOneclickPipeline() {
-  const proj = window._currentProject;
-  if (!proj || !proj.groups || proj.groups.length === 0) {
-    alert('먼저 대본을 분할하세요');
-    return;
-  }
-  if (!_ensureActivePreset()) return;
-
-  // RunPod 키 확인
-  try {
-    const SecretStore = require('../tts/secret-store');
-    const rp = SecretStore.get('runpod');
-    if (!rp || !rp.apiKey) {
-      alert('RunPod API 키가 없습니다.\n🔑 버튼 → RunPod 섹션에서 설정 후 다시 시도하세요.');
-      return;
-    }
-  } catch {}
-
-  const fs = require('fs');
-  const path = require('path');
-
-  // 출력 폴더 결정
-  const ChannelStore = require('../core/channel-store');
-  const channel = (typeof _activeChannelId !== 'undefined' && _activeChannelId)
-    ? ChannelStore.getById(_activeChannelId) : null;
-  const baseOutDir = _resolveOutputDir(channel);
-  if (!baseOutDir) {
-    alert('출력 폴더를 먼저 선택하세요 (또는 채널을 등록하세요)');
-    return;
-  }
-
-  const totalGroups = proj.groups.length;
-  const emptyImgGroups = proj.groups.filter(g => !g.imagePath || !fs.existsSync(g.imagePath));
-  const emptySentences = (proj.sentences || []).filter(s => !s.ttsPath || !fs.existsSync(s.ttsPath));
-
-  const stepLines = [
-    `이미지 생성: ${emptyImgGroups.length}개 그룹 (이미 있는 ${totalGroups - emptyImgGroups.length}개 스킵)`,
-    `TTS 변환: ${emptySentences.length}개 문장`,
-    `.vrew 빌드`,
-  ].join('\n');
-
-  if (!confirm(`🚀 RunPod 원클릭 생성\n\n${stepLines}\n\n진행할까요?`)) return;
-
-  // 중단 플래그 ON + 버튼을 "⏹ 중단" 으로 토글
-  window._runpodPipelineActive = true;
-  _setRunpodPipelineBtn(true);
-  const stopped = () => !window._runpodPipelineActive;
-
-  // ── 진행 배지 헬퍼 ──
-  function stepLog(step, total, msg, type = 'info') {
-    addLog(`[🚀 파이프라인 ${step}/${total}] ${msg}`, type);
-  }
-
-  const TOTAL = 3;
-
-  try {
-    // ── Step 1: Pod 시동 + 이미지 생성 ──
-    stepLog(1, TOTAL, 'Pod 시동 중...', 'info');
-    try {
-      const { PodController } = require('../runpod/pod-controller');
-      const podCtrl = PodController.getInstance();
-      await podCtrl.ensureRunning();
-      stepLog(1, TOTAL, 'Pod 준비 완료', 'ok');
-    } catch (e) {
-      stepLog(1, TOTAL, `Pod 시동 실패: ${e.message} — 이미지 생성 스킵, TTS→vrew 계속`, 'warn');
-    }
-
-    if (stopped()) { addLog('⏹ 파이프라인 중단됨 (이미지 생성 전)', 'warn'); return; }
-
-    if (emptyImgGroups.length > 0) {
-      stepLog(1, TOTAL, `이미지 ${emptyImgGroups.length}개 생성 중...`, 'info');
-      await _runRunPodImageGeneration(emptyImgGroups.map(g => g.id), '원클릭');
-      stepLog(1, TOTAL, '이미지 생성 완료', 'ok');
-    } else {
-      stepLog(1, TOTAL, '이미지 모두 완료 — 스킵', 'ok');
-    }
-
-    if (stopped()) { addLog('⏹ 파이프라인 중단됨 (TTS 전)', 'warn'); return; }
-
-    // ── Step 2: TTS 변환 ──
-    stepLog(2, TOTAL, `TTS ${emptySentences.length}개 문장 변환 중...`, 'info');
-    if (emptySentences.length > 0) {
-      // convertAllSentences 가 완료 Promise 를 반환하지 않으므로
-      // _ttsConvertActive 폴링으로 완료 감지
-      window._ttsConvertActive = false;
-      await new Promise(resolve => {
-        const startActive = () => {
-          if (!_ensureActivePreset()) { resolve(); return; }
-          convertAllSentences({ silent: true });
-          // 최대 30분 대기
-          const deadline = Date.now() + 1_800_000;
-          const poll = setInterval(() => {
-            // 파이프라인 중단 요청 시 TTS 도 함께 중지
-            if (stopped()) { window._ttsConvertActive = false; clearInterval(poll); resolve(); return; }
-            if (!window._ttsConvertActive || Date.now() > deadline) {
-              clearInterval(poll);
-              resolve();
-            }
-          }, 2000);
-        };
-        // 약간 지연 후 시작 (UI 업데이트 안정화)
-        setTimeout(startActive, 300);
-      });
-    }
-    if (stopped()) { addLog('⏹ 파이프라인 중단됨 (.vrew 빌드 전)', 'warn'); return; }
-    stepLog(2, TOTAL, 'TTS 변환 완료', 'ok');
-
-    // ── Step 3: .vrew 빌드 ──
-    stepLog(3, TOTAL, '.vrew 파일 빌드 중...', 'info');
-    try {
-      proj.vrewFileName = proj.vrewFileName || require('path').basename(baseOutDir);
-      proj.imageOutputDir = proj.imageOutputDir || path.join(baseOutDir, 'images');
-      proj.ttsOutputDir   = proj.ttsOutputDir   || path.join(baseOutDir, 'tts');
-      const result = await saveVrew({ proj, silent: true });
-      if (result && result.path) {
-        stepLog(3, TOTAL, `.vrew 저장 완료: ${require('path').basename(result.path)}`, 'ok');
-      } else {
-        stepLog(3, TOTAL, '.vrew 빌드 완료 (경로 미확인)', 'ok');
-      }
-    } catch (e) {
-      stepLog(3, TOTAL, `.vrew 빌드 실패: ${e.message}`, 'err');
-    }
-
-    addLog('🚀 RunPod 원클릭 파이프라인 완료!', 'ok');
-  } finally {
-    window._runpodPipelineActive = false;
-    _setRunpodPipelineBtn(false);
-  }
-}
-
-// 원클릭 버튼 토글 핸들러 — 실행 중이면 중단, 아니면 시작
-function onRunpodPipelineClick() {
-  if (window._runpodPipelineActive) {
-    window._runpodPipelineActive = false;
-    window._ttsConvertActive = false;  // 진행 중 TTS 도 중지
-    addLog('⏹ 중단 요청됨 — 현재 작업 완료 후 정지합니다...', 'warn');
-    return;
-  }
-  runpodOneclickPipeline();
-}
-
-// 버튼 외형 토글 (실행 중 = 빨강 ⏹ 중단 / 대기 = 초록 🚀 생성)
-function _setRunpodPipelineBtn(active) {
-  const btn = document.getElementById('runpodPipelineBtn');
-  if (!btn) return;
-  if (active) {
-    btn.textContent = '⏹ 중단';
-    btn.style.background = 'linear-gradient(135deg,#a83232,#6e1010)';
-  } else {
-    btn.textContent = '🚀 RunPod 원클릭 생성';
-    btn.style.background = 'linear-gradient(135deg,#1a6b3a,#0e4d6e)';
-  }
-}
+// ─── 비디오 생성은 Grok 전용 (convertGroupRangeVideo / convertSelectedGroupsVideo) ───
+// RunPod(Wan2.2/LTX-Video) 비디오 경로는 제거됨 — 영상 제작은 grok-engine.js 로만 진행.
 
 // ─── 통합 자동 제작 (이미지 + TTS) ──────────────────────────────
 // 한 버튼으로 [이미지 생성] → [TTS 변환] 일괄 진행.
@@ -13458,6 +13380,9 @@ async function generateAll() {
     return;
   }
   if (!_ensureActivePreset()) return;
+  // 새 자동제작 시작 — 이전 중지 플래그 해제
+  window._imageGenStop = false;
+  window._autoCancelRequested = false;
   // 모션 프롬프트 입력란이 onchange 발화 전이라도 자동제작 시작 시 강제 sync
   try { onGrokMotionPromptChange(); } catch (_) {}
   // 자동저장 활성화 — 사용자가 한 번도 [💾 프로젝트 저장] 누른 적 없으면 보관 폴더에 자동 첫 저장.
@@ -13526,8 +13451,11 @@ async function generateAll() {
     progressSteps.push({ id: 'video', label: '🎬 도입부 영상' });
   }
   progressSteps.push({ id: 'vrew', label: '💾 Vrew 파일' });
+  // 진행 팝업은 띄우지 않음 — 진행 상태는 '작업 목록' 헤더 상태칩(#taskStatusBadge)으로 표시.
+  // (모달 내부 상태/타이머는 구성하되 화면엔 표시 안 함. 중지는 footer #stopBtn 사용)
   _showAutoProgress('자동제작 진행 중', progressSteps);
-  // v1.13.25: 모달이 화면에 paint 된 후 무거운 작업 시작 — 사용자가 클릭 즉시 모달 확인 가능
+  try { document.getElementById('autoProgressModal').style.display = 'none'; } catch (_) {}
+  try { const _sb = document.getElementById('stopBtn'); if (_sb) _sb.style.display = ''; } catch (_) {}
   await _yieldToPaint();
 
   // 백그라운드 폴링 — 1초 간격으로 현재 진행 상태 모달에 반영
@@ -13541,13 +13469,22 @@ async function generateAll() {
         _updateAutoStep('img', { current: imgDone, total: groupCount, status: imgDone >= groupCount ? '완료' : '진행 중' });
         const ttsDoneNow = proj.sentences.filter(s => s.ttsStatus === 'done' && s.ttsAudioPath && fsP.existsSync(s.ttsAudioPath)).length;
         _updateAutoStep('tts', { current: ttsDoneNow, total: sentenceCount, status: ttsDoneNow >= sentenceCount ? '완료' : '진행 중' });
+        let _badgeTxt = `🖼 ${imgDone}/${groupCount} · 🎙 ${ttsDoneNow}/${sentenceCount}`;
         if (_autoIntroOn && _introGroupCount > 0) {
           const vDone = proj.groups.filter(g => g.isIntro && g.videoPath && fsP.existsSync(g.videoPath)).length;
           _updateAutoStep('video', { current: vDone, total: _introGroupCount, status: vDone >= _introGroupCount ? '완료' : '진행 중' });
+          _badgeTxt += ` · 🎬 ${vDone}/${_introGroupCount}`;
+        }
+        // 작업목록 헤더 상태칩 갱신 (모달과 동시)
+        if (proj === window._currentProject) {
+          const _sbEl = document.getElementById('taskStatusBadge');
+          if (_sbEl) _sbEl.textContent = _badgeTxt;
         }
       } catch {}
       await new Promise(r => setTimeout(r, 1000));
     }
+    // 폴링 종료 시 헤더 상태칩 비움
+    try { const _sbEl = document.getElementById('taskStatusBadge'); if (_sbEl) _sbEl.textContent = ''; } catch (_) {}
   })();
 
   // 1+2 병렬 실행 — 이미지 생성과 TTS 변환은 서로 다른 자원을 쓰므로 동시 진행 가능
@@ -13565,11 +13502,12 @@ async function generateAll() {
     }
     addLog(`[이미지] 생성 시작 (${needImg.length}개 / ${skipped}개 재사용)`, 'info');
     try {
-      await _runGroupImageGeneration(needImg.map(g => g.id), '일괄');
+      // 이미지 모델 드롭다운 기반 라우팅 (Flow 브라우저 자동화 / Nano Banana 2 API).
+      await _runRunPodImageGeneration(needImg.map(g => g.id), '일괄');
     } catch (e) {
       addLog(`[이미지] 예외: ${e.message} — 계속 진행`, 'err');
     }
-    // start-generation 이 첫 N 개만 기다리고 resolve 할 수 있어, 모든 이미지 완료까지 추가 대기
+    // 모든 이미지 완료까지 추가 대기
     // (재시도 포함) — fs.existsSync + imageStatus 'fail' 검증
     const fsImg2 = require('fs');
     const POLL_TIMEOUT = 6 * 60 * 1000;  // 최대 6분
@@ -13599,13 +13537,14 @@ async function generateAll() {
   // 도입부 비디오 task — 토글 ON 이고 isIntro 그룹 1개 이상일 때만
   // 도입부 이미지가 1개 완성되는 즉시 Grok 변환 큐 시작 (이미지/TTS task 와 오버랩)
   const autoIntro = document.getElementById('autoIntroVideoToggle')?.checked ?? true;
-  const introGroups = proj.groups.filter(g => g.isIntro);
+  // 자동 영상화 대상 = 그룹 범위(기본 1~10, 편집 가능). 기존 isIntro 전체 정책에서 변경.
+  const introGroups = _getAutoVideoTargetGroups(proj);
   const introVideoTask = (async () => {
     if (!autoIntro) {
-      if (introGroups.length > 0) addLog(`[Grok] 도입부 자동 영상화 — 토글 OFF (스킵)`, 'info');
+      if (introGroups.length > 0) addLog(`[Grok] 자동 영상화 — 토글 OFF (스킵)`, 'info');
       return;
     }
-    if (introGroups.length === 0) return;  // 도입부 없으면 조용히 스킵
+    if (introGroups.length === 0) return;  // 대상 없으면 조용히 스킵
     if (window._grokConvertActive) {
       addLog('[Grok] 이미 다른 비디오 작업 진행 중 — 도입부 자동 영상화 스킵', 'info');
       return;
@@ -13654,6 +13593,7 @@ async function generateAll() {
   // Vrew 자동 빌드 — embedded 모드 (saveVrew 가 모달을 새로 띄우지 않고 기존 step 갱신만)
   try {
     _updateAutoStep('vrew', { status: '빌드 시작...' });
+    try { const _sb = document.getElementById('taskStatusBadge'); if (_sb && proj === window._currentProject) _sb.textContent = '💾 Vrew 빌드 중…'; } catch (_) {}
     // proj 를 명시 전달 — saveVrew 안 _currentProject 재참조 시 타이밍에 따라 다른 탭으로
     // 바뀌는 multi-project 격리 결함(v1.12.6 발견) 의 root cause 차단.
     const vrewResult = await saveVrew({ embedded: true, silent: false, autoFillTts: false, skipTts: ttsDone < sentenceCount, proj });
@@ -13680,6 +13620,14 @@ async function generateAll() {
   addLog(`━━━ 자동 제작 완료 (${m}분 ${s}초) — 이미지 ${imgDone}/${groupCount}, TTS ${ttsDone}/${sentenceCount}${videoSummary} ━━━`, 'ok');
   addLog(`💡 Flow 자동화 Chrome 창은 다음 작업 빠른 재사용을 위해 유지됩니다. 더 안 쓰시면 수동으로 X 버튼 닫으셔도 OK`, 'info');
   _finishAutoProgress(`${m > 0 ? `${m}분 ` : ''}${s}초 소요`);
+  // 헤더 상태칩 — 완료 표시 후 잠시 뒤 비움
+  try {
+    const _sb = document.getElementById('taskStatusBadge');
+    if (_sb && proj === window._currentProject) {
+      _sb.textContent = `✅ 완료 (이미지 ${imgDone}/${groupCount} · TTS ${ttsDone}/${sentenceCount})`;
+      setTimeout(() => { try { if (_sb.textContent.startsWith('✅')) _sb.textContent = ''; } catch (_) {} }, 8000);
+    }
+  } catch (_) {}
 }
 
 async function regenerateGroups(groupIds) {
@@ -13725,6 +13673,9 @@ async function _runGroupImageGeneration(groupIds, label) {
 async function _runGroupImageGenerationBody(projectId, groupIds, label, channel) {
   const proj = window._projects.find(p => p.id === projectId);
   if (!proj) return false;
+  // 새 생성 시작 — 이전 중지 플래그 해제 (안 그러면 _markGroupImageGenerating 가드가 영구 차단)
+  window._imageGenStop = false;
+  window._autoCancelRequested = false;
 
   // 선택된 그룹들의 합본 paragraph 만 모음. flow-engine 입장에서는 paragraphs[0..N-1] 가 되지만
   // 실제 그룹 번호는 다를 수 있어 (ex: 그룹 2, 5 만 재생성). 매핑 보존을 위해 _pendingGroupOrder 에 기록.
@@ -13777,7 +13728,16 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
     }
 
     const presetPromptText = (document.getElementById('presetPrompt').value || '').trim();
+    let _aiPromptCnt = 0;
     customPrompts = targetGroups.map((g, i) => {
+      // 클로드 왕복 프롬프트 우선 — 앱 스타일 + Claude 본문 + 품질태그 (자동번역 스킵)
+      if (g.imagePrompt && g.imagePrompt.trim()) {
+        _aiPromptCnt++;
+        // 앱 스타일 + Claude 본문 + 사전설정(시대/배경) + 품질태그. 사전설정으로 시대 어긋남 방지.
+        const tail = presetPromptText ? `, ${presetPromptText}` : '';
+        const head = userStylePrompt ? `${userStylePrompt}, ` : '';
+        return `${head}${g.imagePrompt.trim()}${tail}, no text, no watermark`;
+      }
       if (!g.isBracket) return null;
       const body = paragraphs[i].trim();
       const isInfographicGroup = g.title && g.title.includes(KEYWORD);
@@ -13789,7 +13749,10 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
       const head = [stylePrompt, presetPromptText].filter(Boolean).join(', ');
       return head ? `${head}\n\n${body}` : body;
     });
-    const bracketCnt = customPrompts.filter(p => p).length;
+    if (_aiPromptCnt > 0) {
+      addLog(`🤖 AI 프롬프트 ${_aiPromptCnt}개 그룹 — 클로드 프롬프트 + 앱 스타일 사용 (번역 스킵)`, 'info');
+    }
+    const bracketCnt = customPrompts.filter(p => p).length - _aiPromptCnt;
     if (bracketCnt > 0) {
       addLog(`대괄호 그룹 ${bracketCnt}개 — 한국어 + 스타일 프롬프트 직접 사용 (번역 스킵)`, 'info');
     }
@@ -13913,11 +13876,17 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
     return;
   }
 
-  // UI 그룹 카드 상태 → 생성중
-  for (const g of targetGroups) {
-    g.imageStatus = 'generating';
-    _setGroupImageStatus(g.id, 'generating');
-  }
+  // UI 그룹 카드 상태 → 첫 그룹만 '생성중'(스피너), 나머지는 '대기'.
+  // Flow 는 순차 생성하므로 image-done 이벤트마다 스피너를 다음 클립으로 넘긴다.
+  targetGroups.forEach((g, i) => {
+    if (i === 0) {
+      g.imageStatus = 'generating';
+      _markGroupImageGenerating(g.id);
+    } else {
+      g.imageStatus = 'queued';
+      _setGroupImageStatus(g.id, 'queued');
+    }
+  });
 
   // flow-engine 의 run() 옵션. 영상 카드의 기존 옵션을 그대로 활용.
   document.getElementById('startBtn').disabled = true;
@@ -13932,7 +13901,7 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
     mediaType: 'image',
     style: document.getElementById('styleSelect').value,
     ratio: selectedRatio,
-    model: document.getElementById('modelSelect').value,
+    model: document.getElementById('modelSelect')?.value || 'Nano Banana 2',
     count: selectedCount,
     withSubtitle: false,  // .vrew 자막 트랙만 사용 (이미지에 합성 안 함)
     // finalDir 자체가 이미 '.../images' 인데 flow-engine 이 'imgDir = outputDir/images' 한 번 더
@@ -13944,7 +13913,7 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
     characterMap: characterMap,
     kenburnsMode: selectedKenburnsMode,
     kenburnsSpeed: selectedKenburnsSpeed,
-    maxChars: parseInt(document.getElementById('maxCharsSlider').value, 10) || 30,
+    maxChars: 30,  // 최대 글자수 UI 제거됨 — 기본 30자 (필요 시 longLen 으로 조절)
     presetPrompt: document.getElementById('presetPrompt').value.trim(),
     skipVrew: true,  // 이미지 생성만. .vrew 는 saveVrew() 가 정확한 vrewClips 단위로 생성
     antiDetect: {
@@ -14445,6 +14414,9 @@ function _setGroupImageStatus(groupId, status, extraText) {
     el.textContent = '⏭ rate-limit 스킵';
     el.style.color = 'var(--warning, #e8a84c)';
     el.title = 'Flow rate-limit 으로 3회 재시도 실패. 작업 종료 후 [선택 그룹 이미지] 로 재시도 가능';
+  } else if (status === 'queued') {
+    el.textContent = '⏳ 대기';
+    el.style.color = 'var(--text-muted)';
   } else {
     el.textContent = extraText || '🖼 미생성';
     el.style.color = 'var(--text-muted)';
@@ -14481,11 +14453,48 @@ function _fileUrlForImage(absPath) {
   }
 }
 
+// 이미지 생성 중 — 해당 카드에 즉시 파란 스피너 오버레이 + 배지 갱신 (전체 재렌더 없이 실시간 피드백)
+function _markGroupImageGenerating(groupId) {
+  // 중지 요청 후 도착한 늦은 이벤트가 스피너를 다시 칠하지 못하게 차단
+  if (window._imageGenStop || window._autoCancelRequested) return;
+  const owner = _findProjectByGroupId(groupId);
+  const g = owner && owner.groups.find(x => x.id === groupId);
+  if (g) g.imageStatus = 'generating';
+  const box = document.querySelector(`.group-image[data-group-id="${groupId}"]`);
+  if (box) {
+    const cur = (g && g.imagePath) ? `<img src="${_fileUrlForImage(g.imagePath)}" alt="" style="width:100%; height:100%; object-fit:cover; border-radius:6px; opacity:0.35;">` : '';
+    box.innerHTML = cur + `<div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(60,120,200,0.32); border-radius:6px; color:#fff; font-size:12px; font-weight:600; text-align:center; gap:8px;"><span class="pf-img-spin"></span>이미지 생성중</div>`;
+    box.style.position = 'relative';
+    box.classList.add('has-image');
+  }
+  const badge = document.querySelector(`.group-img-status[data-group-id="${groupId}"]`);
+  if (badge) { badge.textContent = '⏳ 생성중'; badge.style.color = 'var(--accent)'; }
+}
+
+// 이미지 생성 실패 — 빨간 오버레이 + 배지. 클릭 시 첨부/재시도.
+function _markGroupImageFailed(groupId) {
+  const owner = _findProjectByGroupId(groupId);
+  const g = owner && owner.groups.find(x => x.id === groupId);
+  if (g) g.imageStatus = 'fail';
+  const box = document.querySelector(`.group-image[data-group-id="${groupId}"]`);
+  if (box) {
+    box.innerHTML = `<div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(200,60,60,0.28); border-radius:6px; color:#fff; font-size:12px; font-weight:600; text-align:center; padding:6px; gap:2px;">❌ 생성 실패<span style="font-size:10px; font-weight:400;">클릭하여 첨부 / 다시 생성</span></div>`;
+    box.style.position = 'relative';
+    box.style.cursor = 'pointer';
+    box.onclick = (e) => { e.stopPropagation(); attachGroupMedia(groupId); };
+  }
+  const badge = document.querySelector(`.group-img-status[data-group-id="${groupId}"]`);
+  if (badge) { badge.textContent = '❌ 실패'; badge.style.color = 'var(--danger)'; }
+}
+
 function _setGroupImageThumbnail(groupId, imgPath) {
   // (PR5) 활성 탭이 아닌 다른 탭의 이미지 task 일 수도 있어 모든 프로젝트 탐색
   const owner = _findProjectByGroupId(groupId);
   const g = owner && owner.groups.find(x => x.id === groupId);
-  if (g) g.imagePath = imgPath;
+  if (g) { g.imagePath = imgPath; g.imageStatus = 'done'; }
+  // 상태 배지 ✅ 완료 로 갱신
+  const badge = document.querySelector(`.group-img-status[data-group-id="${groupId}"]`);
+  if (badge) { badge.textContent = '✅ 완료'; badge.style.color = 'var(--text-muted)'; }
   const box = document.querySelector(`.group-image[data-group-id="${groupId}"]`);
   if (!box) return;
   const url = _fileUrlForImage(imgPath);
@@ -14555,6 +14564,17 @@ ipcRenderer.on('image-done', (_, payload) => {
   const groupId = order[idx];
   const groupNum = nums[idx];
   if (!groupId) return;
+  // 스피너를 다음 클립으로 이동 (Flow 는 순차 생성 — 이 그룹이 끝나면 다음 그룹이 진행 중)
+  try {
+    const _nextId = order[idx + 1];
+    if (_nextId) {
+      const _no = _findProjectByGroupId(_nextId);
+      const _ng = _no && _no.groups.find(x => x.id === _nextId);
+      if (_ng && _ng.imageStatus !== 'done' && _ng.imageStatus !== 'fail') {
+        _markGroupImageGenerating(_nextId);
+      }
+    }
+  } catch (_) {}
   // (다중 탭 격리 fix v1.13.12) groupId 로 owner project 를 먼저 찾고, 그 outputDir 만 사용.
   // 옛 코드는 window._pendingProjectId (단일 전역) 를 우선 신뢰해서, 다른 탭이 그 사이
   // 자기 task 를 시작하면 _pendingProjectId 가 덮어씌워져 owner 식별이 뒤집힘 →

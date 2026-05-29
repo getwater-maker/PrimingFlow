@@ -385,7 +385,10 @@ class GrokEngine {
       //    자동제작 중(이미지/TTS 동시 진행으로 main thread 부하 ↑) vs 단독 호출 시
       //    실제 페이스가 흐트러져 사용자가 다른 속도로 느낌. 명시적 waitForTimeout 으로
       //    분리해서 부하와 무관한 일정 페이스 보장 (자동제작·선택그룹·범위 모두 동일).
-      const TYPING_INTERVAL_MS = 22;  // 약 분당 280자 — 자연스러운 사람 페이스
+      // 길이 적응형 타이핑 — AI 영상 프롬프트는 길어질 수 있어 긴 문자열일수록 빠르게.
+      // 짧음(≤60): 22ms(자연스러운 사람 페이스) / 중간(≤140): 10ms / 긺(>140): 4ms
+      const _len = motion.length;
+      const TYPING_INTERVAL_MS = _len > 140 ? 4 : (_len > 60 ? 10 : 22);
       const promptEl = await this.page.$(GROK_SELECTORS.promptInput);
       if (promptEl) {
         await promptEl.click();
@@ -395,7 +398,7 @@ class GrokEngine {
           await this.page.waitForTimeout(TYPING_INTERVAL_MS);
         }
         await this.page.waitForTimeout(500);
-        this.log(`[Grok] 모션 프롬프트 입력: "${motion.substring(0, 40)}..." (interval ${TYPING_INTERVAL_MS}ms)`);
+        this.log(`[Grok] 모션 프롬프트 입력: "${motion.substring(0, 60)}..." (${_len}자, interval ${TYPING_INTERVAL_MS}ms)`);
       } else {
         this.log('[Grok] ⚠️ 프롬프트 입력 영역 못 찾음 — 빈 프롬프트로 진행');
       }

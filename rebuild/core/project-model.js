@@ -125,6 +125,7 @@ class Group {
     this.imagePath = null;
     this.promptKo = null;
     this.promptEn = null;
+    this.imagePrompt = null;            // 외부 AI(클로드) 생성 영어 이미지 프롬프트 (있으면 자동번역 대신 사용)
 
     // Grok Imagine 비디오 변환 결과 (이미지 → 영상)
     // videoPath 가 있으면 .vrew 가 이미지 대신 비디오 사용 (Ken Burns 대신 진짜 움직임)
@@ -132,6 +133,7 @@ class Group {
     this.videoPath = null;
     this.videoSourceImage = null;       // 비디오의 원본 이미지 경로 (재시도/롤백용)
     this.videoMotionPrompt = null;      // 사용자가 입력한 모션 프롬프트
+    this.videoPrompt = null;            // 외부 AI(클로드) 생성 영상 모션 프롬프트 (있으면 최우선)
 
     // Ken Burns 카메라 효과 (8단계)
     this.kenburns = null;

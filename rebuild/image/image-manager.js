@@ -4,7 +4,8 @@
  * ImageManager — 이미지 생성 provider 추상화
  *
  * 현재 지원:
- *   - runpod-comfy : RunPod ComfyUI Pod 자동 시동 + SDXL 생성
+ *   - gemini : Nano Banana 2 (Gemini API 직접 호출, GPU 불필요)
+ *   (Flow 브라우저 자동화는 flow-engine 경로로 별도 처리)
  *
  * 사용:
  *   const { getInstance } = require('./image/image-manager');
@@ -34,19 +35,16 @@ class ImageManager {
         if (this._started) return;
         this._started = true;
 
-        // RunPod ComfyUI
+        // Gemini (Nano Banana 2) — GPU Pod 불필요, API 직접 호출
         try {
-            const { RunPodComfyProvider } = require('./providers/runpod-comfy-provider');
-            const p = new RunPodComfyProvider();
-            const ok = await p.init();
-            if (ok) {
-                this.providers.set('runpod-comfy', p);
-                this.logger('[Image] RunPod ComfyUI provider 초기화 완료');
-            } else {
-                this.logger('[Image] RunPod ComfyUI provider 초기화 실패 — RunPod 설정 확인');
-            }
+            const { GeminiImageProvider } = require('./providers/gemini-image-provider');
+            const g = new GeminiImageProvider();
+            await g.init();
+            // 키가 없어도 등록은 해둔다 (synth 호출 시 키 안내). ready 는 키 유무 반영.
+            this.providers.set('gemini', g);
+            this.logger(`[Image] Gemini provider 등록 (키 ${g.hasKey ? '있음' : '없음'})`);
         } catch (e) {
-            this.logger(`[Image] RunPod provider 로드 예외: ${e.message}`);
+            this.logger(`[Image] Gemini provider 로드 예외: ${e.message}`);
         }
     }
 
@@ -60,12 +58,12 @@ class ImageManager {
         this._started = false;
     }
 
-    isAvailable(id = 'runpod-comfy') {
+    isAvailable(id = 'gemini') {
         const p = this.providers.get(id);
         return !!(p && p.ready);
     }
 
-    getProvider(id = 'runpod-comfy') {
+    getProvider(id = 'gemini') {
         return this.providers.get(id) || null;
     }
 
@@ -77,13 +75,13 @@ class ImageManager {
 
     /**
      * 이미지 1장 생성.
-     * @param {object} opts - RunPodComfyProvider.synth 와 동일 인터페이스
-     *   - prompt, negativePrompt, workflowName, width, height, seed, steps, cfg, outputPath, onProgress
-     *   - provider: 'runpod-comfy' (기본)
+     * @param {object} opts - provider.synth 인터페이스
+     *   - prompt, outputPath, aspectRatio, onProgress
+     *   - provider: 'gemini' (기본 · Nano Banana 2)
      */
     async synth(opts = {}) {
         if (!this._started) await this.start();
-        const id = opts.provider || 'runpod-comfy';
+        const id = opts.provider || 'gemini';
         const p = this.providers.get(id);
         if (!p || !p.ready) {
             throw new Error(`이미지 provider '${id}' 비활성 — 시크릿/설정 확인`);

@@ -605,7 +605,7 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
         if (realMeta.duration > 0) dur = realMeta.duration;
         log(`[Vrew] mp4 메타: ${path.basename(g.videoPath)} ${videoWidth}x${videoHeight}, ${dur.toFixed(2)}초`);
       } else {
-        // mp4 헤더 파싱 실패 시 RunPod Wan2.2 기본값(720p 16:9) 사용
+        // mp4 헤더 파싱 실패 시 기본값(Grok 720p 16:9) 사용
         videoWidth = 1280; videoHeight = 720; dur = 5;
         log(`[Vrew] mp4 헤더 파싱 실패 — 기본값 사용: ${videoWidth}x${videoHeight}, ${dur}초`);
       }

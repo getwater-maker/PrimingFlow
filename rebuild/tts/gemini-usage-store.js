@@ -10,6 +10,8 @@
  *   tts_429  : Gemini TTS 한도 초과(429) 응답 수
  *   split_ok : ai-splitter Gemini 분할 성공 수
  *   split_429: ai-splitter Gemini 분할 429 수
+ *   img_ok   : Gemini Image 생성 성공 수 (v1.13.49+)
+ *   img_429  : Gemini Image 생성 429 수 (v1.13.49+)
  *
  * 사용:
  *   const Usage = require('./gemini-usage-store');
@@ -28,7 +30,7 @@ const os = require('os');
 const STORE_DIR = path.join(os.homedir(), '.flow-app');
 const STORE_PATH = path.join(STORE_DIR, 'gemini-usage.json');
 
-const VALID_KEYS = new Set(['tts_ok', 'tts_429', 'split_ok', 'split_429']);
+const VALID_KEYS = new Set(['tts_ok', 'tts_429', 'split_ok', 'split_429', 'img_ok', 'img_429']);
 
 function _todayString() {
   // 로컬 자정 기준 YYYY-MM-DD
@@ -40,7 +42,7 @@ function _todayString() {
 }
 
 function _emptyStats() {
-  return { date: _todayString(), tts_ok: 0, tts_429: 0, split_ok: 0, split_429: 0 };
+  return { date: _todayString(), tts_ok: 0, tts_429: 0, split_ok: 0, split_429: 0, img_ok: 0, img_429: 0 };
 }
 
 function _load() {

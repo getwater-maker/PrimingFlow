@@ -34,8 +34,7 @@ GPU 컴퓨터(192.168.219.157)는 **Windows 만 켜져있으면 됨**. PrimingFl
 - **`anti-detect.js`** — 휴먼딜레이/쿨다운/일일 한도/가우시안 분포
 - **`core/sentence-splitter.js`** — 마침표 기준 문장 분할, 따옴표/MD 헤더 자동 제거
 - **`core/group-builder.js`** — N문장 그룹화 + 짧은문장 흡수 + 긴문장 algo-split
-- **`core/long-sentence-splitter/algo-splitter.js`** — 쉼표/접속사/어미/관형형 기준 의미 분할
-- **`core/long-sentence-splitter/ai-splitter.js`** — Gemini API 분할 (algo 폴백 자동)
+- **`core/long-sentence-splitter/algo-splitter.js`** — 쉼표/접속사/어미/관형형 기준 의미 분할 (긴 문장 분할의 유일 경로. AI 분할은 2026-05-29 제거됨)
 - **`core/project-model.js`** — Sentence/Group/Project 클래스
 - **`core/channel-store.js`** — 채널 프리셋 (refAudioFolder/outputFolder/profileId/logoPath)
 - **`core/ref-audio-scanner.js`** — WAV+TXT 묶음 자동 매칭
@@ -47,9 +46,17 @@ GPU 컴퓨터(192.168.219.157)는 **Windows 만 켜져있으면 됨**. PrimingFl
 - **`tts/supertonic-backend/api.py`** — FastAPI 백엔드 (포트 9882, 로컬 CPU 99M ONNX, 자동 시동)
 - **`vrew/vrew-builder.js`** — sentence + vrewClips → .vrew (TTS≠자막 분리, sourceIn/sourceOut)
 
+## 메인 프로세스 (2026-05-28 난독화 복원 완료)
+- **진입점은 `rebuild/main.js` 가 아니라 `rebuild/bootstrap.js`** (package.json `"main": "bootstrap.js"`).
+  bootstrap.js(53줄) → `./startup-logger` + `./auto-updater` + `./main` 로드.
+- **`main.js`** — 과거 javascript-obfuscator 난독화였으나 **webcrack 으로 복원 완료 → 이제 읽기/편집 가능** (1,512줄 CommonJS).
+  - 원본 난독화본은 `rebuild/main.js.obfuscated.bak` 로 백업 보존.
+  - IPC 핸들러 ~27개(auth/settings/folder/vrew/chromium/profiles/**flow-login/start-generation** 등) 전부 가독.
+  - 창: `nodeIntegration:true, contextIsolation:false`, preload 없음 → 렌더러에서 `require()` 직접 사용.
+- **Flow 복원**: `start-generation` → `getAutomator()` → `new FlowAutomator(require('./flow-engine'))`.
+  flow-engine.js + anti-detect.js 를 `_archive/` 에서 root 로 복원함. ⚠ Google Flow **UI selector 유효성은 실사용 검증 필요**(실험적).
+
 ## 절대 건드리지 말 것
-- **`main.js`** — javascript-obfuscator 로 난독화된 단일 라인. 수정 불가.
-  AuthManager 같은 외부 의존은 더미로 우회.
 - **`D:\Work\TTS_Engine`** — 읽기 전용. api.py 만 복사해서 사용.
 - `_src/` 폴더 (있다면) — 아카이브
 
