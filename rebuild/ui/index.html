@@ -1851,14 +1851,10 @@
       <code>## [번호] …</code> 헤더가 있어야 그룹에 매칭됩니다. (성별·인물 일관성은 클로드 프롬프트가 담당)
     </div>
     <textarea id="importPromptsTextarea" placeholder="여기에 클로드 답변 전체를 붙여넣기…&#10;&#10;## [1] 도입부 01&#10;cinematic illustration of King Jeongjo, a middle-aged Korean king in royal robes, ..." style="flex:1; min-height:260px; margin:0 20px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); border-radius:8px; padding:12px; font-size:13px; line-height:1.6; resize:vertical; font-family:'Cascadia Code',monospace;"></textarea>
-    <div style="display:flex; gap:8px; justify-content:space-between; padding:16px 20px;">
-      <button class="btn-sm" onclick="document.getElementById('importPromptsFileInput').click()" title=".md/.txt 파일에서 불러오기">📂 파일에서 열기</button>
-      <div style="display:flex; gap:8px;">
-        <button class="btn-sm" onclick="closeImportPromptsModal()">취소</button>
-        <button class="btn btn-sm-action" onclick="applyImportedPrompts()" style="font-weight:700;">✓ 그룹에 적용</button>
-      </div>
+    <div style="display:flex; gap:8px; justify-content:flex-end; padding:16px 20px;">
+      <button class="btn-sm" onclick="closeImportPromptsModal()">취소</button>
+      <button class="btn btn-sm-action" onclick="applyImportedPrompts()" style="font-weight:700;">✓ 그룹에 적용</button>
     </div>
-    <input type="file" id="importPromptsFileInput" accept=".md,.txt,text/plain,text/markdown" style="display:none;" onchange="_onImportPromptsFile(this)">
   </div>
 </div>
 
@@ -5715,18 +5711,6 @@ function openImportPromptsModal() {
 }
 function closeImportPromptsModal() {
   const m = document.getElementById('importPromptsModal'); if (m) m.style.display = 'none';
-}
-function _onImportPromptsFile(input) {
-  const f = input && input.files && input.files[0];
-  if (!f) return;
-  try {
-    const fs = require('fs');
-    const txt = fs.readFileSync(f.path, 'utf-8');
-    const ta = document.getElementById('importPromptsTextarea');
-    if (ta) ta.value = txt;
-    addLog(`파일 로드: ${f.name}`, 'info');
-  } catch (e) { alert('파일 읽기 실패: ' + e.message); }
-  input.value = '';
 }
 // 클로드 답변 텍스트 → 그룹별 imagePrompt/videoPrompt 매핑. num 기준.
 // "이미지:" / "영상:" (Image:/Video:) 라벨 분리. 라벨 없으면 본문 전체=이미지(하위호환).

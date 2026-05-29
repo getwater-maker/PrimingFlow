@@ -1898,21 +1898,46 @@ class FlowAutomator {
       return { found: true, on };
     });
 
+    // 에이전트 세션 패널(채팅 UI)이 열려 있는지 — 열려 있으면 X/Escape 로 닫아 컴팩트 입력바로 복귀.
+    // 패널 텍스트: "어떤 작업을 하고 싶으신가요" / "제목 없는 세션" (컴팩트 바의 "무엇을 만들고" 와 구분)
+    const readPanelOpen = () => this.page.evaluate(() => {
+      const t = document.body.innerText || '';
+      return /어떤 작업을 하고 싶|제목 없는 세션|에이전트와|Untitled session/i.test(t);
+    });
+    const clickAgentChip = async () => {
+      for (const sel of ['button:has-text("에이전트")', 'button:has-text("Agent")',
+                          '[role="switch"]:has-text("에이전트")', '[role="switch"]:has-text("Agent")']) {
+        try {
+          const b = this.page.locator(sel).first();
+          if (await b.count() > 0) { await b.click({ timeout: 3000 }); return true; }
+        } catch {}
+      }
+      return false;
+    };
+
     try {
+      // 1) 에이전트 세션 패널 닫기 (열려 있으면) → 컴팩트 입력바로 복귀
+      if (await readPanelOpen()) {
+        this.log('[Flow] 에이전트 세션 패널 감지 — 닫기 시도');
+        let closed = false;
+        for (const sel of ['button[aria-label="닫기"]', 'button[aria-label*="Close" i]',
+                            'button[aria-label*="닫기" i]', 'header button:has-text("✕")', 'header button:has-text("×")']) {
+          try {
+            const b = this.page.locator(sel).first();
+            if (await b.count() > 0) { await b.click({ timeout: 2000 }); closed = true; break; }
+          } catch {}
+        }
+        if (!closed) { try { await this.page.keyboard.press('Escape'); } catch {} }
+        await this.page.waitForTimeout(700);
+      }
+
+      // 2) 에이전트 칩 상태 확인 후 OFF (클릭 + 검증 + 재시도)
       let st = await readState();
       if (!st.found) { this.debug('[Flow] 에이전트 버튼 없음 — 스킵'); return; }
       if (st.on === false) { this.debug('[Flow] 에이전트 모드 이미 OFF'); return; }
       // on === true (켜짐) 또는 on === null (판별불가) → 끄기 시도 + 검증 + 재시도(최대 3)
       for (let attempt = 1; attempt <= 3; attempt++) {
-        let clicked = false;
-        for (const sel of ['button:has-text("에이전트")', 'button:has-text("Agent")',
-                            '[role="switch"]:has-text("에이전트")', '[role="switch"]:has-text("Agent")']) {
-          try {
-            const btn = this.page.locator(sel).first();
-            if (await btn.count() > 0) { await btn.click({ timeout: 3000 }); clicked = true; break; }
-          } catch {}
-        }
-        if (!clicked) { this.log(`[Flow] ⚠ 에이전트 버튼 클릭 실패 (시도 ${attempt}) — 수동 확인 필요`); return; }
+        if (!(await clickAgentChip())) { this.log(`[Flow] ⚠ 에이전트 칩 클릭 실패 (시도 ${attempt}) — 수동 확인 필요`); return; }
         await this.page.waitForTimeout(500);
         st = await readState();
         if (st.on === false) { this.log('[Flow] ✅ 에이전트 모드 OFF 확인'); return; }
@@ -3538,6 +3563,23 @@ class FlowAutomator {
 
   // 정책 위반 시 재시도용 단순화 프롬프트 (level: 1=가벼움, 2=중간, 3=최대 단순화)
   _buildSimplifiedPrompt(originalPrompt, level = 1) {
+    // 커스텀/사전조립 프롬프트(클로드 왕복, Gemini 등 — "aspect ratio"/"scene:" 마커 없음)는
+    // 잘라내면 핵심 내용(인물·시대)이 사라진다. 전체를 유지하고 민감어만 레벨별로 스크럽.
+    const _hasLegacyMarkers = /\d+:\d+\s*aspect/i.test(originalPrompt) || /scene:/i.test(originalPrompt);
+    if (!_hasLegacyMarkers) {
+      let p = String(originalPrompt || '');
+      if (level >= 2) {
+        p = p
+          .replace(/\b(blood|wound|pain|disease|illness|sick|rot|dirty|filthy|stink|smell|odor|pus|boil|ulcer|infect)\w*/gi, '')
+          .replace(/\b(kill|murder|assassin|poison|torture|execut|behead|corpse|dead|die|death)\w*/gi, 'scene')
+          .replace(/\b(naked|nude|sex|erotic)\w*/gi, '')
+          .replace(/\s*,\s*,+/g, ', ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
+      return p;
+    }
+
     const styleMatch = originalPrompt.match(/^(.+?),\s*\d+:\d+\s*aspect/i);
     const style = styleMatch ? styleMatch[1].trim().substring(0, 80) : 'cinematic scene';
 
