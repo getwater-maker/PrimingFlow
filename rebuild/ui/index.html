@@ -459,6 +459,10 @@
   /* 🎙 TTS만 보기: 전체 숨기고 TTS 줄만 표시 */
   .log-area.tts-only .log-line { display:none; }
   .log-area.tts-only .log-line.log-tts { display:block; }
+  /* 미리듣기 Ken Burns — 그룹 음성 재생 중 이미지 슬로우 줌 (var(--kb-dur) 로 그룹 길이만큼) */
+  @keyframes kenburnsPreview { from { transform: scale(1.0); } to { transform: scale(1.14); } }
+  .group-image.kenburns-active { overflow: hidden; }
+  .group-image.kenburns-active img { animation: kenburnsPreview var(--kb-dur, 6s) ease-in-out forwards; transform-origin: 50% 45%; }
   .log-area .log-line.ok { color:var(--success); }
   .log-area .log-line.err { color:var(--danger); }
   .log-area .log-line.info { color:var(--accent); }
@@ -11918,6 +11922,8 @@ function _stopAllPreviews() {
   window._groupPreviewGroupId = null;
   // 작업 목록 전체 미리듣기 루프 중지
   window._taskPreviewActive = false;
+  // 그룹 미디어(비디오/Ken Burns) 미리듣기 정지
+  try { _stopAllGroupMediaPreview(); } catch (_) {}
   // 프리셋 모달의 audio element
   const formAudio = document.getElementById('presetForm_audio');
   if (formAudio) {
@@ -12216,6 +12222,57 @@ async function attachGroupMedia(groupId) {
 // 호환성 alias — 옛 호출처가 있을 수 있음
 const attachGroupImage = attachGroupMedia;
 
+// ── 미리듣기 중 그룹 미디어(비디오/이미지 Ken Burns) 동기 재생 ──────────────
+// 그룹 음성이 재생되는 동안 그 그룹 카드의 비디오(음소거·루프) 또는 이미지(슬로우 줌)를 함께 보여준다.
+function _groupImageEl(groupId) {
+  try { return document.querySelector(`.group-image[data-group-id="${(window.CSS && CSS.escape) ? CSS.escape(groupId) : groupId}"]`); }
+  catch (_) { return document.querySelector(`.group-image[data-group-id="${groupId}"]`); }
+}
+function _groupDurationSec(g, sentences) {
+  let total = 0;
+  for (const sid of (g.sentenceIds || [])) {
+    const s = sentences.find(x => x.id === sid);
+    if (s && typeof s.ttsDurationSec === 'number') total += s.ttsDurationSec;
+  }
+  return total;
+}
+function _startGroupMediaPreview(groupId, durSec) {
+  const el = _groupImageEl(groupId);
+  if (!el) return;
+  try { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (_) {}
+  const v = el.querySelector('video.group-video');
+  if (v) {
+    const ov = el.querySelector('.group-video-overlay');
+    if (ov) ov.style.opacity = '0';
+    try { v.muted = true; v.loop = true; v.currentTime = 0; v.play().catch(() => {}); } catch (_) {}
+    return;
+  }
+  const im = el.querySelector('img');
+  if (im) {
+    const dur = Math.max(2, durSec || 6);
+    im.style.setProperty('--kb-dur', dur + 's');
+    el.classList.remove('kenburns-active');
+    void el.offsetWidth;            // reflow — 애니메이션 재시작 보장
+    el.classList.add('kenburns-active');
+  }
+}
+function _stopGroupMediaPreview(groupId) {
+  const el = _groupImageEl(groupId);
+  if (!el) return;
+  const v = el.querySelector('video.group-video');
+  if (v) {
+    try { v.pause(); v.loop = false; v.currentTime = 0; } catch (_) {}
+    const ov = el.querySelector('.group-video-overlay');
+    if (ov) ov.style.opacity = '1';
+  }
+  el.classList.remove('kenburns-active');
+}
+function _stopAllGroupMediaPreview() {
+  document.querySelectorAll('.group-image.kenburns-active').forEach(el => el.classList.remove('kenburns-active'));
+  document.querySelectorAll('video.group-video').forEach(v => { try { if (!v.paused) v.pause(); v.loop = false; } catch (_) {} });
+  document.querySelectorAll('.group-video-overlay').forEach(ov => { ov.style.opacity = '1'; });
+}
+
 // 그룹 카드 [▶ 그룹 미리듣기] — sentence TTS mp3 들을 순차 재생, 다시 누르면 중지
 async function previewGroupAudio(groupId, btnEl) {
   const proj = window._currentProject;
@@ -12247,6 +12304,9 @@ async function previewGroupAudio(groupId, btnEl) {
   if (btnEl) btnEl.textContent = '⏸ 중지';
   addLog(`[Preview] 그룹 ${g.num} 음성 ${sents.length}개 순차 재생`, 'info');
 
+  // 첨부된 비디오/이미지를 음성과 함께 보여줌 (비디오=음소거 루프, 이미지=Ken Burns)
+  try { _startGroupMediaPreview(groupId, _groupDurationSec(g, proj.sentences)); } catch (_) {}
+
   for (const s of sents) {
     if (!window._groupPreviewActive) break;
     await new Promise((resolve) => {
@@ -12259,6 +12319,7 @@ async function previewGroupAudio(groupId, btnEl) {
     });
   }
 
+  try { _stopGroupMediaPreview(groupId); } catch (_) {}
   window._groupPreviewActive = false;
   window._groupPreviewGroupId = null;
   if (btnEl) btnEl.textContent = '▶ 그룹 미리듣기';
@@ -12303,8 +12364,18 @@ async function previewAllSentences(startGroupId) {
   if (btn) btn.textContent = '⏸ 전체 중지';
   addLog(`[Preview] 전체 미리듣기 시작 (${ready.length}개 문장)`, 'info');
 
+  let _curPrevGroupId = null;
   for (const s of ready) {
     if (!window._taskPreviewActive) break;
+    // 그룹이 바뀌면 이전 그룹 미디어 정지 + 새 그룹 미디어(비디오/Ken Burns) 시작
+    if (s.groupId !== _curPrevGroupId) {
+      if (_curPrevGroupId) { try { _stopGroupMediaPreview(_curPrevGroupId); } catch (_) {} }
+      _curPrevGroupId = s.groupId;
+      const g = proj.groups.find(x => x.id === _curPrevGroupId);
+      const spd = _getPreviewSpeed() || 1;
+      const durSec = g ? (_groupDurationSec(g, proj.sentences) / spd) : 0;
+      try { _startGroupMediaPreview(_curPrevGroupId, durSec); } catch (_) {}
+    }
     const url = _makeAudioUrl(s.ttsAudioPath);
     await new Promise(resolve => {
       const audio = new Audio(url);
@@ -12318,6 +12389,7 @@ async function previewAllSentences(startGroupId) {
     });
   }
 
+  if (_curPrevGroupId) { try { _stopGroupMediaPreview(_curPrevGroupId); } catch (_) {} }
   window._taskPreviewActive = false;
   window._sentencePlayingSid = null;
   document.querySelectorAll('.sentence-row.preview-active').forEach(r => r.classList.remove('preview-active'));
