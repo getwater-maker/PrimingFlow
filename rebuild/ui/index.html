@@ -3478,7 +3478,6 @@ function renderProjectTabs() {
   if (!wrap) return;
   const addBtn = wrap.querySelector('.project-tab-add');
   wrap.innerHTML = '';
-  if (addBtn) wrap.appendChild(addBtn);
   for (const p of window._projects) {
     const isActive = p.id === window._activeProjectId;
     const div = document.createElement('div');
@@ -3508,6 +3507,8 @@ function renderProjectTabs() {
     div.appendChild(closeBtn);
     wrap.appendChild(div);
   }
+  // + 새 탭 버튼은 탭들 뒤(맨 오른쪽)에 배치
+  if (addBtn) wrap.appendChild(addBtn);
 }
 
 // 자동저장 pending 이면 활성(=OLD) 프로젝트 기준으로 즉시 실행 — 탭 전환 전 호출
