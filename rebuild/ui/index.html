@@ -7731,8 +7731,10 @@ function renderPresets() {
               // (PR2.5) 활성 탭에도 저장
               { const _cur = window._currentProject; if (_cur) _cur.activePresetId = p.id; }
               try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch {}
-              _applyActivePresetToMainScreen(p, { applySplit: true });
+              try { _applyActivePresetToMainScreen(p, { applySplit: true }); } catch (_) {}
               renderPresets();
+              // 재연결 분기에서도 0.5초 후 대본 탭으로 이동 (usable 경로와 동일하게)
+              setTimeout(() => { try { document.querySelector('.aux-tab[data-tab="script"]')?.click(); } catch (_) {} }, 500);
               return;
             }
           }
@@ -7744,10 +7746,10 @@ function renderPresets() {
       // (PR2.5) 활성 탭에도 저장 — 탭 전환 시 복원 + .pflow 자동저장
       { const _cur = window._currentProject; if (_cur) _cur.activePresetId = p.id; }
       try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch {}
-      _applyActivePresetToMainScreen(p, { applySplit: true });
+      try { _applyActivePresetToMainScreen(p, { applySplit: true }); } catch (e) { console.warn('[preset apply]', e); }
       renderPresets();
       addLog(`기본 프리셋 선택: ${p.name}`, 'ok');
-      // 프리셋 선택 1초 후 대본 탭으로 자동 이동
+      // 프리셋 선택 0.5초 후 대본 탭으로 자동 이동
       setTimeout(() => { try { document.querySelector('.aux-tab[data-tab="script"]')?.click(); } catch (_) {} }, 500);
     };
 
@@ -8754,7 +8756,7 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // 활성 프리셋의 채널 정보를 메인 화면에 반영 (출력 폴더 / Google 계정 / 이미지 사전설정 키워드)
-function _applyActivePresetToMainScreen(p) {
+function _applyActivePresetToMainScreen(p, opts) {
   if (!p) return;
   // 출력 폴더
   if (p.outputFolder) {
