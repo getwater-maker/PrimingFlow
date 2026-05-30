@@ -1929,20 +1929,31 @@ class FlowAutomator {
       if (await readPanelOpen()) {
         this.log('[Flow] 에이전트 세션 패널 감지 — 닫기 시도');
         let closed = false;
-        for (const sel of ['button[aria-label="닫기"]', 'button[aria-label*="Close" i]',
-                            'button[aria-label*="닫기" i]', 'header button:has-text("✕")', 'header button:has-text("×")']) {
+        // 실측(2026-05-30): 닫기 X 버튼은 aria-label 없음 + Material 아이콘 리거처 "close" + 라벨 "닫기".
+        // 따라서 has-text("닫기")/("close") 가 실제로 맞는 셀렉터. 옛 aria-label/✕ 셀렉터는 폴백으로만 유지.
+        // ⚠ "닫기"·"close" 셀렉터는 동일한 X 버튼을 가리킴(실측). 두 번 클릭하면 패널이 다시 열리므로
+        //    매칭되는 첫 셀렉터로 1회만 클릭하고 break (재클릭 금지). 닫힘 검증은 클릭 후 900ms 뒤 1회.
+        for (const sel of ['button:has-text("닫기")', 'button:has-text("close")',
+                            'button[aria-label="닫기"]', 'button[aria-label*="Close" i]', 'button[aria-label*="닫기" i]']) {
           try {
             const b = this.page.locator(sel).first();
-            if (await b.count() > 0) { await b.click({ timeout: 2000 }); closed = true; break; }
+            if (await b.count() > 0) {
+              await b.click({ timeout: 2000 });
+              await this.page.waitForTimeout(900);   // 닫힘 애니메이션 대기 (500ms 는 너무 짧음 — 실측)
+              closed = !(await readPanelOpen());
+              break;
+            }
           } catch {}
         }
         if (!closed) { try { await this.page.keyboard.press('Escape'); } catch {} }
         await this.page.waitForTimeout(700);
+        if (await readPanelOpen()) this.log('[Flow] ⚠ 에이전트 패널이 아직 열려 있음 — Flow 창에서 X 로 직접 닫아주세요');
+        else this.log('[Flow] ✅ 에이전트 세션 패널 닫힘');
       }
 
       // 2) 에이전트 칩 상태 확인 후 OFF (클릭 + 검증 + 재시도)
       let st = await readState();
-      if (!st.found) { this.debug('[Flow] 에이전트 버튼 없음 — 스킵'); return; }
+      if (!st.found) { this.log('[Flow] 에이전트 버튼 못 찾음 — 스킵 (Flow UI 변경 시 셀렉터 점검 필요)'); return; }
       if (st.on === false) { this.debug('[Flow] 에이전트 모드 이미 OFF'); return; }
       // on === true (켜짐) 또는 on === null (판별불가) → 끄기 시도 + 검증 + 재시도(최대 3)
       for (let attempt = 1; attempt <= 3; attempt++) {
