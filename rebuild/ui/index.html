@@ -1470,6 +1470,7 @@
                   <option value="1.75">1.75×</option>
                   <option value="2">2×</option>
                 </select>
+                <button class="btn-sm" id="batchConvertBtn" onclick="onBatchConvertClick()" title="작업 목록의 모든 문장을 음성(TTS)으로만 변환 — 이미지·영상·Vrew 없이. 변환 중 다시 누르면 중지" style="font-size:12px; padding:4px 10px; background:var(--accent-soft);">🎙 TTS 일괄 변환</button>
                 <button class="btn-sm" id="previewAllBtn" onclick="previewAllSentences()" title="작업 목록의 모든 TTS 음성을 순차 재생 (다시 누르면 중지)" style="font-size:12px; padding:4px 10px;">🔊 전체 미리듣기</button>
                 <button class="btn-sm" id="editScriptBtn" onclick="openScriptInputModal()" title="대본 전체 수정 — 모달에서 textarea 로 일괄 편집" style="font-size:12px; padding:4px 10px; display:none;">✏️ 대본 수정</button>
                 <button class="btn-sm" id="undoGroupBtn" onclick="undoGroupChange()" disabled title="마지막 그룹 구조 변경(합치기/나누기/재배치) 되돌리기 — Ctrl+Z" style="font-size:12px; padding:4px 10px; opacity:0.5;">↶ 되돌리기</button>
@@ -2542,11 +2543,11 @@
         📂 대본 폴더
         <span style="color:var(--text-muted); font-size:11px;">('대본 첨부' 클릭 시 이 폴더가 바로 열립니다 — 없으면 다운로드 폴더)</span>
       </label>
-      <div style="display:flex; gap:4px;">
-        <button class="btn-sm" onclick="selectPresetScriptFolder()" style="flex:1;">📂 폴더 선택</button>
-        <button class="btn-sm" onclick="clearPresetScriptFolder()" style="color:var(--danger); padding:6px 8px;">초기화</button>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <button class="btn-sm" onclick="selectPresetScriptFolder()" style="flex:none;">📂 폴더 선택</button>
+        <button class="btn-sm" onclick="clearPresetScriptFolder()" style="color:var(--danger); padding:6px 8px; flex:none;">초기화</button>
+        <div id="presetForm_scriptFolder" data-path="" title="" style="flex:1; min-width:0; font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">선택 안 됨</div>
       </div>
-      <div id="presetForm_scriptFolder" data-path="" style="font-size:11px; color:var(--text-muted); margin-top:4px;">선택 안 됨</div>
     </div>
 
     <!-- 3+4행 통합: 속도 + 문장 무음 + Clone 강도 + 언어 (한 줄, OmniVoice 시 4컬럼) -->
