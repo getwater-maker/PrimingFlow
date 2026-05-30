@@ -216,9 +216,31 @@
     border-top: 1px solid var(--border);
     padding: 10px 4px 4px;
     margin-top: 8px;
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
     gap: 6px;
+  }
+  .col-wiz > .wiz-footer > button {
+    font-size: 12px;
+    padding: 9px 4px;
+    white-space: nowrap;
+    min-width: 0;
+    font-weight: 700;
+  }
+
+  /* 작업 목록 헤더 — 모든 컨트롤/텍스트 폰트를 '이어서 진행' 버튼(13px)과 통일 */
+  .task-list-header input,
+  .task-list-header select,
+  .task-list-header button,
+  .task-list-header span,
+  .task-list-header .task-list-progress {
+    font-size: 13px !important;
+  }
+  /* 첨부 파일명 — 볼드 + 한 단계 큰 폰트 (14px) */
+  #taskListFileName {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    color: var(--text-strong);
   }
 
   /* 보조 패널 탭 (③ 컬럼) */
@@ -257,7 +279,7 @@
   .aux-panel > .wiz-step    { flex: 1; overflow-y: auto; padding-right: 4px; }
   /* 탭바 6개 — 좁으면 줄바꿈 허용 */
   .aux-tabs { flex-wrap: wrap; }
-  .col-wiz .aux-tab { flex: 1 1 auto; min-width: 56px; padding: 8px 4px; font-size: 12px; }
+  .col-wiz .aux-tab { flex: 1 1 auto; min-width: 56px; padding: 8px 4px; font-size: 13px; }
 
   /* 작업 목록 검색 — 매치된 sentence row 강조 */
   .sentence-row.search-match  { background: rgba(212, 165, 116, 0.10); }
@@ -869,6 +891,7 @@
     flex-direction: column;
     gap: 12px;
     min-height: 0;  /* flex item 안에서 overflow 가 작동하려면 0 으로 둬야 함 */
+    padding-right: 14px;  /* 스크롤바와 그룹 카드 사이 여백 — 좌측(카드 패딩)과 균형 */
   }
 
   /* 그룹 카드 */
@@ -1271,6 +1294,7 @@
   <button class="btn-sm" onclick="openVideoToText()" style="font-size:12px; margin-left:auto;">🎬 영상→텍스트</button>
   <button class="btn-sm" onclick="openRecToRef()" style="font-size:12px;">🎤 녹음→참조음성</button>
   <button class="btn-sm" onclick="openRefAudioVault()" style="font-size:12px;" title="~/.flow-app/ref-audio/ — 녹음→참조음성에서 저장된 WAV+TXT 묶음 폴더를 탐색기로 엽니다">📂 참조음성 폴더</button>
+  <button class="btn-sm" onclick="openCurrentOutputFolder()" id="folderBtn" style="font-size:12px;" title="현재 활성 프리셋의 출력 폴더를 윈도우 탐색기로 열기">📂 저장폴더 보기</button>
   <button class="btn-sm" onclick="openGallery()" style="font-size:12px;">🖼 갤러리</button>
   <button class="btn-sm" onclick="document.getElementById('helpModal').style.display='flex'" style="font-size:12px;">📖 사용법</button>
 </div>
@@ -1410,40 +1434,69 @@
     <div class="col col-task">
       <div class="task-list-card">
         <div class="task-list-header">
-          <!-- Row 1: 라벨 + 파일명 전체 (잘림 없이) -->
+          <!-- 제목 -->
           <div style="display:flex; align-items:center; gap:8px;">
             <div class="task-list-title" style="flex-shrink:0;">📋 작업 목록</div>
-            <span id="taskListFileName"
-                  style="display:none; font-size:12px; color:var(--text-soft); flex:1 1 auto; min-width:0; white-space:normal; word-break:break-all; overflow:visible; line-height:1.4;"
-                  title=""></span>
           </div>
-          <!-- Row 2: 검색/시간/진행 (좌) + 액션 버튼들 (우) — 같은 줄에 통합 -->
-          <div style="display:flex; gap:6px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin-top:6px;">
-            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-              <input type="text" id="taskSearchInput" placeholder="🔍 단어/문장 검색"
-                     oninput="searchTaskList(this.value)"
-                     onkeydown="if(event.key==='Enter'){event.preventDefault();searchTaskListNext();}"
-                     title="입력 후 Enter — 다음 결과로 이동"
-                     style="width:140px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:4px 8px; font-size:12px; border-radius:4px;">
-              <span id="taskSearchCount" style="font-size:11px; color:var(--text-muted); min-width:28px; text-align:center;"></span>
-              <span id="taskListTotalDuration" title="변환된 전체 음성 재생 시간" style="font-size:12px; color:var(--text-muted); padding:4px 8px; background:var(--bg-soft); border-radius:6px; min-width:48px; text-align:center; white-space:nowrap;">⏱ 00:00</span>
-              <div class="task-list-progress" id="taskListProgress" style="white-space:nowrap;">0 / 0</div>
-              <span id="taskStatusBadge" title="작업 진행 상태 (이미지 · TTS · 영상)" style="font-size:11px; color:var(--accent); font-weight:600; white-space:nowrap;"></span>
+          <!-- 좌(컨트롤 2줄, 좌측정렬) | 우(제작 진행률 패널) 가로 2분할 -->
+          <div style="display:flex; gap:12px; align-items:stretch; margin-top:6px;">
+            <!-- ◀ 좌: 컨트롤 -->
+            <div style="flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:6px;">
+              <!-- 1행: 모든 컨트롤 (검색·시간·발음사전·배속·미리듣기·대본수정·되돌리기) -->
+              <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                <input type="text" id="taskSearchInput" placeholder="🔍 단어/문장 검색"
+                       oninput="searchTaskList(this.value)"
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();searchTaskListNext();}"
+                       title="입력 후 Enter — 다음 결과로 이동"
+                       style="width:150px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:4px 8px; font-size:12px; border-radius:4px;">
+                <span id="taskSearchCount" style="font-size:11px; color:var(--text-muted); min-width:24px; text-align:center;"></span>
+                <span id="taskListTotalDuration" title="변환된 전체 음성 재생 시간" style="font-size:12px; color:var(--text-muted); padding:4px 8px; background:var(--bg-soft); border-radius:6px; white-space:nowrap;">⏱ 00:00</span>
+                <div class="task-list-progress" id="taskListProgress" title="TTS 변환 진행" style="white-space:nowrap; display:none;">0 / 0</div>
+                <button class="btn-sm" id="scriptDictBtn" onclick="openScriptDictModal()" title="대본 발음 사전 — 숫자/고유명사 발음 지정" style="font-size:12px; padding:4px 10px; display:none;">🔢 발음 사전 <span id="scriptDictBadge" style="display:none; background:var(--accent); color:white; border-radius:8px; padding:0 5px; font-size:11px; margin-left:2px;"></span></button>
+                <select id="previewSpeedSelect" onchange="_onPreviewSpeedChange()" title="미리듣기 배속 (단일·전체 공통)" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:4px 6px; font-size:12px; border-radius:4px;">
+                  <option value="0.75">0.75×</option>
+                  <option value="1" selected>1×</option>
+                  <option value="1.25">1.25×</option>
+                  <option value="1.5">1.5×</option>
+                  <option value="1.75">1.75×</option>
+                  <option value="2">2×</option>
+                </select>
+                <button class="btn-sm" id="previewAllBtn" onclick="previewAllSentences()" title="작업 목록의 모든 TTS 음성을 순차 재생 (다시 누르면 중지)" style="font-size:12px; padding:4px 10px;">🔊 전체 미리듣기</button>
+                <button class="btn-sm" id="editScriptBtn" onclick="openScriptInputModal()" title="대본 전체 수정 — 모달에서 textarea 로 일괄 편집" style="font-size:12px; padding:4px 10px; display:none;">✏️ 대본 수정</button>
+                <button class="btn-sm" id="undoGroupBtn" onclick="undoGroupChange()" disabled title="마지막 그룹 구조 변경(합치기/나누기/재배치) 되돌리기 — Ctrl+Z" style="font-size:12px; padding:4px 10px; opacity:0.5;">↶ 되돌리기</button>
+              </div>
+              <!-- 2행: 첨부한 대본 파일명 + RTF 배지 -->
+              <div style="display:flex; align-items:center; gap:8px; min-height:18px;">
+                <span id="taskListFileName" title=""
+                      style="display:none; font-size:12px; color:var(--text-soft); min-width:0; flex:0 1 auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></span>
+                <span id="rtfBadge" class="section-title-badge" title="Real-Time Factor — 작업시간 / 오디오길이. 낮을수록 빠름" style="flex:none; font-size:11px;">RTF —</span>
+              </div>
             </div>
-            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-              <select id="previewSpeedSelect" onchange="_onPreviewSpeedChange()" title="미리듣기 배속 (단일·전체 공통)" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); padding:4px 6px; font-size:12px; border-radius:4px;">
-                <option value="0.75">0.75×</option>
-                <option value="1" selected>1×</option>
-                <option value="1.25">1.25×</option>
-                <option value="1.5">1.5×</option>
-                <option value="1.75">1.75×</option>
-                <option value="2">2×</option>
-              </select>
-              <button class="btn-sm" id="previewAllBtn" onclick="previewAllSentences()" title="작업 목록의 모든 TTS 음성을 순차 재생 (다시 누르면 중지)" style="font-size:12px; padding:4px 10px;">🔊 전체 미리듣기</button>
-              <button class="btn-sm" id="editScriptBtn" onclick="openScriptInputModal()" title="대본 전체 수정 — 모달에서 textarea 로 일괄 편집" style="font-size:12px; padding:4px 10px; display:none;">✏️ 대본 수정</button>
-              <button class="btn-sm" id="scriptDictBtn" onclick="openScriptDictModal()" title="대본 발음 사전 — 숫자/고유명사 발음 지정" style="font-size:12px; padding:4px 10px; display:none;">🔢 발음 사전 <span id="scriptDictBadge" style="display:none; background:var(--accent); color:white; border-radius:8px; padding:0 5px; font-size:11px; margin-left:2px;"></span></button>
-              <button class="btn-sm" id="clearScriptBtn" onclick="clearScript()" title="모두 지우고 처음 상태로" style="font-size:12px; padding:4px 10px;">초기화</button>
-              <button class="btn-sm" id="undoGroupBtn" onclick="undoGroupChange()" disabled title="마지막 그룹 구조 변경(합치기/나누기/재배치) 되돌리기 — Ctrl+Z" style="font-size:12px; padding:4px 10px; opacity:0.5;">↶ 되돌리기</button>
+            <!-- ▶ 우: 제작 진행률 패널 — 2행 3열 (제작진행률|TTS|영상 / 이어서진행|이미지|vrew) -->
+            <div style="flex:0 0 400px; border-left:1px solid var(--border-soft); padding-left:14px; display:grid; grid-template-columns:auto 1fr 1fr; gap:10px 14px; align-items:center;">
+              <!-- (1,1) 제목 -->
+              <div style="font-size:13px; font-weight:700; color:var(--text-strong); white-space:nowrap;">🎬 제작 진행률</div>
+              <!-- (1,2) TTS -->
+              <div style="font-size:12px;">
+                <div style="display:flex; justify-content:space-between; gap:4px;"><span style="color:var(--text-muted);">🎙 TTS</span><span id="progTtsTxt" style="color:var(--text-soft);">0/0</span></div>
+                <div style="height:6px; background:var(--bg-input); border-radius:3px; overflow:hidden; margin-top:3px;"><div id="progTtsBar" style="height:100%; width:0%; background:var(--accent); transition:width 0.3s;"></div></div>
+              </div>
+              <!-- (1,3) 영상 -->
+              <div style="font-size:12px;">
+                <div style="display:flex; justify-content:space-between; gap:4px;"><span style="color:var(--text-muted);">🎬 영상</span><span id="progVidTxt" style="color:var(--text-soft);">0/0</span></div>
+                <div style="height:6px; background:var(--bg-input); border-radius:3px; overflow:hidden; margin-top:3px;"><div id="progVidBar" style="height:100%; width:0%; background:var(--success, #4caf50); transition:width 0.3s;"></div></div>
+              </div>
+              <!-- (2,1) 이어서 진행 -->
+              <button class="btn-sm" id="resumeBtn" onclick="resumeGeneration()" title="일시정지/중단 후 — 아직 완성 안 된 항목만 이어서 제작 (완료분은 건너뜀)" style="font-size:13px; padding:6px 14px; background:var(--accent-soft); color:var(--accent-hover); border:1px solid var(--accent); font-weight:600; white-space:nowrap;">▶ 이어서 진행</button>
+              <!-- (2,2) 이미지 -->
+              <div style="font-size:12px;">
+                <div style="display:flex; justify-content:space-between; gap:4px;"><span style="color:var(--text-muted);">🖼 이미지</span><span id="progImgTxt" style="color:var(--text-soft);">0/0</span></div>
+                <div style="height:6px; background:var(--bg-input); border-radius:3px; overflow:hidden; margin-top:3px;"><div id="progImgBar" style="height:100%; width:0%; background:var(--info); transition:width 0.3s;"></div></div>
+              </div>
+              <!-- (2,3) Vrew -->
+              <div style="font-size:12px;">
+                <div style="display:flex; justify-content:space-between; gap:4px; white-space:nowrap;"><span style="color:var(--text-muted);">💾 Vrew</span><span id="progVrewTxt" style="color:var(--text-soft);">대기</span></div>
+              </div>
             </div>
           </div>
         </div>
@@ -1506,15 +1559,10 @@
           <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin-bottom:6px;">
             <button class="btn-sm" onclick="openFile()" style="padding:6px 10px;">📂 대본 첨부</button>
             <button class="btn-sm" onclick="openScriptInputModal()" style="padding:6px 10px;">✏️ 직접 입력</button>
-            <button class="btn-sm" onclick="openCurrentOutputFolder()" id="folderBtn" title="현재 활성 프리셋의 출력 폴더를 윈도우 탐색기로 열기" style="padding:6px 10px;">📂 저장폴더 보기</button>
-            <button class="btn-sm" onclick="saveProjectFile()" id="projectSaveBtn" title="현재 작업 상태(분할/sentence/그룹/자산 경로)를 출력 폴더 안 project.pflow 로 저장" style="padding:6px 10px;">💾 저장</button>
+            <button class="btn-sm" id="clearScriptBtn" onclick="clearScript()" title="모두 지우고 처음 상태로" style="padding:6px 10px;">🗑 초기화</button>
+            <!-- 수동 저장 제거 — 자동저장(변경마다 자동)과 중복. 그 자리에 자동저장 상태 표시 -->
+            <div id="autoSaveIndicator" title="자동 저장 상태 — 변경 시 자동 저장됩니다 (수동 저장 불필요)" style="display:flex; align-items:center; justify-content:center; padding:6px 6px; font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; background:var(--bg-soft); border-radius:6px;">— 미저장</div>
             <button class="btn-sm" onclick="loadProjectFile()" title="저장한 project.pflow 를 열어 작업 이어가기" style="padding:6px 10px;">📂 불러오기</button>
-            <button class="btn-sm" onclick="openScriptCopyModal()" title="현재 분할된 도입부/그룹별 대본을 클립명과 함께 한 번에 복사" style="padding:6px 10px;">📋 대본 복사</button>
-          </div>
-
-          <!-- 자동저장 상태 라벨 -->
-          <div style="text-align:center; margin-bottom:8px;">
-            <span id="autoSaveIndicator" title="자동 저장 상태" style="font-size:11px; color:var(--text-muted); white-space:nowrap;">— 미저장</span>
           </div>
 
           <!-- 분할 옵션 — 변경 시 자동 재분할 -->
@@ -1536,28 +1584,24 @@
                      style="width:50px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
               <span style="font-size:12px; color:var(--text-muted); white-space:nowrap;">문장씩</span>
             </div>
-            <div style="font-size:10px; color:var(--text-muted); margin-bottom:8px;">📘도입부/📕본론 문장수는 <b>## 도입부 문법</b>으로 입력한 경우에 적용됩니다.</div>
 
             <!-- 기존 stages 시스템 (UI 비표시 — autoSplit 분기 호환용) -->
             <div id="groupStagesList" style="display:none;"></div>
 
             <!-- 짧은 문장 + 긴 문장 한 줄 -->
             <div class="setting" style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
-              <label style="font-size:13px; color:var(--text-soft);">짧은</label>
+              <label style="font-size:13px; color:var(--text-soft); white-space:nowrap;">✂️ 짧은</label>
               <input type="number" id="shortLen" min="1" max="50" value="10" oninput="autoSplitDebounced()"
                      style="width:50px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
               <span style="font-size:12px; color:var(--text-muted); white-space:nowrap;">자 미만</span>
               <span style="color:var(--border); margin:0 4px;">|</span>
-              <label style="font-size:13px; color:var(--text-soft);">긴</label>
+              <label style="font-size:13px; color:var(--text-soft); white-space:nowrap;">📏 긴</label>
               <input type="number" id="longLen" min="10" max="100" value="20" oninput="autoSplitDebounced()"
                      style="width:50px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
               <span style="font-size:12px; color:var(--text-muted); white-space:nowrap;">자 초과</span>
             </div>
 
-            <!-- 대괄호 [ ] 구간 사용 시 안내 — 도입부/본론 문장수 무시 ([ ] 1개 = 1그룹) -->
-            <span id="groupStagesNote" style="display:none; font-size:11px; color:var(--warning, #d4a574); font-weight:600;">⚠ [ ] 구간 마커 사용 중 — 도입부/본론 문장수 무시 ([ ] 1개 = 1그룹)</span>
-
-            <div id="splitGroupCountPreview" style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--border-soft); font-size:13px; font-weight:700; color:var(--text-strong);"></div>
+            <div id="splitGroupCountPreview" style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--border-soft); font-size:13px; font-weight:700; color:var(--text-strong); text-align:center;"></div>
           </div>
 
           <!-- 🎬 도입부 비디오 준비 — 도입부 TTS + 9초 재배치 (동영상 탭에서 이동) -->
@@ -1570,12 +1614,27 @@
             <div id="prepareIntroProgress" style="font-size:11px; color:var(--text-muted); margin-top:6px; text-align:center;">—</div>
           </div>
 
-          <!-- 🤖 AI 이미지 프롬프트 (클로드 왕복) — 대본 맥락 반영해 인물/성별 일관성 강화 -->
+          <!-- 🤖 AI 이미지 프롬프트 — 대본 맥락 반영해 인물/성별 일관성 강화 -->
           <div style="border-top:1px solid var(--border-soft); padding-top:10px; margin-top:10px;">
             <div style="font-size:12px; font-weight:700; color:var(--text-strong); margin-bottom:6px;">🤖 AI 이미지 프롬프트 (선택)</div>
+
+            <!-- (1) API 자동 작성 — 등록된 LLM API 로 한 번에 작성 -->
+            <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
+              <select id="promptLlmModel" title="프롬프트 작성에 사용할 LLM (고급 → API 관리에서 키 등록)"
+                      style="flex:0 0 110px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 8px; border-radius:6px; font-size:12px;">
+                <option value="gemini">Gemini</option>
+                <option value="claude">Claude</option>
+                <option value="openai">OpenAI</option>
+              </select>
+              <button class="btn-sm" id="apiPromptBtn" onclick="generatePromptsViaApi()" title="등록된 API 로 그룹별 영어 이미지/영상 프롬프트를 자동 작성 (수동 왕복 불필요)"
+                      style="flex:1; background:var(--accent); color:#fff;">🤖 API로 자동 작성</button>
+            </div>
+            <div style="font-size:10px; color:var(--text-muted); margin-bottom:6px;">API 미등록 시 아래 수동 방식 사용 · 사용량 과금 주의</div>
+
+            <!-- (2) 수동 왕복 — 내보내기 → 웹 LLM → 가져오기 -->
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
-              <button class="btn-sm" onclick="exportGroupPromptsForClaude()" title="그룹별 대본을 ai-prompts.md 로 내보내고 클립보드에도 복사 — 클로드에 붙여넣기">📤 내보내기(.md)</button>
-              <button class="btn-sm" onclick="openImportPromptsModal()" title="클로드가 만든 영어 프롬프트를 붙여넣거나 파일로 가져와 그룹에 저장">📥 가져오기</button>
+              <button class="btn-sm" onclick="exportGroupPromptsForClaude()" title="그룹별 대본 요청서를 클립보드에 복사 — 웹 LLM(claude.ai 등)에 붙여넣기">📤 내보내기</button>
+              <button class="btn-sm" onclick="openImportPromptsModal()" title="웹 LLM 이 만든 영어 프롬프트를 붙여넣거나 파일로 가져와 그룹에 저장">📥 가져오기</button>
             </div>
           </div>
         </div>
@@ -1684,7 +1743,7 @@
       <div class="aux-panel" id="auxLog" hidden>
     <div class="log-panel">
       <div class="log-panel-header" style="display:flex; justify-content:space-between; align-items:center;">
-        <span>📋 로그 <span id="rtfBadge" class="section-title-badge" title="Real-Time Factor — 작업시간 / 오디오길이. 낮을수록 빠름" style="margin-left:6px;">RTF —</span></span>
+        <span>📋 로그</span>
         <div style="display:flex; gap:4px;">
           <button class="btn-sm" onclick="copyLogs()" style="font-size:11px; padding:2px 8px;" title="로그 전체 복사">📋 복사</button>
           <button class="btn-sm" onclick="clearLogs()" style="font-size:11px; padding:2px 8px;" title="로그 비우기">지우기</button>
@@ -1705,7 +1764,57 @@
 
       <div class="aux-panel" id="auxAdv" hidden>
     <div class="advanced">
-      <div class="advanced-heading">고급 설정 (캐릭터 · 카메라 · 계정 보호 · 글자수)</div>
+      <div class="advanced-heading">고급 설정 (API · 캐릭터 · 카메라 · 계정 보호)</div>
+
+    <!-- 🔑 API 관리 — LLM/이미지 API 키 등록 (프리셋 Gemini 키와 양방향 동기화) -->
+    <div class="section">
+      <div class="section-title">🔑 API 관리</div>
+      <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px; line-height:1.5;">
+        등록한 키는 <code style="background:var(--bg-soft); padding:1px 4px; border-radius:3px;">~/.flow-app/tts-secrets.json</code> 에 저장됩니다.<br>
+        · <b>Gemini</b> = TTS + 이미지(나노바나나 2) + 프롬프트 자동작성 (이미지 생성은 <b>Gemini 전용</b>)<br>
+        · <b>Claude / OpenAI</b> = AI 이미지·영상 <b>프롬프트 자동작성</b> 용 (이미지 생성 불가 → 이미지 모델은 Flow 또는 Gemini)<br>
+        · ⚠ 3종 모두 사용량 과금 — 무료 quota 정책은 각 사 기준을 따릅니다.
+      </div>
+
+      <!-- Gemini -->
+      <div style="border:1px solid var(--border-soft); border-radius:8px; padding:10px; margin-bottom:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <span style="font-size:13px; font-weight:700; color:var(--text-strong);">Google Gemini <a href="https://aistudio.google.com/apikey" onclick="require('electron').shell.openExternal(this.href); return false;" style="color:var(--accent); font-size:11px;">(키 발급)</a></span>
+          <span id="apiKey_gemini_advStatus" style="font-size:11px; color:var(--text-muted);">—</span>
+        </div>
+        <input type="password" id="apiKey_gemini_adv" placeholder="AIzaSy..." style="width:100%; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 9px; border-radius:6px; font-size:13px; margin-bottom:6px;">
+        <div style="display:flex; gap:6px;">
+          <button class="btn-sm" onclick="saveAdvApiKey('gemini')" style="flex:1; background:var(--accent); color:#fff; font-size:12px;">💾 저장</button>
+          <button class="btn-sm" onclick="deleteAdvApiKey('gemini')" style="color:var(--danger); font-size:12px;">삭제</button>
+        </div>
+      </div>
+
+      <!-- Claude (Anthropic) -->
+      <div style="border:1px solid var(--border-soft); border-radius:8px; padding:10px; margin-bottom:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <span style="font-size:13px; font-weight:700; color:var(--text-strong);">Anthropic Claude <a href="https://console.anthropic.com/settings/keys" onclick="require('electron').shell.openExternal(this.href); return false;" style="color:var(--accent); font-size:11px;">(키 발급)</a></span>
+          <span id="apiKey_claude_advStatus" style="font-size:11px; color:var(--text-muted);">—</span>
+        </div>
+        <input type="password" id="apiKey_claude_adv" placeholder="sk-ant-..." style="width:100%; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 9px; border-radius:6px; font-size:13px; margin-bottom:6px;">
+        <div style="display:flex; gap:6px;">
+          <button class="btn-sm" onclick="saveAdvApiKey('claude')" style="flex:1; background:var(--accent); color:#fff; font-size:12px;">💾 저장</button>
+          <button class="btn-sm" onclick="deleteAdvApiKey('claude')" style="color:var(--danger); font-size:12px;">삭제</button>
+        </div>
+      </div>
+
+      <!-- OpenAI (GPT) -->
+      <div style="border:1px solid var(--border-soft); border-radius:8px; padding:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <span style="font-size:13px; font-weight:700; color:var(--text-strong);">OpenAI GPT <a href="https://platform.openai.com/api-keys" onclick="require('electron').shell.openExternal(this.href); return false;" style="color:var(--accent); font-size:11px;">(키 발급)</a></span>
+          <span id="apiKey_openai_advStatus" style="font-size:11px; color:var(--text-muted);">—</span>
+        </div>
+        <input type="password" id="apiKey_openai_adv" placeholder="sk-..." style="width:100%; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 9px; border-radius:6px; font-size:13px; margin-bottom:6px;">
+        <div style="display:flex; gap:6px;">
+          <button class="btn-sm" onclick="saveAdvApiKey('openai')" style="flex:1; background:var(--accent); color:#fff; font-size:12px;">💾 저장</button>
+          <button class="btn-sm" onclick="deleteAdvApiKey('openai')" style="color:var(--danger); font-size:12px;">삭제</button>
+        </div>
+      </div>
+    </div>
 
     <!-- 캐릭터 참조 이미지 -->
     <div class="section">
@@ -1779,12 +1888,12 @@
       </div>
 
       <!-- 고정 푸터 — 전체 자동제작 / 실행 제어 (모든 단계에서 표시) -->
+      <!-- 한 줄 4버튼 (자동제작 / 모든 탭 / 중지 / 일시정지) — 상시 노출 -->
       <div class="wiz-footer">
-        <button class="btn btn-sm-action" id="startBtn" onclick="generateAll()" title="현재 활성 탭의 대본만 자동 제작 (이미지 + TTS + 도입부 영상 + .vrew)" style="font-weight:700;">▶ 자동제작</button>
-        <button class="btn btn-sm-action" id="startAllProjectsBtn" onclick="generateAllProjects()" title="열려있는 모든 탭을 순차적으로 자동제작 (탭1 완료 → 탭2 자동 시작 → ...)" style="background:var(--accent-soft); color:var(--accent-hover); border:1px solid var(--accent); font-weight:700;">▶▶ 모든 탭 순차 자동제작</button>
-        <!-- ⏹ 전체 중단 — 상시 노출. 이미지·Flow·Grok영상·TTS·자동제작·Vrew 모두 즉시 중단 -->
-        <button class="btn" id="stopBtn" onclick="stopGeneration()" title="진행 중인 모든 작업(이미지·영상·TTS·자동제작·Vrew)을 즉시 중단합니다" style="width:100%; padding:9px 12px; background:var(--danger); color:#fff; font-weight:700; white-space:nowrap;">⏹ 중지 (전체 중단)</button>
-        <button class="btn" id="pauseBtn" onclick="pauseGeneration()" style="width:100%; padding:6px 12px; background:var(--warning); color:#fff; display:none; white-space:nowrap;">일시정지</button>
+        <button class="btn btn-sm-action" id="startBtn" onclick="generateAll()" title="현재 활성 탭의 대본만 자동 제작 (이미지 + TTS + 도입부 영상 + .vrew)">▶ 자동제작</button>
+        <button class="btn btn-sm-action" id="startAllProjectsBtn" onclick="generateAllProjects()" title="열려있는 모든 탭을 순차적으로 자동제작 (탭1 완료 → 탭2 자동 시작 → ...)" style="background:var(--accent-soft); color:var(--accent-hover); border:1px solid var(--accent);">▶▶ 모든 탭</button>
+        <button class="btn" id="stopBtn" onclick="stopGeneration()" title="진행 중인 모든 작업(이미지·영상·TTS·자동제작·Vrew)을 즉시 전체 중단합니다" style="background:var(--danger); color:#fff;">⏹ 중지</button>
+        <button class="btn" id="pauseBtn" onclick="pauseGeneration()" title="진행 중인 작업 일시정지 / 재개" style="background:var(--warning); color:#fff;">⏸ 일시정지</button>
       </div>
     </div>
 
@@ -2023,7 +2132,7 @@
         <div id="introProgressBar" style="height:100%; width:0%; background:var(--accent); transition:width 0.2s ease;"></div>
       </div>
       <div id="introProgressCount" style="font-size:12px; color:var(--text-muted); text-align:right; margin-top:4px;">—</div>
-      <div id="introProgressText" style="font-size:13px; color:var(--text-strong); margin-top:8px; min-height:20px; line-height:1.5; word-break:break-all; white-space:pre-line;">준비 중…</div>
+      <div id="introProgressText" style="font-size:13px; color:var(--text-strong); margin-top:8px; height:40px; line-height:1.5; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; word-break:break-all;" title="">준비 중…</div>
     </div>
 
     <!-- 카운트 -->
@@ -3991,7 +4100,6 @@ async function startGeneration() {
   const result = await ipcRenderer.invoke('start-generation', config);
   document.getElementById('startBtn').disabled = false;
   const pbDone = document.getElementById('pauseBtn');
-  pbDone.style.display = 'none';
   pbDone.textContent = '일시정지';
   pbDone.style.background = 'var(--warning)';
   isPaused = false;
@@ -5378,9 +5486,9 @@ async function stopGeneration() {
   try { await ipcRenderer.invoke('stop-generation', getSelectedProfile()); } catch (_) {}
   // 진행 중 시각 상태 정리 (이미지 생성중 오버레이 제거)
   _clearInProgressVisuals();
-  // 버튼 정리
+  // 버튼 정리 (일시정지는 상시 노출 — 숨기지 않고 라벨/색만 초기화)
   const pb = document.getElementById('pauseBtn');
-  if (pb) { pb.style.display = 'none'; pb.textContent = '일시정지'; pb.style.background = 'var(--warning)'; }
+  if (pb) { pb.textContent = '일시정지'; pb.style.background = 'var(--warning)'; }
   isPaused = false;
   const sb = document.getElementById('startBtn'); if (sb) sb.disabled = false;
   const gsb = document.getElementById('grokStopBtn'); if (gsb) gsb.style.display = 'none';
@@ -5484,6 +5592,8 @@ function clearScript() {
   if (fnEl) { fnEl.style.display = 'none'; fnEl.textContent = ''; }
   const progressEl = document.getElementById('taskListProgress');
   if (progressEl) progressEl.textContent = '0 / 0';
+  // 제작 진행률 패널도 초기화 (TTS/이미지/영상/Vrew → 0/0·대기)
+  try { _resetProgPanel(); } catch (_) {}
   // (PR2) 탭 라벨 갱신
   if (typeof renderProjectTabs === 'function') renderProjectTabs();
   addLog('대본 및 작업 목록 초기화', 'info');
@@ -5639,12 +5749,25 @@ function _buildScriptCopyText(project, startIdx, endIdx) {
 // ─── 클로드 왕복 이미지 프롬프트 (내보내기 / 가져오기) ─────────────────
 // 대본을 .md 요청서로 내보내 → 클로드가 그룹별 영어 프롬프트 작성 → 다시 가져와 g.imagePrompt 에 저장.
 // 생성 시 (Flow/Nano) "앱 스타일 + Claude 본문 + 품질태그" 로 사용. 비용 0 (수동 왕복).
-function exportGroupPromptsForClaude() {
+
+// 내보내기/가져오기 전제 조건 — 대본 분할 + 도입부 TTS+9초 재배치 완료.
+// 도입부 재배치로 그룹이 확정되어야 프롬프트가 올바른 그룹에 매핑되므로 선행 필수.
+function _requireIntroPrepared() {
   const proj = window._currentProject;
   if (!proj || !Array.isArray(proj.groups) || proj.groups.length === 0) {
-    alert('먼저 대본을 분할하세요 (대본 탭 → 직접 입력/첨부 → 도입부 TTS+9초 재배치).');
-    return;
+    alert('먼저 대본을 첨부/입력해 분할하세요.');
+    return false;
   }
+  if (!proj._introPrepared) {
+    alert('먼저 "🎙 도입부 TTS + 9초 재배치" 를 실행해주세요.\n\n도입부 음성 길이에 맞춰 그룹이 확정된 뒤에야\nAI 프롬프트 내보내기/가져오기를 진행할 수 있습니다.');
+    return false;
+  }
+  return true;
+}
+
+// 프롬프트 요청서(.md 문자열) 생성 — 내보내기(클립보드)와 API 자동작성이 공유.
+function _buildPromptRequestText() {
+  const proj = window._currentProject;
   const sentMap = new Map((proj.sentences || []).map(x => [x.id, x]));
   let styleName = '';
   try { styleName = (_getActiveStylePrompt() || {}).name || ''; } catch (_) {}
@@ -5683,18 +5806,138 @@ function exportGroupPromptsForClaude() {
     if (g.isIntro) L.push('영상: (여기에 영어 영상 모션 프롬프트)');
     L.push('');
   }
-  const md = L.join('\n');
+  return L.join('\n');
+}
 
-  // 파일 생성·폴더 열기·팝업 없이 — 클립보드 복사만 (간단). 클로드에 바로 붙여넣기.
+function exportGroupPromptsForClaude() {
+  if (!_requireIntroPrepared()) return;
+  const md = _buildPromptRequestText();
+  // 파일 생성·폴더 열기·팝업 없이 — 클립보드 복사만 (간단). 웹 LLM 에 바로 붙여넣기.
   let ok = false;
   try { require('electron').clipboard.writeText(md); ok = true; }
   catch (_) { try { navigator.clipboard.writeText(md); ok = true; } catch (_) {} }
-  addLog(ok ? '📤 AI 프롬프트 요청서 클립보드 복사 완료 — claude.ai 에 붙여넣으세요' : '⚠ 클립보드 복사 실패', ok ? 'ok' : 'err');
+  addLog(ok ? '📤 AI 프롬프트 요청서 클립보드 복사 완료 — 웹 LLM(claude.ai 등)에 붙여넣으세요' : '⚠ 클립보드 복사 실패', ok ? 'ok' : 'err');
+}
+
+// ─── LLM 텍스트 API 직접 호출 (CORS 회피 위해 node https 사용) ─────────────
+// 모델명은 시점에 따라 달라질 수 있어 상수로 분리 — 'model not found' 오류 시 여기만 수정.
+const LLM_TEXT_MODELS = {
+  gemini: 'gemini-2.5-flash',
+  claude: 'claude-sonnet-4-5',
+  openai: 'gpt-4o',
+};
+
+// node https 로 JSON POST. resolve({ status, json, raw }). 렌더러(nodeIntegration:true)에서 동작.
+function _httpsPostJson(urlStr, headers, bodyObj) {
+  return new Promise((resolve, reject) => {
+    let https, urlMod;
+    try { https = require('https'); urlMod = require('url'); }
+    catch (e) { reject(new Error('https 모듈 로드 실패: ' + e.message)); return; }
+    let u;
+    try { u = new urlMod.URL(urlStr); } catch (e) { reject(new Error('잘못된 URL: ' + urlStr)); return; }
+    const payload = Buffer.from(JSON.stringify(bodyObj), 'utf-8');
+    const opts = {
+      method: 'POST',
+      hostname: u.hostname,
+      path: u.pathname + u.search,
+      headers: Object.assign({
+        'Content-Type': 'application/json',
+        'Content-Length': payload.length,
+      }, headers || {}),
+      timeout: 120000,
+    };
+    const req = https.request(opts, (res) => {
+      let data = '';
+      res.setEncoding('utf-8');
+      res.on('data', c => { data += c; });
+      res.on('end', () => {
+        let json = null;
+        try { json = JSON.parse(data); } catch (_) {}
+        resolve({ status: res.statusCode, json, raw: data });
+      });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(new Error('요청 시간 초과(120초)')); });
+    req.write(payload);
+    req.end();
+  });
+}
+
+// provider(gemini/claude/openai) + key + 프롬프트 → 응답 텍스트. 실패 시 throw(상세 메시지).
+async function _callLlmTextApi(provider, key, promptText) {
+  const model = LLM_TEXT_MODELS[provider];
+  if (provider === 'gemini') {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+    const body = { contents: [{ parts: [{ text: promptText }] }] };
+    const r = await _httpsPostJson(url, {}, body);
+    if (r.status !== 200) throw new Error(`Gemini API ${r.status}: ${(r.json && (r.json.error?.message)) || r.raw?.slice(0, 300)}`);
+    const text = r.json?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
+    if (!text) throw new Error('Gemini 응답에 텍스트가 없습니다 (안전필터 차단 가능)');
+    return text;
+  }
+  if (provider === 'claude') {
+    const url = 'https://api.anthropic.com/v1/messages';
+    const headers = { 'x-api-key': key, 'anthropic-version': '2023-06-01' };
+    const body = { model, max_tokens: 8192, messages: [{ role: 'user', content: promptText }] };
+    const r = await _httpsPostJson(url, headers, body);
+    if (r.status !== 200) throw new Error(`Claude API ${r.status}: ${(r.json && (r.json.error?.message)) || r.raw?.slice(0, 300)}`);
+    const text = (r.json?.content || []).map(b => b.text || '').join('') || '';
+    if (!text) throw new Error('Claude 응답에 텍스트가 없습니다');
+    return text;
+  }
+  if (provider === 'openai') {
+    const url = 'https://api.openai.com/v1/chat/completions';
+    const headers = { 'Authorization': `Bearer ${key}` };
+    const body = { model, messages: [{ role: 'user', content: promptText }] };
+    const r = await _httpsPostJson(url, headers, body);
+    if (r.status !== 200) throw new Error(`OpenAI API ${r.status}: ${(r.json && (r.json.error?.message)) || r.raw?.slice(0, 300)}`);
+    const text = r.json?.choices?.[0]?.message?.content || '';
+    if (!text) throw new Error('OpenAI 응답에 텍스트가 없습니다');
+    return text;
+  }
+  throw new Error('알 수 없는 provider: ' + provider);
+}
+
+// 🤖 API로 자동 작성 — 등록된 LLM 으로 프롬프트 작성 → 파싱 → g.imagePrompt/videoPrompt 저장.
+async function generatePromptsViaApi() {
+  if (!_requireIntroPrepared()) return;
+  const sel = document.getElementById('promptLlmModel');
+  const provider = sel ? sel.value : 'gemini';
+  const SecretStore = require('../tts/secret-store');
+  const secret = SecretStore.get(provider) || {};
+  const key = (secret.key || '').trim();
+  if (!key) {
+    alert(`${provider.toUpperCase()} API 키가 없습니다.\n\n고급 탭 → 🔑 API 관리 에서 키를 먼저 등록하세요.`);
+    return;
+  }
+  const btn = document.getElementById('apiPromptBtn');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.innerHTML = '⏳ 작성 중…'; }
+  addLog(`🤖 [${provider}] API 프롬프트 자동 작성 시작 (${LLM_TEXT_MODELS[provider]})`, 'info');
+  try {
+    const reqText = _buildPromptRequestText();
+    const answer = await _callLlmTextApi(provider, key, reqText);
+    const r = _applyClaudePrompts(answer);
+    if (r.groups > 0) {
+      addLog(`📥 [${provider}] 적용 — ${r.groups}개 그룹 (🖼 이미지 ${r.img} · 🎬 영상 ${r.vid})`, 'ok');
+      try { _autoSaveProject(); } catch (_) {}
+      try { renderTaskList(window._currentProject); } catch (_) {}
+      setTimeout(() => { try { document.querySelector('.aux-tab[data-tab="image"]')?.click(); } catch (_) {} }, 300);
+    } else {
+      addLog(`⚠ [${provider}] 응답에서 인식된 프롬프트가 없습니다. 로그의 원문 확인 필요`, 'err');
+      console.warn('[LLM 응답 원문]', answer);
+      alert('API 응답을 받았지만 프롬프트를 인식하지 못했습니다.\n콘솔(F12)에서 원문을 확인하세요. 모델을 바꿔 다시 시도해보세요.');
+    }
+  } catch (e) {
+    addLog(`❌ [${provider}] API 호출 실패: ${e.message}`, 'err');
+    alert(`API 호출 실패:\n${e.message}\n\n키가 올바른지, 모델명/잔여 한도를 확인하세요.`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = orig; }
+  }
 }
 
 function openImportPromptsModal() {
-  const proj = window._currentProject;
-  if (!proj || !Array.isArray(proj.groups) || proj.groups.length === 0) { alert('먼저 대본을 분할하세요.'); return; }
+  if (!_requireIntroPrepared()) return;
   const ta = document.getElementById('importPromptsTextarea');
   if (ta) ta.value = '';
   const m = document.getElementById('importPromptsModal'); if (m) m.style.display = 'flex';
@@ -6765,6 +7008,8 @@ function _splitScriptImpl() {
     },
     sentences,
     groups,
+    // 재분할되면 9초 재배치가 무효화되므로 도입부 준비 플래그 리셋 → 내보내기/가져오기 다시 차단
+    _introPrepared: false,
   };
 
   // 4단계: 작업 목록 UI 렌더
@@ -6776,23 +7021,8 @@ function _splitScriptImpl() {
   // 자동 저장 — 분할 결과 보존
   if (typeof _autoSaveProject === 'function') _autoSaveProject();
 
-  // 분할 옵션 안내문 끝에 그룹 수 미리보기 갱신 (입력 변경 시마다 자동 갱신됨)
-  const previewEl = document.getElementById('splitGroupCountPreview');
-  if (previewEl) {
-    const introCnt   = groups.filter(g => g.isIntro).length;
-    const bracketCnt = groups.filter(g => g.isBracket).length;
-    const mainCnt    = groups.length - introCnt - bracketCnt;
-    const sentTxt = `${sentences.length}문장`;
-    const parts = [];
-    if (introCnt > 0)   parts.push(`<span style="color:var(--info);">📘 도입부 ${introCnt}</span>`);
-    if (mainCnt > 0)    parts.push(`📕 본론 ${mainCnt}`);
-    if (bracketCnt > 0) parts.push(`<span style="color:var(--accent);">[ ] 구간 ${bracketCnt}</span>`);
-    const breakdown = parts.length > 1 ? `${parts.join(' + ')} = ` : '';
-    // 그룹 1개 = 이미지 1장 → 사용자가 생성할 이미지 장수를 바로 알 수 있게 표시
-    previewEl.innerHTML =
-      `→ ${sentTxt} → ${breakdown}` +
-      `<span style="color:var(--accent);">총 ${groups.length}그룹 · 🖼 ${groups.length}장 이미지</span>`;
-  }
+  // 분할 옵션 안내문 끝에 그룹 수 미리보기 갱신 (renderTaskList 안에서도 호출되어 합치기/나누기/재배치 후 동기화)
+  _refreshSplitCountPreview(window._currentProject);
 
   // 그룹 범위 입력 자동 채움 — 기본은 도입부 그룹 전체 (도입부 없으면 1~10)
   const fromEl = document.getElementById('videoRangeFrom');
@@ -6854,6 +7084,10 @@ function renderTaskList(project) {
 
   // 그룹 시작/끝 자동 채움 — 매 렌더마다 빈 입력만 채워서 모든 호출 경로 보장.
   try { _refreshGroupRangeInputs(project); } catch (_) {}
+  // 제작 진행률 패널 — 현재 프로젝트 상태(TTS/이미지/영상 완료수)를 항상 반영 (자동제작 중이 아니어도)
+  try { _refreshProgPanel(project); } catch (_) {}
+  // 분할 미리보기(→ N문장 → 도입부 X + 본론 Y = 총 Z그룹) — 합치기/나누기/재배치 후에도 항상 동기화
+  try { _refreshSplitCountPreview(project); } catch (_) {}
 
   // 빈 상태 → 그룹 카드 모드
   if (empty) empty.style.display = 'none';
@@ -7144,10 +7378,12 @@ function renderTaskList(project) {
     actions.innerHTML =
       `<button class="btn-sm group-regen-btn" data-group-id="${g.id}" title="${regenTitle}">${regenLabel}</button>` +
       `<button class="btn-sm group-preview-btn" data-group-id="${g.id}" title="이 그룹의 TTS 음성 순차 재생 (다시 클릭 시 중지)">▶ 그룹 미리듣기</button>` +
+      `<button class="btn-sm group-previewfrom-btn" data-group-id="${g.id}" title="이 그룹부터 끝까지 전체 미리듣기 (수정 후 여기서부터 이어 듣기)">▶ 여기부터</button>` +
       `<button class="btn-sm group-tts-btn" data-group-id="${g.id}" title="이 그룹의 모든 문장 TTS 재변환">🎙 그룹 TTS 변환</button>` +
       `<button class="btn-sm group-video-btn" data-group-id="${g.id}" title="이 그룹의 이미지를 Grok 으로 비디오 변환 (이미지 자리에 비디오가 들어감)">${videoBtnLabel}</button>`;
     const regenBtn = actions.querySelector('.group-regen-btn');
     const previewBtn = actions.querySelector('.group-preview-btn');
+    const previewFromBtn = actions.querySelector('.group-previewfrom-btn');
     const ttsBtn2 = actions.querySelector('.group-tts-btn');
     const videoBtn = actions.querySelector('.group-video-btn');
     const groupId = g.id;
@@ -7171,6 +7407,7 @@ function renderTaskList(project) {
       }
     };
     previewBtn.onclick = (e) => { e.stopPropagation(); previewGroupAudio(groupId, previewBtn); };
+    if (previewFromBtn) previewFromBtn.onclick = (e) => { e.stopPropagation(); previewAllSentences(groupId); };
     ttsBtn2.onclick = (e) => { e.stopPropagation(); convertGroupSentences(groupId); };
     videoBtn.onclick = (e) => { e.stopPropagation(); convertGroupVideo(groupId); };
     card.appendChild(actions);
@@ -7617,6 +7854,7 @@ async function saveApiKey(provider) {
     const key = document.getElementById('apiKey_gemini_key').value.trim();
     if (!key) { alert('Gemini API 키를 입력하세요'); return; }
     SecretStore.set('gemini', { key });
+    _syncGeminiKeyEverywhere(key);  // 고급/프리셋 입력칸도 동기화
   }
 
   // provider 즉시 재초기화 (gemini 등 TTS provider)
@@ -7652,6 +7890,82 @@ function deleteApiKey(provider) {
     getInstance().refreshProvider(provider);
     if (typeof renderPresets === 'function') renderPresets();
   } catch {}
+  if (provider === 'gemini') _syncGeminiKeyEverywhere('');
+  addLog(`[${provider}] API 키 삭제 완료`, 'info');
+}
+
+// ─── 고급 섹션 API 관리 (Gemini / Claude / OpenAI) ───────────────────────
+// 저장소는 secret-store 단일. Gemini 키는 프리셋 편집/전역 모달과 양방향 동기화.
+
+// Gemini 키 입력칸을 모든 위치(고급/프리셋/전역모달)에서 동시 갱신 + 상태표시.
+function _syncGeminiKeyEverywhere(key) {
+  const v = key == null ? '' : key;
+  const ids = ['apiKey_gemini_adv', 'presetForm_geminiKey', 'apiKey_gemini_key'];
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (el) el.value = v;
+  }
+  _setAdvKeyStatus('gemini', !!v);
+  // 전역 모달 상태표시도 갱신
+  const gs = document.getElementById('apiKey_gemini_status');
+  if (gs) { gs.textContent = v ? '✅ 저장됨' : '⚠ 미설정'; gs.style.color = v ? 'var(--success)' : 'var(--text-muted)'; }
+}
+
+function _setAdvKeyStatus(provider, has) {
+  const el = document.getElementById(`apiKey_${provider}_advStatus`);
+  if (!el) return;
+  el.textContent = has ? '✅ 등록됨' : '— 미등록';
+  el.style.color = has ? 'var(--success)' : 'var(--text-muted)';
+}
+
+// 고급 탭 열릴 때 3종 키를 저장소에서 로드 (마스킹된 password input 에 채움).
+function _loadAdvApiKeys() {
+  let SecretStore;
+  try { SecretStore = require('../tts/secret-store'); } catch (_) { return; }
+  for (const p of ['gemini', 'claude', 'openai']) {
+    const s = SecretStore.get(p) || {};
+    const inp = document.getElementById(`apiKey_${p}_adv`);
+    if (inp) inp.value = s.key || '';
+    _setAdvKeyStatus(p, !!s.key);
+  }
+}
+
+async function saveAdvApiKey(provider) {
+  const inp = document.getElementById(`apiKey_${provider}_adv`);
+  const key = inp ? inp.value.trim() : '';
+  if (!key) { alert(`${provider.toUpperCase()} API 키를 입력하세요`); return; }
+  let SecretStore;
+  try { SecretStore = require('../tts/secret-store'); } catch (e) { alert('저장 실패: ' + e.message); return; }
+  SecretStore.set(provider, { key });
+  _setAdvKeyStatus(provider, true);
+  // Gemini 는 TTS provider 재초기화 + 다른 입력칸 동기화
+  if (provider === 'gemini') {
+    _syncGeminiKeyEverywhere(key);
+    try {
+      const { getInstance } = require('../tts/tts-manager');
+      await getInstance().refreshProvider('gemini');
+      if (typeof renderPresets === 'function') renderPresets();
+    } catch (_) {}
+  }
+  addLog(`[${provider}] API 키 저장 완료`, 'ok');
+}
+
+function deleteAdvApiKey(provider) {
+  if (!confirm(`${provider.toUpperCase()} API 키를 삭제할까요?`)) return;
+  let SecretStore;
+  try { SecretStore = require('../tts/secret-store'); } catch (_) { return; }
+  SecretStore.remove(provider);
+  const inp = document.getElementById(`apiKey_${provider}_adv`);
+  if (inp) inp.value = '';
+  _setAdvKeyStatus(provider, false);
+  if (provider === 'gemini') {
+    _syncGeminiKeyEverywhere('');
+    try {
+      const { getInstance } = require('../tts/tts-manager');
+      getInstance().refreshProvider('gemini');
+      if (typeof renderPresets === 'function') renderPresets();
+    } catch (_) {}
+  }
   addLog(`[${provider}] API 키 삭제 완료`, 'info');
 }
 
@@ -9929,7 +10243,7 @@ async function savePreset() {
   const SecretStore = require('../tts/secret-store');
   if (preset.engine === 'gemini') {
     const key = document.getElementById('presetForm_geminiKey').value.trim();
-    if (key) SecretStore.set('gemini', { key });
+    if (key) { SecretStore.set('gemini', { key }); _syncGeminiKeyEverywhere(key); }  // 고급/전역 모달도 동기화
   }
 
   // 프리셋 저장
@@ -11724,7 +12038,8 @@ async function previewGroupAudio(groupId, btnEl) {
 }
 
 // 작업 목록 전체 미리듣기 — 모든 sentence 의 TTS mp3 를 순차 재생, 다시 누르면 중지
-async function previewAllSentences() {
+// startGroupId 가 주어지면 그 그룹의 첫 문장부터 끝까지 재생 ("▶ 여기부터" — 수정 후 이어 듣기)
+async function previewAllSentences(startGroupId) {
   const proj = window._currentProject;
   const btn = document.getElementById('previewAllBtn');
   if (!proj || !proj.sentences || proj.sentences.length === 0) {
@@ -11742,7 +12057,16 @@ async function previewAllSentences() {
   _stopAllPreviews();
 
   const fs = require('fs');
-  const ready = proj.sentences.filter(s => s && s.ttsAudioPath && fs.existsSync(s.ttsAudioPath));
+  let sentences = proj.sentences;
+  // ▶ 여기부터 — 시작 그룹의 첫 문장 인덱스부터 슬라이스
+  if (startGroupId) {
+    const g = proj.groups.find(x => x.id === startGroupId);
+    const firstSid = g && Array.isArray(g.sentenceIds) ? g.sentenceIds[0] : null;
+    const idx = firstSid ? proj.sentences.findIndex(s => s.id === firstSid) : -1;
+    if (idx > 0) sentences = proj.sentences.slice(idx);
+    if (g) addLog(`[Preview] ${g.isIntro ? '도입부' : '그룹'} ${g.num}번부터 이어서 재생`, 'info');
+  }
+  const ready = sentences.filter(s => s && s.ttsAudioPath && fs.existsSync(s.ttsAudioPath));
   if (ready.length === 0) {
     addLog('TTS 변환된 문장이 없습니다 — 먼저 🎙 TTS 일괄 변환', 'err');
     return;
@@ -12524,6 +12848,8 @@ async function prepareIntroVideos() {
   // Phase C — 저장 + UI 갱신
   _setIntroStep(3);
   _updateIntroProgress({ ok: success, fail, text: '저장 및 화면 갱신 중…' });
+  // 도입부 재배치 완료 표시 — AI 프롬프트 내보내기/가져오기 차단 해제 (autoSplit 재분할 시 리셋됨)
+  proj._introPrepared = true;
   try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch (_) {}
   try { if (typeof renderTaskList === 'function') renderTaskList(proj); } catch (_) {}
 
@@ -13344,6 +13670,71 @@ async function generateAllProjects() {
   );
 }
 
+// 작업목록 헤더 '제작 진행률' 패널 한 줄(바+텍스트) 갱신
+function _setProgRow(barId, txtId, done, total) {
+  try {
+    const bar = document.getElementById(barId);
+    const txt = document.getElementById(txtId);
+    const pct = total > 0 ? Math.round(done / total * 100) : 0;
+    if (bar) bar.style.width = pct + '%';
+    if (txt) txt.textContent = `${done}/${total}`;
+  } catch (_) {}
+}
+// 진행률 패널 초기화 (새 제작 시작 시)
+function _resetProgPanel() {
+  _setProgRow('progTtsBar', 'progTtsTxt', 0, 0);
+  _setProgRow('progImgBar', 'progImgTxt', 0, 0);
+  _setProgRow('progVidBar', 'progVidTxt', 0, 0);
+  try { const v = document.getElementById('progVrewTxt'); if (v) v.textContent = '대기'; } catch (_) {}
+}
+// 분할 미리보기(→ N문장 → 📘도입부 X + 📕본론 Y = 총 Z그룹) 갱신.
+// autoSplit 뿐 아니라 renderTaskList(합치기/나누기/도입부 재배치 후)에서도 호출되어 항상 동기화.
+function _refreshSplitCountPreview(proj) {
+  proj = proj || window._currentProject;
+  const previewEl = document.getElementById('splitGroupCountPreview');
+  if (!previewEl) return;
+  if (!proj || !Array.isArray(proj.groups) || !Array.isArray(proj.sentences) || proj.groups.length === 0) {
+    previewEl.innerHTML = '';
+    return;
+  }
+  const groups = proj.groups, sentences = proj.sentences;
+  const introCnt   = groups.filter(g => g.isIntro).length;
+  const bracketCnt = groups.filter(g => g.isBracket).length;
+  const mainCnt    = groups.length - introCnt - bracketCnt;
+  const sentTxt = `${sentences.length}문장`;
+  const parts = [];
+  if (introCnt > 0)   parts.push(`<span style="color:var(--info);">📘 도입부 ${introCnt}</span>`);
+  if (mainCnt > 0)    parts.push(`📕 본론 ${mainCnt}`);
+  if (bracketCnt > 0) parts.push(`<span style="color:var(--accent);">[ ] 구간 ${bracketCnt}</span>`);
+  const breakdown = parts.length > 1 ? `${parts.join(' + ')} = ` : '';
+  previewEl.innerHTML =
+    `→ ${sentTxt} → ${breakdown}` +
+    `<span style="color:var(--accent);">총 ${groups.length}그룹</span>`;
+}
+
+// 진행률 패널을 현재 프로젝트 상태로 갱신 (renderTaskList 에서 호출 — 자동제작 중이 아니어도 0/6 등 표시)
+// 상태 플래그 기준(파일 존재 검사 생략 — 매 렌더 성능). 자동제작 중에는 폴링이 더 정밀하게 갱신.
+function _refreshProgPanel(proj) {
+  proj = proj || window._currentProject;
+  if (!proj || !Array.isArray(proj.groups)) { _resetProgPanel(); return; }
+  const sents = proj.sentences || [];
+  const ttsDone = sents.filter(s => s.ttsStatus === 'done').length;
+  const imgDone = proj.groups.filter(g => g.imagePath).length;
+  let vidTargets;
+  try { vidTargets = _getAutoVideoTargetGroups(proj); } catch (_) { vidTargets = proj.groups.filter(g => g.isIntro); }
+  const vidDone = vidTargets.filter(g => g.videoPath).length;
+  _setProgRow('progTtsBar', 'progTtsTxt', ttsDone, sents.length);
+  _setProgRow('progImgBar', 'progImgTxt', imgDone, proj.groups.length);
+  _setProgRow('progVidBar', 'progVidTxt', vidDone, vidTargets.length);
+}
+
+// ▶ 이어서 진행 — 일시정지/중단 후 완성 안 된 항목만 이어서 제작.
+// generateAll 이 needImg(이미지 없는 그룹)·emptySentences(TTS 없는 문장)만 처리하므로 그대로 재호출.
+function resumeGeneration() {
+  addLog('▶ 이어서 진행 — 완성 안 된 항목만 제작합니다 (완료분 건너뜀)', 'info');
+  generateAll();
+}
+
 async function generateAll() {
   const proj = window._currentProject;
   if (!proj || !proj.groups || proj.groups.length === 0) {
@@ -13351,9 +13742,10 @@ async function generateAll() {
     return;
   }
   if (!_ensureActivePreset()) return;
-  // 새 자동제작 시작 — 이전 중지 플래그 해제
+  // 새 자동제작 시작 — 이전 중지 플래그 해제 + 진행률 패널 초기화
   window._imageGenStop = false;
   window._autoCancelRequested = false;
+  try { _resetProgPanel(); } catch (_) {}
   // 모션 프롬프트 입력란이 onchange 발화 전이라도 자동제작 시작 시 강제 sync
   try { onGrokMotionPromptChange(); } catch (_) {}
   // 자동저장 활성화 — 사용자가 한 번도 [💾 프로젝트 저장] 누른 적 없으면 보관 폴더에 자동 첫 저장.
@@ -13440,22 +13832,20 @@ async function generateAll() {
         _updateAutoStep('img', { current: imgDone, total: groupCount, status: imgDone >= groupCount ? '완료' : '진행 중' });
         const ttsDoneNow = proj.sentences.filter(s => s.ttsStatus === 'done' && s.ttsAudioPath && fsP.existsSync(s.ttsAudioPath)).length;
         _updateAutoStep('tts', { current: ttsDoneNow, total: sentenceCount, status: ttsDoneNow >= sentenceCount ? '완료' : '진행 중' });
-        let _badgeTxt = `🖼 ${imgDone}/${groupCount} · 🎙 ${ttsDoneNow}/${sentenceCount}`;
+        let vDone = 0;
         if (_autoIntroOn && _introGroupCount > 0) {
-          const vDone = proj.groups.filter(g => g.isIntro && g.videoPath && fsP.existsSync(g.videoPath)).length;
+          vDone = proj.groups.filter(g => g.isIntro && g.videoPath && fsP.existsSync(g.videoPath)).length;
           _updateAutoStep('video', { current: vDone, total: _introGroupCount, status: vDone >= _introGroupCount ? '완료' : '진행 중' });
-          _badgeTxt += ` · 🎬 ${vDone}/${_introGroupCount}`;
         }
-        // 작업목록 헤더 상태칩 갱신 (모달과 동시)
+        // 작업목록 헤더 진행률 패널 갱신 (활성 탭일 때만)
         if (proj === window._currentProject) {
-          const _sbEl = document.getElementById('taskStatusBadge');
-          if (_sbEl) _sbEl.textContent = _badgeTxt;
+          _setProgRow('progTtsBar', 'progTtsTxt', ttsDoneNow, sentenceCount);
+          _setProgRow('progImgBar', 'progImgTxt', imgDone, groupCount);
+          _setProgRow('progVidBar', 'progVidTxt', vDone, (_autoIntroOn && _introGroupCount > 0) ? _introGroupCount : 0);
         }
       } catch {}
       await new Promise(r => setTimeout(r, 1000));
     }
-    // 폴링 종료 시 헤더 상태칩 비움
-    try { const _sbEl = document.getElementById('taskStatusBadge'); if (_sbEl) _sbEl.textContent = ''; } catch (_) {}
   })();
 
   // 1+2 병렬 실행 — 이미지 생성과 TTS 변환은 서로 다른 자원을 쓰므로 동시 진행 가능
@@ -13566,14 +13956,14 @@ async function generateAll() {
   if (window._autoCancelRequested) {
     addLog('🛑 중단됨 — Vrew 빌드/마무리 스킵 (사용자 중지)', 'warn');
     try { _finishAutoProgress('🛑 사용자 중지'); } catch (_) {}
-    try { const _sb = document.getElementById('taskStatusBadge'); if (_sb) _sb.textContent = ''; } catch (_) {}
+    try { const _v = document.getElementById('progVrewTxt'); if (_v) _v.textContent = '중단됨'; } catch (_) {}
     return;
   }
 
   // Vrew 자동 빌드 — embedded 모드 (saveVrew 가 모달을 새로 띄우지 않고 기존 step 갱신만)
   try {
     _updateAutoStep('vrew', { status: '빌드 시작...' });
-    try { const _sb = document.getElementById('taskStatusBadge'); if (_sb && proj === window._currentProject) _sb.textContent = '💾 Vrew 빌드 중…'; } catch (_) {}
+    try { const _v = document.getElementById('progVrewTxt'); if (_v && proj === window._currentProject) _v.textContent = '빌드 중…'; } catch (_) {}
     // proj 를 명시 전달 — saveVrew 안 _currentProject 재참조 시 타이밍에 따라 다른 탭으로
     // 바뀌는 multi-project 격리 결함(v1.12.6 발견) 의 root cause 차단.
     const vrewResult = await saveVrew({ embedded: true, silent: false, autoFillTts: false, skipTts: ttsDone < sentenceCount, proj });
@@ -13600,14 +13990,8 @@ async function generateAll() {
   addLog(`━━━ 자동 제작 완료 (${m}분 ${s}초) — 이미지 ${imgDone}/${groupCount}, TTS ${ttsDone}/${sentenceCount}${videoSummary} ━━━`, 'ok');
   addLog(`💡 Flow 자동화 Chrome 창은 다음 작업 빠른 재사용을 위해 유지됩니다. 더 안 쓰시면 수동으로 X 버튼 닫으셔도 OK`, 'info');
   _finishAutoProgress(`${m > 0 ? `${m}분 ` : ''}${s}초 소요`);
-  // 헤더 상태칩 — 완료 표시 후 잠시 뒤 비움
-  try {
-    const _sb = document.getElementById('taskStatusBadge');
-    if (_sb && proj === window._currentProject) {
-      _sb.textContent = `✅ 완료 (이미지 ${imgDone}/${groupCount} · TTS ${ttsDone}/${sentenceCount})`;
-      setTimeout(() => { try { if (_sb.textContent.startsWith('✅')) _sb.textContent = ''; } catch (_) {} }, 8000);
-    }
-  } catch (_) {}
+  // 헤더 진행률 패널 — Vrew 단계 완료 표시 (바는 최종 상태 유지)
+  try { const _v = document.getElementById('progVrewTxt'); if (_v && proj === window._currentProject) _v.textContent = '✅ 완료'; } catch (_) {}
 }
 
 async function regenerateGroups(groupIds) {
@@ -14031,7 +14415,6 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
 
   document.getElementById('startBtn').disabled = false;
   const pbDone = document.getElementById('pauseBtn');
-  pbDone.style.display = 'none';
   pbDone.textContent = '일시정지';
   pbDone.style.background = 'var(--warning)';
   isPaused = false;
@@ -15055,6 +15438,18 @@ function searchTaskListNext() {
       document.querySelectorAll('.aux-panel').forEach(p => {
         p.hidden = (p.id !== target);
       });
+      // 로그 탭을 열면 가장 최근 로그가 보이도록 맨 아래로 스크롤
+      // (패널이 숨김→표시로 바뀐 직후라야 scrollHeight 가 정확 → rAF 로 한 프레임 뒤 실행)
+      if (key === 'log') {
+        requestAnimationFrame(() => {
+          const la = document.getElementById('logArea');
+          if (la) la.scrollTop = la.scrollHeight;
+        });
+      }
+      // 고급 탭을 열면 등록된 API 키를 저장소에서 로드 (프리셋/전역 모달과 동기화 보장)
+      if (key === 'adv') {
+        try { _loadAdvApiKeys(); } catch (_) {}
+      }
     });
   });
 })();

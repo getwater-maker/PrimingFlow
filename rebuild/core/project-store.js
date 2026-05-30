@@ -47,18 +47,6 @@ function _sanitizeName(name) {
   return s;
 }
 
-/** 보관 폴더 안에 이미 같은 이름의 .pflow 가 있으면 ' (2)', ' (3)' 접미사 */
-function _uniqueNameInProjectsDir(safeName) {
-  ensureProjectsDir();
-  const taken = (suffix) => fs.existsSync(path.join(PROJECTS_DIR, safeName + suffix + '.pflow'));
-  if (!taken('')) return safeName;
-  for (let i = 2; i < 1000; i++) {
-    const suffix = ` (${i})`;
-    if (!taken(suffix)) return safeName + suffix;
-  }
-  return safeName + '_' + Date.now();
-}
-
 /** 절대경로 → outputDir 기준 상대경로. outputDir 밖이면 절대경로 그대로. */
 function _toRel(absPath, outputDir) {
   if (!absPath || typeof absPath !== 'string') return absPath || null;
@@ -119,8 +107,10 @@ function saveProject(project, opts) {
       || project.name
       || `project_${new Date().toISOString().slice(0, 10)}`;
     const safe = _sanitizeName(rawName);
-    const unique = _uniqueNameInProjectsDir(safe);
-    target = path.join(getProjectsDir(), unique + '.pflow');
+    // 사용자 정책: 같은 이름이 있으면 ' (2)' 같은 새 파일을 만들지 말고 같은 파일에 덮어쓴다.
+    // (덮어쓰기 직전 <name>.pflow.bak 백업이 생성되므로 직전 상태는 1회 복구 가능)
+    ensureProjectsDir();
+    target = path.join(getProjectsDir(), safe + '.pflow');
   }
 
   const saveDir = path.dirname(target);
