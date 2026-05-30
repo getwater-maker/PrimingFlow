@@ -454,6 +454,11 @@
   /* 로그 */
   .log-area { flex:1; overflow-y:auto; padding:16px 20px; font-size:13px; line-height:1.8; font-family:'Cascadia Code','Consolas',monospace; background:var(--bg-elevated); }
   .log-area .log-line { color:var(--text-base); display:block; white-space:pre-wrap; word-break:break-word; }
+  /* 기본 로그: TTS 줄은 숨김 — TTS 로그는 '🎙 TTS만' 토글에서만 표시 (중복 방지) */
+  .log-area .log-line.log-tts { display:none; }
+  /* 🎙 TTS만 보기: 전체 숨기고 TTS 줄만 표시 */
+  .log-area.tts-only .log-line { display:none; }
+  .log-area.tts-only .log-line.log-tts { display:block; }
   .log-area .log-line.ok { color:var(--success); }
   .log-area .log-line.err { color:var(--danger); }
   .log-area .log-line.info { color:var(--accent); }
@@ -1618,6 +1623,16 @@
           <div style="border-top:1px solid var(--border-soft); padding-top:10px; margin-top:10px;">
             <div style="font-size:12px; font-weight:700; color:var(--text-strong); margin-bottom:6px;">🤖 AI 이미지 프롬프트 (선택)</div>
 
+            <!-- (0) 영상 프롬프트 범위 — 비워두면 도입부만 / 다중 구간 지원 -->
+            <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px;">
+              <label style="font-size:11px; color:var(--text-soft); white-space:nowrap;">🎬 영상범위</label>
+              <input type="text" id="videoPromptRange" oninput="_refreshVideoPromptRangeHint()"
+                     placeholder="비워두면 도입부만 · 예: 전체  또는  도입부,50-55,100-끝"
+                     title="영상 모션 프롬프트를 만들 그룹 범위. 비워두면 도입부만. 쉼표로 다중 구간: 도입부, 50-55, 100-끝"
+                     style="flex:1; min-width:0; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 8px; border-radius:6px; font-size:12px;">
+            </div>
+            <div id="videoPromptRangeHint" style="font-size:10px; color:var(--text-muted); margin-bottom:6px;"></div>
+
             <!-- (1) API 자동 작성 — 등록된 LLM API 로 한 번에 작성 -->
             <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
               <select id="promptLlmModel" title="프롬프트 작성에 사용할 LLM (고급 → API 관리에서 키 등록)"
@@ -1680,11 +1695,11 @@
             </div>
           </div>
 
-          <!-- 이미지 생성 버튼 -->
-          <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px; margin-top:10px;">
-            <button class="btn btn-sm-action" onclick="generateEmptyGroupImagesRunPod()" title="이미지가 비어있는 그룹만 순차적으로 생성 (모델은 위 드롭다운: Flow / Nano Banana 2)">🖼 빈 그룹 이미지</button>
-            <button class="btn btn-sm-action" id="imageBatchAttachBtn" onclick="openImageBatchAttach()" title="외부 이미지/동영상 파일을 그룹 제목 또는 그룹 번호(예: '그룹 01_...')와 매칭해서 자동 첨부">📎 이미지·영상 첨부</button>
-            <button class="btn btn-sm-action" onclick="generateSelectedGroupImagesRunPod()" title="좌상단 체크박스로 선택한 그룹의 이미지를 생성/재생성 (모델은 위 드롭다운: Flow / Nano Banana 2)" style="grid-column:span 2;">🖼 선택 그룹 이미지</button>
+          <!-- 이미지 생성 버튼 — 한 줄 3개 (첨부 / 빈 그룹 / 선택 그룹) -->
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px; margin-top:10px;">
+            <button class="btn btn-sm-action" id="imageBatchAttachBtn" onclick="openImageBatchAttach()" style="font-size:12px; padding:8px 4px;" title="외부 이미지/동영상 파일을 그룹 제목 또는 그룹 번호(예: '그룹 01_...')와 매칭해서 자동 첨부">📎 이미지·영상 첨부</button>
+            <button class="btn btn-sm-action" onclick="generateEmptyGroupImagesRunPod()" style="font-size:12px; padding:8px 4px;" title="이미지가 비어있는 그룹만 순차적으로 생성 (모델은 위 드롭다운: Flow / Nano Banana 2)">🖼 빈 그룹 이미지</button>
+            <button class="btn btn-sm-action" onclick="generateSelectedGroupImagesRunPod()" style="font-size:12px; padding:8px 4px;" title="좌상단 체크박스로 선택한 그룹의 이미지를 생성/재생성 (모델은 위 드롭다운: Flow / Nano Banana 2)">🖼 선택 그룹 이미지</button>
           </div>
           <input type="file" id="imageBatchInput" multiple accept="image/jpeg,image/png,image/jpg,image/webp,video/mp4,video/webm,video/x-matroska,video/quicktime" style="display:none;">
 
@@ -1708,9 +1723,9 @@
             <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px;">
               <div class="range-cell">
                 <span>그룹</span>
-                <input type="number" id="videoRangeFrom" min="1" placeholder="시작" title="범위 시작 그룹 번호" />
+                <input type="number" id="videoRangeFrom" min="1" placeholder="시작" title="범위 시작 그룹 번호" oninput="window._videoRangeUserEdited=true" />
                 <span>~</span>
-                <input type="number" id="videoRangeTo" min="1" placeholder="끝" title="범위 끝 그룹 번호 (빈칸=끝까지)" />
+                <input type="number" id="videoRangeTo" min="1" placeholder="끝" title="범위 끝 그룹 번호 (빈칸=끝까지)" oninput="window._videoRangeUserEdited=true" />
               </div>
               <button class="btn btn-sm-action" onclick="convertGroupRangeVideo()" title="위 입력 범위 그룹의 이미지를 Grok 으로 영상 변환">🎬 범위 영상</button>
               <button class="btn btn-sm-action" id="grokLoginBtn" onclick="openGrokLogin()" title="Grok 자동화 크롬을 띄우고 grok.com 로그인 페이지로 이동 (영상 생성 전 X 계정 로그인 권장)">🔑 그록 로그인</button>
@@ -1745,6 +1760,7 @@
       <div class="log-panel-header" style="display:flex; justify-content:space-between; align-items:center;">
         <span>📋 로그</span>
         <div style="display:flex; gap:4px;">
+          <button class="btn-sm" id="ttsOnlyLogBtn" onclick="toggleTtsOnlyLog()" style="font-size:11px; padding:2px 8px;" title="TTS 변환 관련 로그만 보기/전체 보기 토글">🎙 TTS만</button>
           <button class="btn-sm" onclick="copyLogs()" style="font-size:11px; padding:2px 8px;" title="로그 전체 복사">📋 복사</button>
           <button class="btn-sm" onclick="clearLogs()" style="font-size:11px; padding:2px 8px;" title="로그 비우기">지우기</button>
         </div>
@@ -2132,7 +2148,7 @@
         <div id="introProgressBar" style="height:100%; width:0%; background:var(--accent); transition:width 0.2s ease;"></div>
       </div>
       <div id="introProgressCount" style="font-size:12px; color:var(--text-muted); text-align:right; margin-top:4px;">—</div>
-      <div id="introProgressText" style="font-size:13px; color:var(--text-strong); margin-top:8px; height:40px; line-height:1.5; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; word-break:break-all;" title="">준비 중…</div>
+      <div id="introProgressText" style="font-size:13px; color:var(--text-strong); margin-top:8px; height:22px; line-height:22px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;" title="">준비 중…</div>
     </div>
 
     <!-- 카운트 -->
@@ -2488,6 +2504,45 @@
       <textarea id="presetForm_presetPrompt" rows="2"
         style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-base); border-radius:6px; padding:8px; font-size:13px; resize:vertical;"
         placeholder="예: 30대 한국 남성, 짧은 머리, 회색 양복, 현대 사무실 배경, 따뜻한 조명"></textarea>
+    </div>
+
+    <!-- 분할 옵션 — 프리셋 선택 시 우측 사이드바(대본 분할)에 자동 반영 · 이후 수정 가능 -->
+    <div id="presetForm_splitRow" style="margin-bottom:10px; padding-top:10px; border-top:1px solid var(--border-soft);">
+      <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:6px;">
+        ✂️ 분할 옵션
+        <span style="color:var(--text-muted); font-size:11px;">(프리셋 선택 시 대본 분할에 자동 적용 — 이후 우측에서 수정 가능)</span>
+      </label>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:6px;">
+        <div>
+          <div style="font-size:11px; color:var(--info); margin-bottom:2px;">📘 도입부</div>
+          <input type="number" id="presetForm_introSize" min="1" max="20" value="3" style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
+        </div>
+        <div>
+          <div style="font-size:11px; color:var(--text-soft); margin-bottom:2px;">📕 본론</div>
+          <input type="number" id="presetForm_mainSize" min="1" max="20" value="7" style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
+        </div>
+        <div>
+          <div style="font-size:11px; color:var(--text-soft); margin-bottom:2px;">✂️ 짧은</div>
+          <input type="number" id="presetForm_shortLen" min="1" max="50" value="10" style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
+        </div>
+        <div>
+          <div style="font-size:11px; color:var(--text-soft); margin-bottom:2px;">📏 긴</div>
+          <input type="number" id="presetForm_longLen" min="10" max="100" value="20" style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
+        </div>
+      </div>
+    </div>
+
+    <!-- 대본 폴더 — '대본 첨부' 클릭 시 이 폴더가 바로 열림 (없으면 다운로드 폴더) -->
+    <div id="presetForm_scriptFolderRow" style="margin-bottom:10px;">
+      <label style="display:block; font-size:12px; color:var(--text-soft); margin-bottom:4px;">
+        📂 대본 폴더
+        <span style="color:var(--text-muted); font-size:11px;">('대본 첨부' 클릭 시 이 폴더가 바로 열립니다 — 없으면 다운로드 폴더)</span>
+      </label>
+      <div style="display:flex; gap:4px;">
+        <button class="btn-sm" onclick="selectPresetScriptFolder()" style="flex:1;">📂 폴더 선택</button>
+        <button class="btn-sm" onclick="clearPresetScriptFolder()" style="color:var(--danger); padding:6px 8px;">초기화</button>
+      </div>
+      <div id="presetForm_scriptFolder" data-path="" style="font-size:11px; color:var(--text-muted); margin-top:4px;">선택 안 됨</div>
     </div>
 
     <!-- 3+4행 통합: 속도 + 문장 무음 + Clone 강도 + 언어 (한 줄, OmniVoice 시 4컬럼) -->
@@ -3546,6 +3601,8 @@ function closeProjectTab(id) {
 // 주어진 프로젝트의 데이터를 화면에 반영 — switchProject / newProjectTab / closeProjectTab 공용
 function _applyProjectToUI(p) {
   if (!p) return;
+  // 프로젝트 전환 시 영상 범위는 다시 자동 추적(도입부) 모드로 — 새 프로젝트의 도입부 범위 반영
+  window._videoRangeUserEdited = false;
   // 전역 캐시 동기화 — 기존 코드 호환
   window._scriptText = p.scriptText || '';
   window._scriptFileName = p.scriptFileName || null;
@@ -3704,70 +3761,72 @@ function _notifyTabIfInactive(projectId, kind) {
 window._scriptText = '';
 
 // 대본 첨부 — .txt / .md 지원. 첨부 후 자동 분할.
+// Electron 네이티브 다이얼로그(IPC 'open-file') 사용 — 시작 폴더 지정 가능 + file.path 빈값 문제 회피.
+// 시작 폴더 = 활성 프리셋의 "대본 폴더"(존재 시) → 없으면 다운로드 폴더.
 async function openFile() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.txt,.md,.markdown,text/plain,text/markdown';
-  input.onchange = async (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
+  // 시작 폴더 결정
+  let defaultPath = '';
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+    let scriptFolder = '';
     try {
-      const text = await file.text();
-      window._scriptText = text;
-      // 첨부 파일명 보관 — .vrew 저장 시 같은 이름으로 사용 (확장자 제거)
-      window._scriptFileName = (file.name || '').replace(/\.(txt|md|markdown)$/i, '').trim();
-      // 짝꿍 사전 경로 보관
-      window._scriptFilePath = file.path || '';
-      // (PR2) 활성 프로젝트 메타에도 반영 — 탭 라벨에 보이도록
-      {
-        const _cur = window._currentProject;
-        if (_cur) {
-          _cur.scriptFileName = window._scriptFileName;
-          _cur.scriptFilePath = window._scriptFilePath;
-        }
-      }
-      // 탭 라벨 즉시 갱신 — "새 대본 N" 이 첨부 파일명 앞부분으로 바뀌도록
-      try { renderProjectTabs(); } catch (_) {}
-      // 작업 목록 헤더에 파일명 표시
-      const fnEl = document.getElementById('taskListFileName');
-      if (fnEl) {
-        fnEl.textContent = file.name || '';
-        fnEl.title = file.name || '';
-        fnEl.style.display = '';
-      }
-      const sizeKB = (file.size / 1024).toFixed(1);
-      addLog(`대본 로드: ${file.name} (${sizeKB}KB)`, 'ok');
-      // 자동 분할
-      splitScript();
+      const PresetStore = require('../tts/preset-store');
+      const pid = (window._currentProject && window._currentProject.activePresetId)
+        || (typeof _activePresetId !== 'undefined' ? _activePresetId : null);
+      const p = pid ? PresetStore.getById(pid) : null;
+      if (p && p.scriptFolder) scriptFolder = p.scriptFolder;
+    } catch (_) {}
+    if (scriptFolder && fs.existsSync(scriptFolder)) defaultPath = scriptFolder;
+    else defaultPath = path.join(os.homedir(), 'Downloads');
+  } catch (_) {}
 
-      // 캐릭터 이미지 자동 매칭 — 같은 폴더의 png/jpg/webp 스캔
-      if (file.path) {
-        try {
-          const path = require('path');
-          const fs = require('fs');
-          const dir = path.dirname(file.path);
-          const entries = fs.readdirSync(dir);
-          const chars = entries
-            .filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f))
-            .map(f => ({
-              name: path.basename(f, path.extname(f)),
-              path: path.join(dir, f),
-            }));
-          if (chars.length > 0) {
-            characterMap = chars;
-            characterImagePaths = chars.map(c => c.path);
-            if (typeof updateCharImageList === 'function') updateCharImageList();
-            addLog(`캐릭터 ${chars.length}명 자동 로드: ${chars.map(c => c.name).join(', ')}`, 'ok');
-          }
-        } catch (err) {
-          // 캐릭터 스캔 실패해도 대본 로드는 정상 — 무시
-        }
+  let res;
+  try {
+    res = await ipcRenderer.invoke('open-file', { defaultPath });
+  } catch (e) {
+    addLog(`파일 대화상자 실패: ${e.message}`, 'err');
+    return;
+  }
+  if (!res) return; // 취소
+  try {
+    const path = require('path');
+    const text = res.content || '';
+    window._scriptText = text;
+    const fname = path.basename(res.path || '');
+    // 파일명(확장자 제거) — .vrew 저장 시 사용
+    window._scriptFileName = path.basename(res.path || '', path.extname(res.path || '')).trim();
+    window._scriptFilePath = res.path || '';
+    {
+      const _cur = window._currentProject;
+      if (_cur) {
+        _cur.scriptFileName = window._scriptFileName;
+        _cur.scriptFilePath = window._scriptFilePath;
       }
-    } catch (err) {
-      addLog(`파일 읽기 실패: ${err.message}`, 'err');
     }
-  };
-  input.click();
+    try { renderProjectTabs(); } catch (_) {}
+    const fnEl = document.getElementById('taskListFileName');
+    if (fnEl) {
+      fnEl.textContent = fname;
+      fnEl.title = fname;
+      fnEl.style.display = '';
+    }
+    addLog(`대본 로드: ${fname} (${text.length}자)`, 'ok');
+    // 자동 분할
+    splitScript();
+
+    // 캐릭터 이미지 자동 매칭 — IPC 가 같은 폴더의 png/jpg/webp 를 미리 스캔해 줌
+    const chars = Array.isArray(res.characters) ? res.characters : [];
+    if (chars.length > 0) {
+      characterMap = chars;
+      characterImagePaths = chars.map(c => c.path);
+      if (typeof updateCharImageList === 'function') updateCharImageList();
+      addLog(`캐릭터 ${chars.length}명 자동 로드: ${chars.map(c => c.name).join(', ')}`, 'ok');
+    }
+  } catch (err) {
+    addLog(`파일 읽기 실패: ${err.message}`, 'err');
+  }
 }
 
 // 폴더 선택
@@ -3949,6 +4008,20 @@ async function _loadProjectFromPath(filePath) {
         }
       }
       if (typeof renderProjectTabs === 'function') renderProjectTabs();
+
+      // 활성 프리셋 복원 — 저장된 activePresetId 로 프리셋 선택 + 메인 화면 반영.
+      // applySplit 미전달 → 재분할 안 함 (불러온 그룹/자산 그대로 유지).
+      try {
+        if (typeof _activePresetId !== 'undefined') {
+          _activePresetId = project.activePresetId || null;
+          if (_activePresetId && typeof _applyActivePresetToMainScreen === 'function') {
+            const PresetStore = require('../tts/preset-store');
+            const preset = PresetStore.getById(_activePresetId);
+            if (preset) _applyActivePresetToMainScreen(preset);
+          }
+          if (typeof renderPresets === 'function') renderPresets();
+        }
+      } catch (e) { console.warn('[load preset]', e.message); }
 
       // 로그 요약
       const path = require('path');
@@ -4250,7 +4323,21 @@ function clearLogs() {
   if (empty) empty.style.display = '';
 }
 
-function addLog(msg, type = '') {
+// 🎙 TTS만 보기 토글 — logArea 에 tts-only 클래스를 켜고/끄고 (CSS 가 비-TTS 줄을 숨김)
+function toggleTtsOnlyLog() {
+  const area = document.getElementById('logArea');
+  const btn = document.getElementById('ttsOnlyLogBtn');
+  if (!area) return;
+  const on = area.classList.toggle('tts-only');
+  if (btn) {
+    btn.style.background = on ? 'var(--accent)' : '';
+    btn.style.color = on ? '#fff' : '';
+    btn.textContent = on ? '🎙 TTS만 ✓' : '🎙 TTS만';
+  }
+  area.scrollTop = area.scrollHeight;
+}
+
+function addLog(msg, type = '', opts) {
   const el = document.getElementById('logArea');
   if (!el) return;
   // v1.13.27: 로그 라인 앞에 시간 prefix 자동 추가 (HH:MM:SS).
@@ -4269,7 +4356,11 @@ function addLog(msg, type = '') {
     stamped = `[${hh}:${mm}:${ss}] ${stamped}`;
   }
   const line = document.createElement('div');
-  line.className = 'log-line' + (type ? ' ' + type : '');
+  // TTS 관련 로그는 별도 클래스로 태깅 → 기본 로그에서 숨기고 "🎙 TTS만" 토글에서만 표시.
+  // 명시 플래그(opts.tts) 우선, 없으면 문구로 판정 (TTS 합성/변환/일괄·도입부·RTF·🎙).
+  const _isTts = (opts && opts.tts === true)
+    || /\[TTS\]|\[도입부\]|🎙|RTF|TTS\s*(?:합성|변환|일괄)|음성\s*합성/.test(stamped);
+  line.className = 'log-line' + (type ? ' ' + type : '') + (_isTts ? ' log-tts' : '');
   line.textContent = stamped;
   el.appendChild(line);
   el.scrollTop = el.scrollHeight;
@@ -5557,6 +5648,7 @@ function clearScript() {
   window._scriptText = '';
   window._scriptFileName = null;
   window._scriptFilePath = '';
+  window._videoRangeUserEdited = false;  // 영상 범위 자동 추적 복귀
   // (PR2) 활성 탭은 유지하고 데이터만 빈 상태로 reset — 탭 자체를 닫으려면 ✕ 사용
   const cur = window._currentProject;
   if (cur) {
@@ -5765,10 +5857,66 @@ function _requireIntroPrepared() {
   return true;
 }
 
+// 영상 프롬프트 범위 문자열 → 영상 프롬프트를 만들 그룹 num 의 Set.
+// 비어있으면 기본값 = 도입부 그룹. "전체"/"all" = 전 그룹. "도입부"/"intro" = 도입부.
+// 숫자 구간: "50-55", "50~55", "100-끝"(끝/end = 마지막), 단일 "50". 쉼표로 다중 구간.
+function _parseVideoPromptGroupNums(spec, proj) {
+  const set = new Set();
+  if (!proj || !Array.isArray(proj.groups) || proj.groups.length === 0) return set;
+  const nums = proj.groups.map(g => g.num);
+  const lastNum = nums[nums.length - 1];
+  const valid = new Set(nums);
+  const s = String(spec || '').trim();
+  // 기본값: 도입부
+  if (!s) {
+    for (const g of proj.groups) if (g.isIntro) set.add(g.num);
+    return set;
+  }
+  const tokens = s.split(',').map(t => t.trim()).filter(Boolean);
+  for (const tok of tokens) {
+    const low = tok.toLowerCase();
+    if (low === '전체' || low === 'all') { for (const n of nums) set.add(n); continue; }
+    if (low === '도입부' || low === 'intro') { for (const g of proj.groups) if (g.isIntro) set.add(g.num); continue; }
+    // 구간: a-b / a~b (b 가 끝/end 면 마지막까지)
+    let m = tok.match(/^(\d+)\s*[-~]\s*(\d+|끝|end)$/i);
+    if (m) {
+      const a = parseInt(m[1], 10);
+      const b = (/^\d+$/.test(m[2])) ? parseInt(m[2], 10) : lastNum;
+      const lo = Math.min(a, b), hi = Math.max(a, b);
+      for (let n = lo; n <= hi; n++) if (valid.has(n)) set.add(n);
+      continue;
+    }
+    // "a-" / "a~" (끝까지)
+    m = tok.match(/^(\d+)\s*[-~]\s*$/);
+    if (m) { const a = parseInt(m[1], 10); for (let n = a; n <= lastNum; n++) if (valid.has(n)) set.add(n); continue; }
+    // 단일 숫자
+    m = tok.match(/^(\d+)$/);
+    if (m) { const a = parseInt(m[1], 10); if (valid.has(a)) set.add(a); continue; }
+    // 인식 불가 토큰은 무시
+  }
+  return set;
+}
+
+// 영상범위 입력 옆 힌트 갱신 (→ 영상 프롬프트 N그룹)
+function _refreshVideoPromptRangeHint() {
+  const el = document.getElementById('videoPromptRangeHint');
+  if (!el) return;
+  const proj = window._currentProject;
+  if (!proj || !Array.isArray(proj.groups) || proj.groups.length === 0) { el.textContent = ''; return; }
+  const spec = document.getElementById('videoPromptRange')?.value || '';
+  let set;
+  try { set = _parseVideoPromptGroupNums(spec, proj); } catch (_) { el.textContent = '⚠ 범위 형식 확인'; return; }
+  const isDefault = !String(spec).trim();
+  el.textContent = `→ 영상 프롬프트 ${set.size}그룹${isDefault ? ' (기본: 도입부)' : ''}`;
+}
+
 // 프롬프트 요청서(.md 문자열) 생성 — 내보내기(클립보드)와 API 자동작성이 공유.
 function _buildPromptRequestText() {
   const proj = window._currentProject;
   const sentMap = new Map((proj.sentences || []).map(x => [x.id, x]));
+  // 영상 프롬프트 대상 그룹 (비워두면 도입부, 다중 구간 지원)
+  const vidSpec = document.getElementById('videoPromptRange')?.value || '';
+  const vidSet = _parseVideoPromptGroupNums(vidSpec, proj);
   let styleName = '';
   try { styleName = (_getActiveStylePrompt() || {}).name || ''; } catch (_) {}
   const presetKo = (document.getElementById('presetPrompt')?.value || '').trim();
@@ -5794,8 +5942,9 @@ function _buildPromptRequestText() {
   L.push('');
   for (const g of proj.groups) {
     const gnum2 = String(g.num).padStart(2, '0');
+    const isVid = vidSet.has(g.num);
     const baseLabel = g.isIntro ? `도입부 ${gnum2}` : `그룹 ${gnum2}`;
-    const label = baseLabel + (g.isIntro ? ' (영상)' : '') + (g.title ? ` — ${g.title}` : '');
+    const label = baseLabel + (isVid ? ' (영상)' : '') + (g.title ? ` — ${g.title}` : '');
     L.push(`## [${g.num}] ${label}`);
     const full = (g.sentenceIds || []).map(sid => {
       const x = sentMap.get(sid); return x ? String(x.text || '').replace(/\s+/g, ' ').trim() : '';
@@ -5803,7 +5952,7 @@ function _buildPromptRequestText() {
     L.push(`- 대본: ${full}`);
     L.push('');
     L.push('이미지: (여기에 영어 이미지 프롬프트)');
-    if (g.isIntro) L.push('영상: (여기에 영어 영상 모션 프롬프트)');
+    if (isVid) L.push('영상: (여기에 영어 영상 모션 프롬프트)');
     L.push('');
   }
   return L.join('\n');
@@ -7064,14 +7213,19 @@ function _refreshGroupRangeInputs(project) {
   const fromEl = document.getElementById('videoRangeFrom');
   const toEl   = document.getElementById('videoRangeTo');
   if (!fromEl || !toEl) return;
-  const fromEmpty = !String(fromEl.value || '').trim();
-  const toEmpty   = !String(toEl.value || '').trim();
-  if (!fromEmpty && !toEmpty) return;
-  // 자동 영상화 기본 범위 1~10 (사용자가 직접 입력한 값은 보존)
   const lastNum = project.groups[project.groups.length - 1].num;
   const introNums = project.groups.filter(g => g.isIntro).map(g => g.num);
-  if (fromEmpty) fromEl.value = introNums.length > 0 ? Math.min(...introNums) : 1;
-  if (toEmpty)   toEl.value   = introNums.length > 0 ? Math.max(...introNums) : Math.min(10, lastNum);
+  const autoFrom = introNums.length > 0 ? Math.min(...introNums) : 1;
+  const autoTo   = introNums.length > 0 ? Math.max(...introNums) : Math.min(10, lastNum);
+  // 사용자가 범위를 직접 수정하지 않았으면(자동 추적 모드) — 도입부 변경(합치기/나누기/재배치) 시 항상 도입부 범위로 갱신.
+  if (!window._videoRangeUserEdited) {
+    fromEl.value = autoFrom;
+    toEl.value   = autoTo;
+    return;
+  }
+  // 사용자 수정 모드 — 빈 값만 보조로 채움 (직접 입력값 보존)
+  if (!String(fromEl.value || '').trim()) fromEl.value = autoFrom;
+  if (!String(toEl.value || '').trim())   toEl.value   = autoTo;
 }
 
 function renderTaskList(project) {
@@ -7088,6 +7242,8 @@ function renderTaskList(project) {
   try { _refreshProgPanel(project); } catch (_) {}
   // 분할 미리보기(→ N문장 → 도입부 X + 본론 Y = 총 Z그룹) — 합치기/나누기/재배치 후에도 항상 동기화
   try { _refreshSplitCountPreview(project); } catch (_) {}
+  // 영상 프롬프트 범위 힌트도 동기화 (그룹 수 변동 반영)
+  try { _refreshVideoPromptRangeHint(); } catch (_) {}
 
   // 빈 상태 → 그룹 카드 모드
   if (empty) empty.style.display = 'none';
@@ -7569,7 +7725,7 @@ function renderPresets() {
               // (PR2.5) 활성 탭에도 저장
               { const _cur = window._currentProject; if (_cur) _cur.activePresetId = p.id; }
               try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch {}
-              _applyActivePresetToMainScreen(p);
+              _applyActivePresetToMainScreen(p, { applySplit: true });
               renderPresets();
               return;
             }
@@ -7582,7 +7738,7 @@ function renderPresets() {
       // (PR2.5) 활성 탭에도 저장 — 탭 전환 시 복원 + .pflow 자동저장
       { const _cur = window._currentProject; if (_cur) _cur.activePresetId = p.id; }
       try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch {}
-      _applyActivePresetToMainScreen(p);
+      _applyActivePresetToMainScreen(p, { applySplit: true });
       renderPresets();
       addLog(`기본 프리셋 선택: ${p.name}`, 'ok');
       // 프리셋 선택 1초 후 대본 탭으로 자동 이동
@@ -8615,6 +8771,43 @@ function _applyActivePresetToMainScreen(p) {
     const mainPromptEl = document.getElementById('presetPrompt');
     if (mainPromptEl) mainPromptEl.value = p.presetPrompt || '';
   }
+  // 이미지 스타일 → 제작탭 styleSelect (프리셋 편집의 스타일이 우측 사이드바에 반영)
+  if (p.styleId) {
+    const styleSel = document.getElementById('styleSelect');
+    if (styleSel && Array.from(styleSel.options).some(o => o.value === p.styleId)) {
+      styleSel.value = p.styleId;
+      try { styleSel.dispatchEvent(new Event('change')); } catch (_) {}
+    }
+  }
+  // 분할 옵션 → 우측 사이드바 분할옵션 입력 + (대본 있으면) 재분할.
+  // ⚠ 재분할은 그룹을 새로 만들어 기존 이미지/비디오 자산 매핑을 초기화하므로,
+  //    사용자가 프리셋을 직접 "선택(클릭)" 했을 때만 수행 (opts.applySplit).
+  //    탭 전환 / 프로젝트 불러오기 복원 시에는 호출하지 않음 → 저장된 그룹 그대로 유지.
+  if (opts && opts.applySplit) _applyPresetSplitOptions(p);
+}
+
+// 프리셋의 분할 옵션을 우측 사이드바 입력에 반영하고, 값이 바뀌었으면 재분할.
+function _applyPresetSplitOptions(p) {
+  if (!p) return;
+  const map = [
+    ['introSentenceSize', 'introSentenceSize'],
+    ['mainSentenceSize',  'mainSentenceSize'],
+    ['shortLen',          'shortLen'],
+    ['longLen',           'longLen'],
+  ];
+  let changed = false;
+  for (const [key, id] of map) {
+    if (p[key] == null) continue;  // 옛 프리셋(미설정)은 건너뜀 → 현재 사이드바 값 유지
+    const el = document.getElementById(id);
+    if (!el) continue;
+    const nv = String(p[key]);
+    if (String(el.value) !== nv) { el.value = nv; changed = true; }
+  }
+  // 대본이 있고 값이 실제로 바뀌었을 때만 재분할 (불필요한 그룹 초기화 방지)
+  if (changed && window._scriptText && typeof splitScript === 'function') {
+    addLog('프리셋 분할 옵션 적용 — 대본 재분할 (수동 합치기/9초 재배치는 초기화됩니다)', 'info');
+    try { splitScript(); } catch (_) {}
+  }
 }
 
 // ─── 프리셋 편집 모달 ────────────────────────────────
@@ -8872,6 +9065,18 @@ async function selectPresetOutputFolder() {
   if (!folder) return;
   const el = document.getElementById('presetForm_outputFolder');
   if (el) { _setPathDisplay(el, folder); el.dataset.path = folder; }
+}
+
+async function selectPresetScriptFolder() {
+  const folder = await ipcRenderer.invoke('select-folder').catch(() => null);
+  if (!folder) return;
+  const el = document.getElementById('presetForm_scriptFolder');
+  if (el) { _setPathDisplay(el, folder); el.dataset.path = folder; }
+}
+
+function clearPresetScriptFolder() {
+  const el = document.getElementById('presetForm_scriptFolder');
+  if (el) { _setPathDisplay(el, ''); el.dataset.path = ''; }
 }
 
 function clearPresetOutputFolder() {
@@ -9141,6 +9346,17 @@ function openPresetModal(presetId) {
   // 이미지 사전설정 키워드 — 옛 프리셋엔 없을 수도 있어 '' 폴백
   const ppEl = document.getElementById('presetForm_presetPrompt');
   if (ppEl) ppEl.value = p.presetPrompt || '';
+
+  // 분할 옵션 — 옛 프리셋엔 없을 수 있어 기본값 폴백 (3/7/10/20)
+  const _setNum = (id, v, def) => { const el = document.getElementById(id); if (el) el.value = (v != null ? v : def); };
+  _setNum('presetForm_introSize', p.introSentenceSize, 3);
+  _setNum('presetForm_mainSize',  p.mainSentenceSize, 7);
+  _setNum('presetForm_shortLen',  p.shortLen, 10);
+  _setNum('presetForm_longLen',   p.longLen, 20);
+
+  // 대본 폴더 복원
+  const sfEl = document.getElementById('presetForm_scriptFolder');
+  if (sfEl) { _setPathDisplay(sfEl, p.scriptFolder || ''); sfEl.dataset.path = p.scriptFolder || ''; }
 
 
   // voice select 의 onchange 재바인딩 후 강제 트리거 (Clone 영역 표시 갱신)
@@ -10093,6 +10309,17 @@ function _readPresetForm() {
   // 이미지 사전설정 키워드 — 메인 "미디어 설정 > 사전 설정" 에 자동 반영될 값
   const _presetPromptEl = document.getElementById('presetForm_presetPrompt');
   preset.presetPrompt = (_presetPromptEl && _presetPromptEl.value || '').trim();
+
+  // 분할 옵션 — 프리셋 선택 시 우측 사이드바에 반영 (값 없으면 기본 3/7/10/20)
+  const _numVal = (id, def) => { const el = document.getElementById(id); const v = el ? parseInt(el.value, 10) : NaN; return Number.isFinite(v) ? v : def; };
+  preset.introSentenceSize = _numVal('presetForm_introSize', 3);
+  preset.mainSentenceSize  = _numVal('presetForm_mainSize', 7);
+  preset.shortLen          = _numVal('presetForm_shortLen', 10);
+  preset.longLen           = _numVal('presetForm_longLen', 20);
+
+  // 대본 폴더 — '대본 첨부' 시작 위치
+  const _scriptFolderEl = document.getElementById('presetForm_scriptFolder');
+  preset.scriptFolder = (_scriptFolderEl && _scriptFolderEl.dataset.path) || '';
   return preset;
 }
 
@@ -10899,7 +11126,7 @@ async function _convertSentenceImpl(projectId, sid, preset, channel, _opts = {})
         : ' ref=(없음)';
       const seedTag = opts.seed != null ? ` seed=${opts.seed}` : '';
       const textPreview = (sentence.text || '').slice(0, 40) + (sentence.text.length > 40 ? '…' : '');
-      addLog(`[${sentence.num}] ${preset.name} (${preset.engine}/${opts.voice})${refTag}${seedTag} · "${textPreview}"`, 'info');
+      addLog(`[${sentence.num}] ${preset.name} (${preset.engine}/${opts.voice})${refTag}${seedTag} · "${textPreview}"`, 'info', { tts: true });
     }
     const _ttsStartedAt = Date.now();
     // v1.13.34: silent 모드에서도 매 sentence 합성 시작 로그 — 자동제작 mini-log 가시성
@@ -12796,7 +13023,7 @@ async function prepareIntroVideos() {
   for (const s of introSentences) {
     idx++;
     if (!window._ttsConvertActive) { stopped = true; break; }
-    const preview = (s.text || '').slice(0, 30);
+    const preview = (s.text || '').slice(0, 16);
     setProgress(`합성 중 ${idx}/${introSentences.length} — "${preview}"`);
     _updateIntroProgress({ current: idx - 1, total: introSentences.length, ok: success, fail, text: `합성 중 — "${preview}…"` });
     const ok = await convertSentence(s.id, { silent: true });
@@ -13313,6 +13540,7 @@ function removeGroupImage(groupId) {
   } else {
     addLog(`[Image] 그룹 ${g.num} 이미지 제거 (파일은 유지: ${oldPath})`, 'ok');
   }
+  try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch (_) {}
   renderTaskList(proj);
 }
 
@@ -13335,6 +13563,7 @@ function removeGroupVideo(groupId) {
   g.videoStatus = 'idle';
   g.videoSourceImage = null;
   addLog(`[Grok] 그룹 ${g.num} 비디오 제거 (파일은 유지: ${oldPath})`, 'ok');
+  try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch (_) {}
   renderTaskList(proj);
 }
 
@@ -13519,10 +13748,10 @@ async function _runRunPodImageGeneration(groupIds, label, modelOverride) {
           if (_pk) _pen = (await _translateKoToEn(_pk)) || _pk;
         } catch (_) {}
         const cparts = [];
-        if (stylePrompt) cparts.push(stylePrompt);
+        if (stylePrompt) cparts.push(stylePrompt);  // _getActiveStylePrompt 가 품질태그(highly detailed, no text, no watermark) 이미 부착
         cparts.push(g.imagePrompt.trim());
         if (_pen) cparts.push(_pen);
-        cparts.push('cinematic, highly detailed, no text, no watermark');
+        // Flow 경로와 완전히 동일하게 — cinematic 미부착 (영화풍은 스타일로 선택). 품질태그는 스타일 접미사에 포함됨.
         prompt = cparts.join(', ');
       } else {
         // Gemini(Nano Banana 2): 한국어 → 영문 번역 (안전필터 회피). 번역 실패 시 1회 재시도.
@@ -13537,10 +13766,10 @@ async function _runRunPodImageGeneration(groupIds, label, modelOverride) {
           if (_presetKo) presetEn = (await _translateKoToEn(_presetKo)) || _presetKo;
         } catch (_) {}
         const parts = [];
-        if (stylePrompt) parts.push(stylePrompt);
+        if (stylePrompt) parts.push(stylePrompt);  // 스타일 접미사에 품질태그 포함됨
         parts.push(`scene: ${englishText || koreanText}`);
         if (presetEn) parts.push(`setting: ${presetEn}`);
-        parts.push('cinematic, highly detailed, no text, no watermark');
+        // cinematic 미부착 (영화풍은 스타일로 선택) — 품질태그는 스타일 접미사가 담당
         prompt = parts.join(', ');
         if (i === 0) addLog(`[Gemini] 스타일 ${stylePrompt ? '✓ 적용됨' : '미선택'} · 사전설정 ${presetEn ? '✓' : '없음'}`, 'info');
       }
@@ -13721,7 +13950,13 @@ function _refreshProgPanel(proj) {
   const ttsDone = sents.filter(s => s.ttsStatus === 'done').length;
   const imgDone = proj.groups.filter(g => g.imagePath).length;
   let vidTargets;
-  try { vidTargets = _getAutoVideoTargetGroups(proj); } catch (_) { vidTargets = proj.groups.filter(g => g.isIntro); }
+  // 자동제작이 실제 변환한 그룹(랜덤 9~13)이 기록돼 있으면 그 갯수 기준으로 표시 (일관성)
+  if (Array.isArray(proj._autoVideoRunGroupIds) && proj._autoVideoRunGroupIds.length) {
+    const ids = new Set(proj._autoVideoRunGroupIds);
+    vidTargets = proj.groups.filter(g => ids.has(g.id));
+  } else {
+    try { vidTargets = _getAutoVideoTargetGroups(proj); } catch (_) { vidTargets = proj.groups.filter(g => g.isIntro); }
+  }
   const vidDone = vidTargets.filter(g => g.videoPath).length;
   _setProgRow('progTtsBar', 'progTtsTxt', ttsDone, sents.length);
   _setProgRow('progImgBar', 'progImgTxt', imgDone, proj.groups.length);
@@ -13805,7 +14040,17 @@ async function generateAll() {
 
   // 진행 모달 — 4 단계 (이미지 / TTS / 도입부 영상 / Vrew 빌드)
   const _autoIntroOn = document.getElementById('autoIntroVideoToggle')?.checked ?? true;
-  const _introGroupCount = proj.groups.filter(g => g.isIntro).length;
+  // 자동 영상화 대상 + 랜덤 갯수(9~13). 같은 대본/조건이어도 매 실행 갯수가 달라져 "공장형 대량생산 템플릿" 인상 방지.
+  let _autoVideoGroups = _autoIntroOn ? _getAutoVideoTargetGroups(proj) : [];
+  if (_autoVideoGroups.length > 0) {
+    const _capRand = 9 + Math.floor(Math.random() * 5); // 9,10,11,12,13 중 랜덤
+    const _fullN = _autoVideoGroups.length;
+    if (_fullN > _capRand) _autoVideoGroups = _autoVideoGroups.slice(0, _capRand);
+    addLog(`[Grok] 이번 영상 갯수 ${_autoVideoGroups.length}개 (랜덤 9~13 → 상한 ${_capRand}, 대상 ${_fullN})`, 'info');
+  }
+  // 진행률/폴링은 이번 실제 대상 갯수 기준 — proj 에 저장해 패널 재렌더에도 일관 유지
+  proj._autoVideoRunGroupIds = _autoVideoGroups.map(g => g.id);
+  const _introGroupCount = _autoVideoGroups.length;
   const progressSteps = [
     { id: 'img', label: '🖼  이미지 생성' },
     { id: 'tts', label: '🎙  TTS 변환' },
@@ -13834,7 +14079,8 @@ async function generateAll() {
         _updateAutoStep('tts', { current: ttsDoneNow, total: sentenceCount, status: ttsDoneNow >= sentenceCount ? '완료' : '진행 중' });
         let vDone = 0;
         if (_autoIntroOn && _introGroupCount > 0) {
-          vDone = proj.groups.filter(g => g.isIntro && g.videoPath && fsP.existsSync(g.videoPath)).length;
+          const _vidIds = new Set(proj._autoVideoRunGroupIds || []);
+          vDone = proj.groups.filter(g => _vidIds.has(g.id) && g.videoPath && fsP.existsSync(g.videoPath)).length;
           _updateAutoStep('video', { current: vDone, total: _introGroupCount, status: vDone >= _introGroupCount ? '완료' : '진행 중' });
         }
         // 작업목록 헤더 진행률 패널 갱신 (활성 탭일 때만)
@@ -13898,9 +14144,9 @@ async function generateAll() {
 
   // 도입부 비디오 task — 토글 ON 이고 isIntro 그룹 1개 이상일 때만
   // 도입부 이미지가 1개 완성되는 즉시 Grok 변환 큐 시작 (이미지/TTS task 와 오버랩)
-  const autoIntro = document.getElementById('autoIntroVideoToggle')?.checked ?? true;
-  // 자동 영상화 대상 = 그룹 범위(기본 1~10, 편집 가능). 기존 isIntro 전체 정책에서 변경.
-  const introGroups = _getAutoVideoTargetGroups(proj);
+  const autoIntro = _autoIntroOn;
+  // 자동 영상화 대상 = 위에서 랜덤 갯수(9~13)로 슬라이스한 목록 재사용.
+  const introGroups = _autoVideoGroups;
   const introVideoTask = (async () => {
     if (!autoIntro) {
       if (introGroups.length > 0) addLog(`[Grok] 자동 영상화 — 토글 OFF (스킵)`, 'info');
@@ -14098,9 +14344,10 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
       if (g.imagePrompt && g.imagePrompt.trim()) {
         _aiPromptCnt++;
         // 앱 스타일 + Claude 본문 + 사전설정(시대/배경) + 품질태그. 사전설정으로 시대 어긋남 방지.
+        // 품질태그는 스타일에서 제거했으므로 여기서 1회만 부착 (highly detailed 포함).
         const tail = presetPromptText ? `, ${presetPromptText}` : '';
         const head = userStylePrompt ? `${userStylePrompt}, ` : '';
-        return `${head}${g.imagePrompt.trim()}${tail}, no text, no watermark`;
+        return `${head}${g.imagePrompt.trim()}${tail}, highly detailed, no text, no watermark`;
       }
       if (!g.isBracket) return null;
       const body = paragraphs[i].trim();
@@ -14108,9 +14355,10 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
       const stylePrompt = (isInfographicGroup && forcedInfographicStyle)
         ? forcedInfographicStyle
         : userStylePrompt;
-      // 스타일 + 사전설정 + 빈 줄 + 본문. 사전설정은 "모든 장면 공통 적용" UI 약속에 따라
-      // 대괄호 그룹에도 prepend (영문 흐름의 _buildEnglishPrompt 와 동등).
-      const head = [stylePrompt, presetPromptText].filter(Boolean).join(', ');
+      // 스타일 + 사전설정 + 품질태그 + 빈 줄 + 본문. 사전설정은 "모든 장면 공통 적용" UI 약속에 따라 prepend.
+      // 품질태그는 스타일에서 제거됐으므로 여기서 부착. 단 인포그래픽은 화면에 한글 텍스트가 필요하므로 'no text' 제외.
+      const qual = isInfographicGroup ? '' : 'highly detailed, no text, no watermark';
+      const head = [stylePrompt, presetPromptText, qual].filter(Boolean).join(', ');
       return head ? `${head}\n\n${body}` : body;
     });
     if (_aiPromptCnt > 0) {
