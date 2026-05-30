@@ -133,7 +133,7 @@
     cursor: pointer;
     padding: 1px 4px;
     border-radius: 3px;
-    margin-left: 2px;
+    margin-left: auto;   /* 탭 끝(맨 오른쪽)으로 밀기 */
   }
   .project-tab .close-btn:hover { background: var(--danger); color: white; }
   .project-tab.flash { animation: tabFlash 0.5s ease-in-out 3; }
@@ -14206,22 +14206,39 @@ async function generateAll() {
     } catch (e) {
       addLog(`[이미지] 예외: ${e.message} — 계속 진행`, 'err');
     }
-    // 모든 이미지 완료까지 추가 대기
-    // (재시도 포함) — fs.existsSync + imageStatus 'fail' 검증
+    // _runRunPodImageGeneration 가 반환된 시점 = Flow/Nano 생성 완료.
+    // 트레일링 image-done IPC 만 짧게 정리 — 모두 매핑되면 즉시 종료, 아니면 최대 30초.
+    // (옛 6분 폴링은 '실패해서 영원히 안 채워지는 그룹' 때문에 끝까지 안 끝나는 문제 → 제거)
     const fsImg2 = require('fs');
-    const POLL_TIMEOUT = 6 * 60 * 1000;  // 최대 6분
+    const POLL_TIMEOUT = 30 * 1000;  // 트레일링 IPC 정리용 짧은 대기
     const pollStart = Date.now();
+    let _tick = 0;
     while (Date.now() - pollStart < POLL_TIMEOUT) {
-      if (window._autoCancelRequested) break;  // 중단 시 즉시 폴링 종료
-      // v1.13.21: rate-limit 으로 skip 된 그룹도 pending 에서 제외 — 자동제작이 무한 대기하지 않게
+      if (window._autoCancelRequested) break;
+      // 폴더 재매핑(IPC 누락 복구) — 6초마다만 호출해 로그/IO 스팸 방지
+      if (_tick % 3 === 0) { try { if (typeof forceReloadGroupImages === 'function') forceReloadGroupImages(proj); } catch (_) {} }
+      _tick++;
       const pending = proj.groups.filter(g =>
         (!g.imagePath || !fsImg2.existsSync(g.imagePath)) && g.imageStatus !== 'fail' && g.imageStatus !== 'rate-skipped'
       );
       if (pending.length === 0) break;
       await new Promise(r => setTimeout(r, 2000));
     }
+    // 마지막 재매핑
+    try { if (typeof forceReloadGroupImages === 'function') forceReloadGroupImages(proj); } catch (_) {}
+    // 생성이 끝났는데도 이미지가 없는 그룹 = 생성 실패 → 'fail' 마킹.
+    // (Flow UI 클릭 실패 등으로 일부 그룹이 안 만들어진 경우 무한 스피너/폴링 방지)
+    let _failMarked = 0;
+    for (const g of proj.groups) {
+      if ((!g.imagePath || !fsImg2.existsSync(g.imagePath)) && g.imageStatus !== 'fail' && g.imageStatus !== 'rate-skipped') {
+        g.imageStatus = 'fail';
+        try { _setGroupImageStatus(g.id, 'fail'); } catch (_) {}
+        _failMarked++;
+      }
+    }
+    if (_failMarked > 0) addLog(`[이미지] ${_failMarked}개 그룹 생성 실패 — ❌ 표시 (그룹 카드 클릭 또는 '선택 그룹 이미지'로 재시도)`, 'err');
     const finalDone = proj.groups.filter(g => g.imagePath && fsImg2.existsSync(g.imagePath)).length;
-    addLog(`[이미지] 폴링 완료 — ${finalDone}/${groupCount} 보유`, 'info');
+    addLog(`[이미지] 완료 — ${finalDone}/${groupCount} 보유${_failMarked ? `, 실패 ${_failMarked}` : ''}`, _failMarked ? 'err' : 'info');
   })();
 
   // TTS task
@@ -15402,8 +15419,11 @@ window.forceReloadGroupImages = function (projectArg) {
       }
     }
 
-    if (typeof renderTaskList === 'function') renderTaskList(proj);
-    if (typeof addLog === 'function') addLog(`[forceReload] ${matched}/${proj.groups.length} 그룹 이미지 강제 갱신`, 'ok');
+    // 새로 매칭된 게 있을 때만 재렌더 + 로그 (자동 폴링에서 반복 호출 시 스팸/불필요 렌더 방지)
+    if (matched > 0) {
+      if (typeof renderTaskList === 'function') renderTaskList(proj);
+      if (typeof addLog === 'function') addLog(`[forceReload] ${matched}/${proj.groups.length} 그룹 이미지 강제 갱신`, 'ok');
+    }
     return matched;
   } catch (e) {
     console.error('[forceReloadGroupImages] 예외:', e);
