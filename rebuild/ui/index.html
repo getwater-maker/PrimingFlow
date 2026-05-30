@@ -5570,6 +5570,7 @@ function _clearInProgressVisuals() {
 async function stopGeneration() {
   addLog('🛑 중지 요청 — 모든 작업(이미지·영상·TTS·자동제작) 중단', 'err');
   // 모든 중단 플래그 set
+  window._allProjectsCancelRequested = true;  // '모든 탭' 순차 배치도 전체 중단
   window._autoCancelRequested = true;
   window._autoPollActive = false;
   window._grokConvertActive = false;
@@ -13923,9 +13924,17 @@ async function generateAllProjects() {
   const startedAt = Date.now();
   let completed = 0;
   let failed = 0;
+  let aborted = false;
   const failedNames = [];
+  window._allProjectsCancelRequested = false;  // 배치 시작 — 전체중단 플래그 초기화
 
   for (let i = 0; i < projects.length; i++) {
+    // 중지 버튼(stopGeneration)이 눌렸으면 다음 탭으로 넘어가지 않고 배치 전체 종료
+    if (window._allProjectsCancelRequested) {
+      aborted = true;
+      addLog(`[모든 탭] 🛑 중지됨 — 전체 배치 종료 (${completed} 완료 / ${failed} 실패 / ${projects.length - i} 미진행)`, 'warn');
+      break;
+    }
     const p = projects[i];
     const label = p.name || p.id;
     // 탭 전환 (활성 탭이어야 generateAll 이 그 프로젝트 처리)
@@ -13941,6 +13950,12 @@ async function generateAllProjects() {
 
     try {
       await generateAll();
+      // 진행 중 중지 버튼이 눌렸으면 완료로 치지 않고 전체 배치 종료
+      if (window._allProjectsCancelRequested) {
+        aborted = true;
+        addLog(`[모든 탭 ${i + 1}/${projects.length}] 🛑 '${label}' 중지됨 — 전체 배치 종료`, 'warn');
+        break;
+      }
       completed++;
       addLog(`[모든 탭 ${i + 1}/${projects.length}] ✅ '${label}' 완료`, 'ok');
     } catch (e) {
@@ -13962,9 +13977,10 @@ async function generateAllProjects() {
   const m = Math.floor(elapsed / 60);
   const s = elapsed % 60;
   const failPart = failed > 0 ? `, ❌ 실패 ${failed} (${failedNames.join(', ')})` : '';
-  addLog(`━━━ 모든 탭 순차 자동제작 종료 — ✅ ${completed}${failPart}, ${m}분 ${s}초 ━━━`, failed === 0 ? 'ok' : 'err');
+  const abortPart = aborted ? ' (🛑 중지로 종료)' : '';
+  addLog(`━━━ 모든 탭 순차 자동제작 종료${abortPart} — ✅ ${completed}${failPart}, ${m}분 ${s}초 ━━━`, (failed === 0 && !aborted) ? 'ok' : 'err');
   alert(
-    `모든 탭 순차 자동제작 종료\n\n` +
+    `모든 탭 순차 자동제작 종료${aborted ? ' (중지됨)' : ''}\n\n` +
     `✅ 완료: ${completed}개\n` +
     (failed > 0 ? `❌ 실패: ${failed}개 (${failedNames.join(', ')})\n` : '') +
     `⏱ 총 ${m}분 ${s}초`
