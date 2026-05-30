@@ -1298,10 +1298,19 @@ class FlowAutomator {
 
   // ─── v2.0: 휴먼화 타이핑 ───
   async _typePromptHumanized(text, speedMultiplier = 1.0) {
-    const input = await this.page.waitForSelector(
-      'div[role="textbox"][contenteditable="true"]', { timeout: 10000 }
-    );
-    await input.click();
+    // Locator + 재시도 — DOM 재렌더로 인한 "Element is not attached" 방지 (_typePrompt 와 동일 정책)
+    const inputLoc = this.page.locator('div[role="textbox"][contenteditable="true"]').first();
+    await inputLoc.waitFor({ state: 'visible', timeout: 10000 });
+    let clicked = false;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try { await inputLoc.click({ timeout: 5000 }); clicked = true; break; }
+      catch (e) {
+        if (attempt === 3) throw e;
+        this.debug(`[Flow] 입력창 클릭 재시도 ${attempt}/3 — ${e.message.split('\n')[0]}`);
+        await this.page.waitForTimeout(800);
+      }
+    }
+    if (!clicked) throw new Error('프롬프트 입력창 클릭 실패');
     await this.page.waitForTimeout(300);
     await this.page.keyboard.press('Control+a');
     await this.page.keyboard.press('Backspace');
@@ -1955,10 +1964,24 @@ class FlowAutomator {
   }
 
   async _typePrompt(text) {
-    const input = await this.page.waitForSelector(
-      'div[role="textbox"][contenteditable="true"]', { timeout: 10000 }
-    );
-    await input.click();
+    // ElementHandle 대신 Locator 사용 — 매 액션마다 셀렉터를 재조회하므로 DOM 재렌더로 인한
+    // "Element is not attached to the DOM" 오류에 강함 (첫 단락: 캐릭터 업로드 직후 입력창 재렌더 대비).
+    const inputLoc = this.page.locator('div[role="textbox"][contenteditable="true"]').first();
+    await inputLoc.waitFor({ state: 'visible', timeout: 10000 });
+    // 클릭 — stale/unstable(재렌더 애니메이션) 시 짧게 대기 후 재시도 (최대 3회)
+    let clicked = false;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await inputLoc.click({ timeout: 5000 });
+        clicked = true;
+        break;
+      } catch (e) {
+        if (attempt === 3) throw e;
+        this.debug(`[Flow] 입력창 클릭 재시도 ${attempt}/3 — ${e.message.split('\n')[0]}`);
+        await this.page.waitForTimeout(800);
+      }
+    }
+    if (!clicked) throw new Error('프롬프트 입력창 클릭 실패');
     await this.page.waitForTimeout(300);
     await this.page.keyboard.press('Control+a');
     await this.page.keyboard.press('Backspace');
