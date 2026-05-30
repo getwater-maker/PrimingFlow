@@ -1536,13 +1536,10 @@
                      style="width:50px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:5px 6px; border-radius:6px; font-size:13px; text-align:center;">
               <span style="font-size:12px; color:var(--text-muted); white-space:nowrap;">문장씩</span>
             </div>
-            <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px; line-height:1.4;">
-              💡 본론을 7~10 문장으로 늘리면 이미지 생성 횟수가 줄어 작업 시간이 단축됩니다. 켄번스 10패턴이 자동 순회되어 영상은 단조롭지 않습니다.
-            </div>
+            <div style="font-size:10px; color:var(--text-muted); margin-bottom:8px;">📘도입부/📕본론 문장수는 <b>## 도입부 문법</b>으로 입력한 경우에 적용됩니다.</div>
 
             <!-- 기존 stages 시스템 (UI 비표시 — autoSplit 분기 호환용) -->
             <div id="groupStagesList" style="display:none;"></div>
-            <span id="groupStagesNote" style="display:none; font-size:11px; color:var(--warning, #d4a574); font-weight:600; margin-top:3px;">⚠ 섹션 마커 감지 — 그룹 크기 무시</span>
 
             <!-- 짧은 문장 + 긴 문장 한 줄 -->
             <div class="setting" style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
@@ -1557,15 +1554,15 @@
               <span style="font-size:12px; color:var(--text-muted); white-space:nowrap;">자 초과</span>
             </div>
 
-            <div id="splitGroupCountPreview" style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--border-soft); font-size:12px; font-weight:600; color:var(--text-strong);"></div>
+            <!-- 대괄호 [ ] 구간 사용 시 안내 — 도입부/본론 문장수 무시 ([ ] 1개 = 1그룹) -->
+            <span id="groupStagesNote" style="display:none; font-size:11px; color:var(--warning, #d4a574); font-weight:600;">⚠ [ ] 구간 마커 사용 중 — 도입부/본론 문장수 무시 ([ ] 1개 = 1그룹)</span>
+
+            <div id="splitGroupCountPreview" style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--border-soft); font-size:13px; font-weight:700; color:var(--text-strong);"></div>
           </div>
 
           <!-- 🎬 도입부 비디오 준비 — 도입부 TTS + 9초 재배치 (동영상 탭에서 이동) -->
           <div style="border-top:1px solid var(--border-soft); padding-top:10px; margin-top:10px;">
-            <div style="font-size:12px; font-weight:700; color:var(--text-strong); margin-bottom:4px;">🎬 도입부 비디오 준비</div>
-            <div style="font-size:11px; color:var(--text-muted); margin-bottom:6px; line-height:1.4;">
-              도입부 sentence 들을 일괄 TTS 합성한 뒤 음성 길이 9초 기준으로 그룹을 자동 재배치합니다 (1 그룹 = 1 비디오 클립 ≤ 10초). 완료되면 제작 탭으로 이동합니다.
-            </div>
+            <div style="font-size:12px; font-weight:700; color:var(--text-strong); margin-bottom:6px;">🎬 도입부 비디오 준비</div>
             <button class="btn-sm" id="prepareIntroVideosBtn" onclick="prepareIntroVideos()" title="도입부 sentence 전체 TTS 합성 후 실제 음성 길이 9초 한도로 그룹을 다시 묶습니다. 자산이 이미 있으면 확인 후 초기화."
                     style="width:100%; padding:8px 12px; background:var(--accent-soft); color:var(--accent-hover); border:1px solid var(--accent); font-weight:600;">
               🎙 도입부 TTS + 9초 재배치
@@ -1575,10 +1572,7 @@
 
           <!-- 🤖 AI 이미지 프롬프트 (클로드 왕복) — 대본 맥락 반영해 인물/성별 일관성 강화 -->
           <div style="border-top:1px solid var(--border-soft); padding-top:10px; margin-top:10px;">
-            <div style="font-size:12px; font-weight:700; color:var(--text-strong); margin-bottom:4px;">🤖 AI 이미지 프롬프트 (선택)</div>
-            <div style="font-size:11px; color:var(--text-muted); margin-bottom:6px; line-height:1.4;">
-              대본을 내보내 클로드(claude.ai)에서 그룹별 영어 이미지 프롬프트를 받아 다시 가져오면, 이미지 생성 시 그 프롬프트를 사용합니다 (성별·인물 일관성↑, 비용 0).
-            </div>
+            <div style="font-size:12px; font-weight:700; color:var(--text-strong); margin-bottom:6px;">🤖 AI 이미지 프롬프트 (선택)</div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
               <button class="btn-sm" onclick="exportGroupPromptsForClaude()" title="그룹별 대본을 ai-prompts.md 로 내보내고 클립보드에도 복사 — 클로드에 붙여넣기">📤 내보내기(.md)</button>
               <button class="btn-sm" onclick="openImportPromptsModal()" title="클로드가 만든 영어 프롬프트를 붙여넣거나 파일로 가져와 그룹에 저장">📥 가져오기</button>
@@ -1671,7 +1665,6 @@
                 <span>자동 영상화 (도입부 기본 · 범위 수정 가능 · Grok)</span>
               </label>
             </div>
-            <button class="btn" id="grokStopBtn" onclick="stopGrokVideoConversion()" title="진행 중인 Grok 이미지→비디오 변환을 모두 중단" style="width:100%; margin-bottom:8px; background:var(--danger); color:#fff; font-weight:700; display:none;">⏹ 영상 변환 중단</button>
             <button class="btn btn-sm-action" id="retryFailedVideoBtn"
               onclick="retryFailedVideos()"
               title="비디오 생성에 실패한 그룹만 골라서 다시 시도 (도입부/본론 모두)"
@@ -1789,10 +1782,9 @@
       <div class="wiz-footer">
         <button class="btn btn-sm-action" id="startBtn" onclick="generateAll()" title="현재 활성 탭의 대본만 자동 제작 (이미지 + TTS + 도입부 영상 + .vrew)" style="font-weight:700;">▶ 자동제작</button>
         <button class="btn btn-sm-action" id="startAllProjectsBtn" onclick="generateAllProjects()" title="열려있는 모든 탭을 순차적으로 자동제작 (탭1 완료 → 탭2 자동 시작 → ...)" style="background:var(--accent-soft); color:var(--accent-hover); border:1px solid var(--accent); font-weight:700;">▶▶ 모든 탭 순차 자동제작</button>
-        <div style="display:flex; gap:6px;">
-          <button class="btn" id="pauseBtn" onclick="pauseGeneration()" style="flex:1; padding:8px 12px; background:var(--warning); color:#fff; display:none; white-space:nowrap;">일시정지</button>
-          <button class="btn" id="stopBtn" onclick="stopGeneration()" style="flex:1; padding:8px 12px; background:var(--danger); color:#fff; display:none; white-space:nowrap;">중지</button>
-        </div>
+        <!-- ⏹ 전체 중단 — 상시 노출. 이미지·Flow·Grok영상·TTS·자동제작·Vrew 모두 즉시 중단 -->
+        <button class="btn" id="stopBtn" onclick="stopGeneration()" title="진행 중인 모든 작업(이미지·영상·TTS·자동제작·Vrew)을 즉시 중단합니다" style="width:100%; padding:9px 12px; background:var(--danger); color:#fff; font-weight:700; white-space:nowrap;">⏹ 중지 (전체 중단)</button>
+        <button class="btn" id="pauseBtn" onclick="pauseGeneration()" style="width:100%; padding:6px 12px; background:var(--warning); color:#fff; display:none; white-space:nowrap;">일시정지</button>
       </div>
     </div>
 
@@ -3998,7 +3990,6 @@ async function startGeneration() {
 
   const result = await ipcRenderer.invoke('start-generation', config);
   document.getElementById('startBtn').disabled = false;
-  document.getElementById('stopBtn').style.display = 'none';
   const pbDone = document.getElementById('pauseBtn');
   pbDone.style.display = 'none';
   pbDone.textContent = '일시정지';
@@ -5388,7 +5379,6 @@ async function stopGeneration() {
   // 진행 중 시각 상태 정리 (이미지 생성중 오버레이 제거)
   _clearInProgressVisuals();
   // 버튼 정리
-  const stopBtn = document.getElementById('stopBtn'); if (stopBtn) stopBtn.style.display = 'none';
   const pb = document.getElementById('pauseBtn');
   if (pb) { pb.style.display = 'none'; pb.textContent = '일시정지'; pb.style.background = 'var(--warning)'; }
   isPaused = false;
@@ -6789,19 +6779,19 @@ function _splitScriptImpl() {
   // 분할 옵션 안내문 끝에 그룹 수 미리보기 갱신 (입력 변경 시마다 자동 갱신됨)
   const previewEl = document.getElementById('splitGroupCountPreview');
   if (previewEl) {
-    const introCnt = groups.filter(g => g.isIntro).length;
-    const mainCnt = groups.length - introCnt;
+    const introCnt   = groups.filter(g => g.isIntro).length;
+    const bracketCnt = groups.filter(g => g.isBracket).length;
+    const mainCnt    = groups.length - introCnt - bracketCnt;
     const sentTxt = `${sentences.length}문장`;
-    if (introCnt > 0) {
-      previewEl.innerHTML =
-        `→ ${sentTxt} → ` +
-        `<span style="color:var(--info);">📘 도입부 ${introCnt}그룹</span> + ` +
-        `📕 본론 ${mainCnt}그룹 = ` +
-        `<span style="color:var(--accent);">총 ${groups.length}그룹</span>`;
-    } else {
-      previewEl.innerHTML =
-        `→ ${sentTxt} → <span style="color:var(--accent);">총 ${groups.length}그룹</span>`;
-    }
+    const parts = [];
+    if (introCnt > 0)   parts.push(`<span style="color:var(--info);">📘 도입부 ${introCnt}</span>`);
+    if (mainCnt > 0)    parts.push(`📕 본론 ${mainCnt}`);
+    if (bracketCnt > 0) parts.push(`<span style="color:var(--accent);">[ ] 구간 ${bracketCnt}</span>`);
+    const breakdown = parts.length > 1 ? `${parts.join(' + ')} = ` : '';
+    // 그룹 1개 = 이미지 1장 → 사용자가 생성할 이미지 장수를 바로 알 수 있게 표시
+    previewEl.innerHTML =
+      `→ ${sentTxt} → ${breakdown}` +
+      `<span style="color:var(--accent);">총 ${groups.length}그룹 · 🖼 ${groups.length}장 이미지</span>`;
   }
 
   // 그룹 범위 입력 자동 채움 — 기본은 도입부 그룹 전체 (도입부 없으면 1~10)
@@ -10874,8 +10864,7 @@ function _finishAutoProgress(summary) {
   const sumEl = document.getElementById('autoProgressSummary');
   // 중지 버튼 숨김 — 작업 종료된 시점이라 무의미
   if (stopBtn) stopBtn.style.display = 'none';
-  // 팝업 미표시 모드 — footer 중지 버튼도 함께 숨김
-  try { const _fsb = document.getElementById('stopBtn'); if (_fsb) _fsb.style.display = 'none'; } catch (_) {}
+  // (footer 중지 버튼은 상시 노출 — 숨기지 않음)
   if (closeBtn) {
     closeBtn.disabled = false;
     closeBtn.style.opacity = '1';
@@ -13173,8 +13162,7 @@ async function _runRunPodImageGeneration(groupIds, label, modelOverride) {
 
   addLog(`[Gemini] ${label} ${targets.length}개 그룹 이미지 생성 시작 (Nano Banana 2 · GPU 불필요)`, 'info');
 
-  window._imageGenStop = false;  // 진입 시 중단 플래그 리셋
-  window._autoCancelRequested = false;
+  window._imageGenStop = false;  // 진입 시 이미지 중단 플래그만 리셋 (파이프라인 취소는 generateAll 관리)
   try { const _sb = document.getElementById('stopBtn'); if (_sb) _sb.style.display = ''; } catch (_) {}
   let success = 0, failed = 0;
   for (let i = 0; i < targets.length; i++) {
@@ -13259,7 +13247,6 @@ async function _runRunPodImageGeneration(groupIds, label, modelOverride) {
   }
 
   addLog(`[Gemini] ${label} 완료 — 성공 ${success}, 실패 ${failed}`, success > 0 ? 'ok' : 'err');
-  try { const _sb = document.getElementById('stopBtn'); if (_sb) _sb.style.display = 'none'; } catch (_) {}
 }
 
 // ─── 비디오 생성은 Grok 전용 (convertGroupRangeVideo / convertSelectedGroupsVideo) ───
@@ -13497,6 +13484,7 @@ async function generateAll() {
     const POLL_TIMEOUT = 6 * 60 * 1000;  // 최대 6분
     const pollStart = Date.now();
     while (Date.now() - pollStart < POLL_TIMEOUT) {
+      if (window._autoCancelRequested) break;  // 중단 시 즉시 폴링 종료
       // v1.13.21: rate-limit 으로 skip 된 그룹도 pending 에서 제외 — 자동제작이 무한 대기하지 않게
       const pending = proj.groups.filter(g =>
         (!g.imagePath || !fsImg2.existsSync(g.imagePath)) && g.imageStatus !== 'fail' && g.imageStatus !== 'rate-skipped'
@@ -13573,6 +13561,14 @@ async function generateAll() {
       _updateAutoStep('video', { current: videoDone, total: _introGroupCount, status: '완료', done: videoDone >= _introGroupCount });
     }
   } catch {}
+
+  // ⛔ 중단 게이트 — 사용자가 중지했으면 여기서 즉시 종료 (Vrew 빌드/폴더 열기 안 함)
+  if (window._autoCancelRequested) {
+    addLog('🛑 중단됨 — Vrew 빌드/마무리 스킵 (사용자 중지)', 'warn');
+    try { _finishAutoProgress('🛑 사용자 중지'); } catch (_) {}
+    try { const _sb = document.getElementById('taskStatusBadge'); if (_sb) _sb.textContent = ''; } catch (_) {}
+    return;
+  }
 
   // Vrew 자동 빌드 — embedded 모드 (saveVrew 가 모달을 새로 띄우지 않고 기존 step 갱신만)
   try {
@@ -13657,9 +13653,9 @@ async function _runGroupImageGeneration(groupIds, label) {
 async function _runGroupImageGenerationBody(projectId, groupIds, label, channel) {
   const proj = window._projects.find(p => p.id === projectId);
   if (!proj) return false;
-  // 새 생성 시작 — 이전 중지 플래그 해제 (안 그러면 _markGroupImageGenerating 가드가 영구 차단)
+  // 새 이미지 생성 시작 — 이미지 중단 플래그만 해제 (파이프라인 취소 _autoCancelRequested 는
+  // generateAll 만 관리 — 여기서 건드리면 자동제작 직후 중지가 무효화되는 race 발생)
   window._imageGenStop = false;
-  window._autoCancelRequested = false;
 
   // 선택된 그룹들의 합본 paragraph 만 모음. flow-engine 입장에서는 paragraphs[0..N-1] 가 되지만
   // 실제 그룹 번호는 다를 수 있어 (ex: 그룹 2, 5 만 재생성). 매핑 보존을 위해 _pendingGroupOrder 에 기록.
@@ -14034,7 +14030,6 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
   }
 
   document.getElementById('startBtn').disabled = false;
-  document.getElementById('stopBtn').style.display = 'none';
   const pbDone = document.getElementById('pauseBtn');
   pbDone.style.display = 'none';
   pbDone.textContent = '일시정지';
@@ -14439,8 +14434,8 @@ function _fileUrlForImage(absPath) {
 
 // 이미지 생성 중 — 해당 카드에 즉시 파란 스피너 오버레이 + 배지 갱신 (전체 재렌더 없이 실시간 피드백)
 function _markGroupImageGenerating(groupId) {
-  // 중지 요청 후 도착한 늦은 이벤트가 스피너를 다시 칠하지 못하게 차단
-  if (window._imageGenStop || window._autoCancelRequested) return;
+  // 중지 요청 후 도착한 늦은 이벤트가 스피너를 다시 칠하지 못하게 차단 (이미지 중단 플래그)
+  if (window._imageGenStop) return;
   const owner = _findProjectByGroupId(groupId);
   const g = owner && owner.groups.find(x => x.id === groupId);
   if (g) g.imageStatus = 'generating';
