@@ -1614,12 +1614,12 @@
             <div id="splitGroupCountPreview" style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--border-soft); font-size:13px; font-weight:700; color:var(--text-strong); text-align:center;"></div>
           </div>
 
-          <!-- 🎬 도입부 비디오 준비 — 도입부 TTS + 9초 재배치 (동영상 탭에서 이동) -->
+          <!-- 🎬 도입부 비디오 준비 — 도입부 TTS + 16초 재배치 (동영상 탭에서 이동) -->
           <div style="border-top:1px solid var(--border-soft); padding-top:10px; margin-top:10px;">
             <div style="font-size:12px; font-weight:700; color:var(--text-strong); margin-bottom:6px;">🎬 도입부 비디오 준비</div>
-            <button class="btn-sm" id="prepareIntroVideosBtn" onclick="prepareIntroVideos()" title="도입부 sentence 전체 TTS 합성 후 실제 음성 길이 9초 한도로 그룹을 다시 묶습니다. 자산이 이미 있으면 확인 후 초기화."
+            <button class="btn-sm" id="prepareIntroVideosBtn" onclick="prepareIntroVideos()" title="도입부 sentence 전체 TTS 합성 후 실제 음성 길이 16초 한도로 그룹을 다시 묶습니다. 자산이 이미 있으면 확인 후 초기화."
                     style="width:100%; padding:8px 12px; background:var(--accent-soft); color:var(--accent-hover); border:1px solid var(--accent); font-weight:600;">
-              🎙 도입부 TTS + 9초 재배치
+              🎙 도입부 TTS + 16초 재배치
             </button>
             <div id="prepareIntroProgress" style="font-size:11px; color:var(--text-muted); margin-top:6px; text-align:center;">—</div>
           </div>
@@ -1693,18 +1693,28 @@
 
             <div class="setting">
               <label>이미지 모델</label>
-              <select id="runpodImageModel" onchange="_onImageModelChange()" title="Flow=브라우저 자동화(기본·무료), Nano Banana 2=Gemini API 직접(유료 크레딧)" style="flex:1; padding:6px 8px; border-radius:6px;">
-                <option value="flow" selected>🌐 Flow (브라우저 자동화 · 무료 · 기본)</option>
+              <select id="runpodImageModel" onchange="_onImageModelChange()" title="Flow=브라우저 자동화(기본·무료), Nano Banana 2=Gemini API 직접(유료 크레딧), Genspark=genspark.ai 브라우저 자동화(무료·크롬 로그인)" style="flex:1; padding:6px 8px; border-radius:6px;">
+                <option value="genspark" selected>🌌 Genspark · Nano Banana 2 (브라우저 자동화 · 무료 · 기본)</option>
+                <option value="flow">🌐 Flow (브라우저 자동화 · 무료)</option>
                 <option value="gemini-nano-banana-2">🍌 Nano Banana 2 (API · 유료 크레딧)</option>
               </select>
             </div>
           </div>
 
-          <!-- 이미지 생성 버튼 — 한 줄 3개 (첨부 / 빈 그룹 / 선택 그룹) -->
-          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px; margin-top:10px;">
-            <button class="btn btn-sm-action" id="imageBatchAttachBtn" onclick="openImageBatchAttach()" style="font-size:12px; padding:8px 4px;" title="외부 이미지/동영상 파일을 그룹 제목 또는 그룹 번호(예: '그룹 01_...')와 매칭해서 자동 첨부">📎 이미지·영상 첨부</button>
-            <button class="btn btn-sm-action" onclick="generateEmptyGroupImagesRunPod()" style="font-size:12px; padding:8px 4px;" title="이미지가 비어있는 그룹만 순차적으로 생성 (모델은 위 드롭다운: Flow / Nano Banana 2)">🖼 빈 그룹 이미지</button>
-            <button class="btn btn-sm-action" onclick="generateSelectedGroupImagesRunPod()" style="font-size:12px; padding:8px 4px;" title="좌상단 체크박스로 선택한 그룹의 이미지를 생성/재생성 (모델은 위 드롭다운: Flow / Nano Banana 2)">🖼 선택 그룹 이미지</button>
+          <!-- 이미지 버튼 — 2개씩 3줄 (영상 변환과 동일 레이아웃·크기). 인라인 크기 스타일 없이 .btn-sm-action 기본 크기 사용 -->
+          <!-- 1행: 그룹범위 | 범위이미지 · 2행: 빈그룹 | 선택그룹 · 3행: 첨부 | Genspark 로그인 -->
+          <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px; margin-top:10px; align-items:stretch;">
+            <div class="range-cell">
+              <span>그룹</span>
+              <input type="number" id="imageRangeFrom" min="1" placeholder="시작" title="범위 시작 그룹 번호" />
+              <span>~</span>
+              <input type="number" id="imageRangeTo" min="1" placeholder="끝" title="범위 끝 그룹 번호 (빈칸=끝까지)" />
+            </div>
+            <button class="btn btn-sm-action" onclick="generateRangeGroupImages()" title="위 입력 범위의 그룹 이미지를 위 드롭다운 모델(Genspark/Flow/Nano Banana 2)로 생성/재생성">🖼 범위 이미지</button>
+            <button class="btn btn-sm-action" onclick="generateEmptyGroupImagesRunPod()" title="이미지가 비어있는 그룹만 순차적으로 생성 (모델은 위 드롭다운)">🖼 빈 그룹 이미지</button>
+            <button class="btn btn-sm-action" onclick="generateSelectedGroupImagesRunPod()" title="좌상단 체크박스로 선택한 그룹의 이미지를 생성/재생성 (모델은 위 드롭다운)">🖼 선택 그룹 이미지</button>
+            <button class="btn btn-sm-action" id="imageBatchAttachBtn" onclick="openImageBatchAttach()" title="외부 이미지/동영상 파일을 그룹 제목 또는 그룹 번호(예: '그룹 01_...')와 매칭해서 자동 첨부">📎 이미지·영상 첨부</button>
+            <button class="btn btn-sm-action" id="gensparkLoginBtn" onclick="openGensparkLogin()" title="Genspark 자동화 크롬을 띄우고 genspark.ai 로그인 페이지로 이동 (이미지 모델 Genspark 사용 전 로그인 권장 · 첫 실행 시 프로필 복사 10~30초)">🔑 Genspark 로그인</button>
           </div>
           <input type="file" id="imageBatchInput" multiple accept="image/jpeg,image/png,image/jpg,image/webp,video/mp4,video/webm,video/x-matroska,video/quicktime" style="display:none;">
 
@@ -1722,6 +1732,17 @@
                 placeholder="예: natural slow motion, cinematic feel"
                 title="이 문구가 Grok 비디오 생성 시 모션 프롬프트로 전달됩니다. 입력 끝낼 때 자동 저장 (~/.flow-app/grok-config.json)."
                 onchange="onGrokMotionPromptChange()"></textarea>
+            </div>
+
+            <!-- 타이핑 속도 (모션 프롬프트 입력 페이스 — 길이 무관 일관) -->
+            <div style="margin-bottom:8px; display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-muted);">
+              <label for="grokTypingSpeed" style="white-space:nowrap;">⌨ 타이핑 속도</label>
+              <select id="grokTypingSpeed" onchange="onGrokTypingSpeedChange()" title="Grok 모션 프롬프트를 입력하는 글자당 속도. 길이와 무관하게 일관됩니다." style="flex:1; padding:5px 8px; border-radius:6px; font-size:12px;">
+                <option value="instant">⚡ 즉시 (한 번에 입력 · 가장 빠름)</option>
+                <option value="fast">🚀 빠르게 (4ms/자)</option>
+                <option value="normal">🚶 보통 (12ms/자 · 기본)</option>
+                <option value="slow">🐢 느리게 (28ms/자 · 가장 안전)</option>
+              </select>
             </div>
 
             <!-- 영상 범위 + 변환 버튼 -->
@@ -2129,7 +2150,7 @@
   </div>
 </div>
 
-<!-- 🎬 도입부 비디오 준비 — 진행 상황 팝업 (TTS 합성 → 9초 재배치 → 저장) -->
+<!-- 🎬 도입부 비디오 준비 — 진행 상황 팝업 (TTS 합성 → 16초 재배치 → 저장) -->
 <div id="introPrepareModal" style="display:none; position:fixed; inset:0; background:rgba(58,52,46,0.55); z-index:1001; align-items:center; justify-content:center;">
   <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:14px; width:440px; max-width:92vw; box-shadow:var(--shadow-lg); display:flex; flex-direction:column; overflow:hidden;">
     <!-- 헤더 -->
@@ -2142,7 +2163,7 @@
     <div style="flex:none; padding:0 22px; display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600;">
       <span id="introStep1" class="intro-step" style="flex:1; text-align:center; padding:6px 4px; border-radius:6px; background:var(--bg-input); color:var(--text-muted);">① TTS 합성</span>
       <span style="color:var(--text-muted);">→</span>
-      <span id="introStep2" class="intro-step" style="flex:1; text-align:center; padding:6px 4px; border-radius:6px; background:var(--bg-input); color:var(--text-muted);">② 9초 재배치</span>
+      <span id="introStep2" class="intro-step" style="flex:1; text-align:center; padding:6px 4px; border-radius:6px; background:var(--bg-input); color:var(--text-muted);">② 16초 재배치</span>
       <span style="color:var(--text-muted);">→</span>
       <span id="introStep3" class="intro-step" style="flex:1; text-align:center; padding:6px 4px; border-radius:6px; background:var(--bg-input); color:var(--text-muted);">③ 저장</span>
     </div>
@@ -2165,7 +2186,7 @@
     <!-- 푸터 버튼 -->
     <div style="flex:none; padding:0 22px 18px 22px; display:flex; justify-content:center;">
       <button id="introStopBtn" class="btn-sm" onclick="_stopIntroPrepare()" style="padding:8px 22px; background:var(--danger-soft, #4a2a2a); color:var(--danger, #e57373); border:1px solid var(--danger, #e57373); font-weight:600;">⏹ 중지</button>
-      <button id="introDoneBtn" class="btn-sm" onclick="closeIntroPrepareModal()" style="display:none; padding:8px 28px; background:var(--accent-soft); color:var(--accent-hover); border:1px solid var(--accent); font-weight:600;">닫기</button>
+      <button id="introDoneBtn" class="btn-sm" onclick="closeIntroPrepareModal()" style="display:none; padding:8px 28px; background:var(--accent-soft); color:var(--accent-hover); border:1px solid var(--accent); font-weight:600;">완료</button>
     </div>
   </div>
 </div>
@@ -5849,7 +5870,7 @@ function _buildScriptCopyText(project, startIdx, endIdx) {
 // 대본을 .md 요청서로 내보내 → 클로드가 그룹별 영어 프롬프트 작성 → 다시 가져와 g.imagePrompt 에 저장.
 // 생성 시 (Flow/Nano) "앱 스타일 + Claude 본문 + 품질태그" 로 사용. 비용 0 (수동 왕복).
 
-// 내보내기/가져오기 전제 조건 — 대본 분할 + 도입부 TTS+9초 재배치 완료.
+// 내보내기/가져오기 전제 조건 — 대본 분할 + 도입부 TTS+16초 재배치 완료.
 // 도입부 재배치로 그룹이 확정되어야 프롬프트가 올바른 그룹에 매핑되므로 선행 필수.
 function _requireIntroPrepared() {
   const proj = window._currentProject;
@@ -5858,7 +5879,7 @@ function _requireIntroPrepared() {
     return false;
   }
   if (!proj._introPrepared) {
-    alert('먼저 "🎙 도입부 TTS + 9초 재배치" 를 실행해주세요.\n\n도입부 음성 길이에 맞춰 그룹이 확정된 뒤에야\nAI 프롬프트 내보내기/가져오기를 진행할 수 있습니다.');
+    alert('먼저 "🎙 도입부 TTS + 16초 재배치" 를 실행해주세요.\n\n도입부 음성 길이에 맞춰 그룹이 확정된 뒤에야\nAI 프롬프트 내보내기/가져오기를 진행할 수 있습니다.');
     return false;
   }
   return true;
@@ -7164,7 +7185,7 @@ function _splitScriptImpl() {
     },
     sentences,
     groups,
-    // 재분할되면 9초 재배치가 무효화되므로 도입부 준비 플래그 리셋 → 내보내기/가져오기 다시 차단
+    // 재분할되면 16초 재배치가 무효화되므로 도입부 준비 플래그 리셋 → 내보내기/가져오기 다시 차단
     _introPrepared: false,
   };
 
@@ -7289,10 +7310,10 @@ function renderTaskList(project) {
       const color = charSum > 50 ? 'var(--warn, #e8a84c)' : 'var(--text-muted)';
       charBadge = ` / <span style="color:${color};">${charSum}자</span>`;
     }
-    // 도입부 한정: 9초 초과 경고 배지 (regroupIntroByTtsDuration 가 마크)
+    // 도입부 한정: 16초 초과 경고 배지 (regroupIntroByTtsDuration 가 마크)
     let overBadge = '';
     if (g.isIntro && g.isOverDuration) {
-      overBadge = ` <span style="color:var(--danger, #d94c4c); font-weight:600; font-size:11px; padding:1px 6px; background:rgba(217,76,76,0.12); border-radius:4px;" title="이 그룹의 TTS 음성이 9초를 초과합니다. 비디오 클립 최대 10초 한도를 넘을 수 있어 문장을 더 잘게 나눠야 합니다.">⚠ 9초 초과</span>`;
+      overBadge = ` <span style="color:var(--danger, #d94c4c); font-weight:600; font-size:11px; padding:1px 6px; background:rgba(217,76,76,0.12); border-radius:4px;" title="이 그룹의 TTS 음성이 16초를 초과합니다. 비디오 클립 최대 10초 한도를 넘을 수 있어 문장을 더 잘게 나눠야 합니다.">⚠ 16초 초과</span>`;
     }
     // 그룹 합치기 버튼: 위 그룹이 같은 종류(도입↔도입, 본론↔본론) 일 때만 표시
     const groupIdx = project.groups.indexOf(g);
@@ -7493,7 +7514,7 @@ function renderTaskList(project) {
       const playBtn = row.querySelector('.sentence-play-btn');
       const splitBtn = row.querySelector('.sentence-split-btn');
       const sentenceId = s.id;
-      ttsBtn.onclick = (e) => { e.stopPropagation(); convertSentence(sentenceId); };
+      ttsBtn.onclick = (e) => { e.stopPropagation(); convertSentence(sentenceId, { regenerate: true }); };
       playBtn.onclick = (e) => { e.stopPropagation(); playSentence(sentenceId); };
       if (splitBtn) splitBtn.onclick = (e) => { e.stopPropagation(); splitGroupAtSentence(sentenceId); };
 
@@ -8814,7 +8835,7 @@ function _applyPresetSplitOptions(p) {
   }
   // 대본이 있고 값이 실제로 바뀌었을 때만 재분할 (불필요한 그룹 초기화 방지)
   if (changed && window._scriptText && typeof splitScript === 'function') {
-    addLog('프리셋 분할 옵션 적용 — 대본 재분할 (수동 합치기/9초 재배치는 초기화됩니다)', 'info');
+    addLog('프리셋 분할 옵션 적용 — 대본 재분할 (수동 합치기/16초 재배치는 초기화됩니다)', 'info');
     try { splitScript(); } catch (_) {}
   }
 }
@@ -11123,6 +11144,12 @@ async function _convertSentenceImpl(projectId, sid, preset, channel, _opts = {})
     const { getInstance } = require('../tts/tts-manager');
     const mgr = getInstance();
     const opts = _buildSynthesizeOpts(preset, channel);
+    // 단일 수동 재생성(문장별 🎙 버튼) — 매번 새 seed 로 re-roll 해서 첫 클릭에 다른 음성이 나오게.
+    //   (배치/자동제작은 silent:true 라 프리셋 고정 seed 유지 → 영상 전체 음성 일관성 보존)
+    //   OmniVoice voice clone 은 참조음성(=화자)은 그대로, seed 만 바뀌어 같은 목소리의 다른 테이크가 됨.
+    if (_opts.regenerate) {
+      opts.seed = Math.floor(Math.random() * 1e9);
+    }
     if (preset.voice === 'clone' && preset.engine === 'omnivoice' && (!opts.refAudioPath || !opts.refText)) {
       addLog(`[!] [${sentence.num}] Voice Clone 모드인데 참조음성/참조텍스트 누락 — 프리셋 ⚙ 다시 설정 후 저장 필요`, 'err');
       sentence.ttsStatus = 'fail';
@@ -11839,7 +11866,8 @@ function _makeAudioUrl(filePath) {
   try {
     const fs = require('fs');
     const m = Math.floor(fs.statSync(filePath).mtimeMs);
-    return `${url}#${m}`;
+    // ?t= 쿼리스트링이라야 Chromium 미디어 캐시가 갱신됨 (#fragment 는 캐시 키에서 무시됨 → 옛 음성 재생)
+    return `${url}?t=${m}`;
   } catch (_) {
     return url;
   }
@@ -12415,6 +12443,8 @@ function _initGrokMotionPromptInput() {
     const cfg = GrokStore.load();
     const el = document.getElementById('grokMotionPromptInput');
     if (el && typeof cfg.defaultMotionPrompt === 'string') el.value = cfg.defaultMotionPrompt;
+    const spd = document.getElementById('grokTypingSpeed');
+    if (spd && cfg.typingSpeed) spd.value = cfg.typingSpeed;
   } catch (e) {
     console.error('[grok-motion-prompt init]', e);
   }
@@ -12427,6 +12457,17 @@ function onGrokMotionPromptChange() {
     GrokStore.update({ defaultMotionPrompt: el.value.trim() });
   } catch (e) {
     console.error('[grok-motion-prompt save]', e);
+  }
+}
+// Grok 모션 프롬프트 타이핑 속도 저장 (grok-store.typingSpeed). 엔진 재시작 없이 다음 변환부터 적용.
+function onGrokTypingSpeedChange() {
+  try {
+    const spd = document.getElementById('grokTypingSpeed');
+    if (!spd) return;
+    require('../tts/grok-store').update({ typingSpeed: spd.value });
+    addLog(`[Grok] 타이핑 속도: ${spd.value}`, 'info');
+  } catch (e) {
+    console.error('[grok-typing-speed save]', e);
   }
 }
 // DOM 준비 즉시 초기화 (스크립트가 HTML 뒤에 있어도 안전한 패턴)
@@ -12940,8 +12981,8 @@ async function convertGroupSentences(groupId) {
   }
 }
 
-// ─── 도입부 일괄 TTS + 9초 재배치 ──────────────────────────────────
-// 도입부 sentence 전부 TTS 합성 → 실제 TTS 길이 9초 한도로 도입부 그룹 재구성.
+// ─── 도입부 일괄 TTS + 16초 재배치 ──────────────────────────────────
+// 도입부 sentence 전부 TTS 합성 → 실제 TTS 길이 16초 한도로 도입부 그룹 재구성.
 // 비디오 클립 최대 10초 제약에 안전 마진 1초 적용.
 // ─── 도입부 비디오 준비 진행 팝업 제어 ──────────────────────────────
 function _openIntroPrepareModal(totalSentences) {
@@ -13063,7 +13104,7 @@ async function prepareIntroVideos() {
       addLog('도입부 재배치 취소됨 (자산 충돌)', 'info');
       return;
     }
-    _pushGroupUndoSnapshot('도입부 9초 재배치');
+    _pushGroupUndoSnapshot('도입부 16초 재배치');
     // 자산 초기화 — 도입부 그룹 전체
     for (const g of proj.groups) {
       if (!g.isIntro) continue;
@@ -13073,7 +13114,7 @@ async function prepareIntroVideos() {
       if ('videoDowngradedTo480p' in g) g.videoDowngradedTo480p = false;
     }
   } else {
-    _pushGroupUndoSnapshot('도입부 9초 재배치');
+    _pushGroupUndoSnapshot('도입부 16초 재배치');
   }
 
   // Phase A — 도입부 sentence 일괄 TTS 합성
@@ -13125,15 +13166,15 @@ async function prepareIntroVideos() {
     addLog(`[도입부] TTS 완료 — ${success}문장`, 'ok');
   }
 
-  // Phase B — 9초 기준 재배치
-  setProgress('9초 기준 재배치 중…');
+  // Phase B — 16초 기준 재배치
+  setProgress('16초 기준 재배치 중…');
   _setIntroStep(2);
   _setIntroProgressBar(100);
-  _updateIntroProgress({ ok: success, fail, text: '9초 기준으로 그룹 재배치 중…' });
+  _updateIntroProgress({ ok: success, fail, text: '16초 기준으로 그룹 재배치 중…' });
   let regroupResult;
   try {
     const GB = require('../core/group-builder');
-    regroupResult = GB.regroupIntroByTtsDuration(proj, { maxSec: 9 });
+    regroupResult = GB.regroupIntroByTtsDuration(proj, { maxSec: 16 });
   } catch (e) {
     addLog(`[도입부] 재배치 실패: ${e.message}`, 'err');
     setProgress('재배치 실패');
@@ -13143,7 +13184,7 @@ async function prepareIntroVideos() {
     return;
   }
 
-  // 9초 초과 그룹 마크 (id 기반)
+  // 16초 초과 그룹 마크 (id 기반)
   const overSet = new Set(regroupResult.overGroupIds || []);
   for (const g of proj.groups) {
     g.isOverDuration = !!(g.isIntro && overSet.has(g.id));
@@ -13159,10 +13200,10 @@ async function prepareIntroVideos() {
 
   const newIntroGroupCount = proj.groups.filter(g => g.isIntro).length;
   const overCount = overSet.size;
-  const summary = `완료 — ${introSentences.length}문장 → ${newIntroGroupCount}그룹` + (overCount ? ` (⚠ 9초 초과 ${overCount})` : '');
+  const summary = `완료 — ${introSentences.length}문장 → ${newIntroGroupCount}그룹` + (overCount ? ` (⚠ 16초 초과 ${overCount})` : '');
   setProgress(summary);
   _finishIntroPrepareModal(`✅ ${summary}` + (fail > 0 ? `\n(TTS 실패 ${fail}문장 — 재배치는 진행됨)` : ''), { isError: false });
-  addLog(`[도입부] 재배치 완료 — ${introSentences.length}문장 → ${newIntroGroupCount}그룹 (9초 한도, 초과 ${overCount})`, 'ok');
+  addLog(`[도입부] 재배치 완료 — ${introSentences.length}문장 → ${newIntroGroupCount}그룹 (16초 한도, 초과 ${overCount})`, 'ok');
   setBtnDisabled(false);
   if (btn) btn.innerHTML = origBtnText;
   // (탭 자동 이동 제거됨 — 가져오기 '그룹에 적용' 시 제작 탭으로 이동)
@@ -13287,7 +13328,7 @@ function mergeGroupWithPrev(groupId) {
   let r;
   try {
     const GB = require('../core/group-builder');
-    r = GB.mergeGroupWithPrev(proj, groupId, { maxSec: 9 });
+    r = GB.mergeGroupWithPrev(proj, groupId, { maxSec: 16 });
   } catch (e) {
     addLog(`그룹 합치기 실패: ${e.message}`, 'err');
     return;
@@ -13329,7 +13370,7 @@ function splitGroupAtSentence(sentenceId) {
   let r;
   try {
     const GB = require('../core/group-builder');
-    r = GB.splitGroupAt(proj, g.id, sentenceId, { maxSec: 9 });
+    r = GB.splitGroupAt(proj, g.id, sentenceId, { maxSec: 16 });
   } catch (e) {
     addLog(`그룹 나누기 실패: ${e.message}`, 'err');
     return;
@@ -13669,11 +13710,14 @@ function _onImageModelChange() {
   const sel = document.getElementById('runpodImageModel');
   const model = (sel && sel.value) || 'flow';
   const isGemini = model.startsWith('gemini');
+  const isGenspark = model === 'genspark';
 
   const hint = document.getElementById('imageModelHint');
   if (hint) {
     hint.style.display = '';
-    if (isGemini) {
+    if (isGenspark) {
+      hint.textContent = '🌌 Genspark — genspark.ai Nano Banana 2 브라우저 자동화 (무료 · 크롬 로그인 필요 · 2K/16:9/자동프롬프트OFF 자동 설정). 무료 크레딧 소진 주의.';
+    } else if (isGemini) {
       hint.textContent = '🍌 Nano Banana 2 — Gemini API 직접 호출. GPU 불필요 · 16:9 자동 · 유료 크레딧 차감 (대량이면 비용 주의).';
     } else {
       hint.textContent = '🌐 Flow — Google Flow 브라우저 자동화 (무료 · 기본). 프로필 로그인 필요.';
@@ -13698,7 +13742,9 @@ async function generateEmptyGroupImagesRunPod() {
     return;
   }
   const _m1 = (document.getElementById('runpodImageModel') || {}).value || 'flow';
-  const _msg1 = _m1.startsWith('gemini')
+  const _msg1 = _m1 === 'genspark'
+    ? `🌌 Genspark(genspark.ai 브라우저 자동화)로 ${empties.length}개 빈 그룹 이미지 생성. 자동화 크롬 창이 열립니다 (Genspark 로그인 필요 · 무료 크레딧 소진 주의). 진행할까요?`
+    : _m1.startsWith('gemini')
     ? `🍌 Nano Banana 2(API)로 ${empties.length}개 빈 그룹 이미지 생성 (유료 크레딧). 진행할까요?`
     : `🌐 Flow(브라우저 자동화)로 ${empties.length}개 빈 그룹 이미지 생성. Chrome 자동화 창이 열립니다. 진행할까요?`;
   if (!confirm(_msg1)) return;
@@ -13719,11 +13765,49 @@ async function generateSelectedGroupImagesRunPod() {
     return;
   }
   const _m2 = (document.getElementById('runpodImageModel') || {}).value || 'flow';
-  const _msg2 = _m2.startsWith('gemini')
+  const _msg2 = _m2 === 'genspark'
+    ? `🌌 Genspark(genspark.ai 브라우저 자동화)로 체크된 ${checked.length}개 그룹 이미지 생성. 자동화 크롬 창이 열립니다 (Genspark 로그인 필요 · 무료 크레딧 소진 주의). 진행할까요?`
+    : _m2.startsWith('gemini')
     ? `🍌 Nano Banana 2(API)로 체크된 ${checked.length}개 그룹 이미지 생성 (유료 크레딧). 진행할까요?`
     : `🌐 Flow(브라우저 자동화)로 체크된 ${checked.length}개 그룹 이미지 생성. Chrome 자동화 창이 열립니다. 진행할까요?`;
   if (!confirm(_msg2)) return;
   await _runRunPodImageGeneration(checked, '선택그룹');
+}
+
+// 범위 이미지 — videoRange(범위 영상)와 동일 개념. imageRangeFrom~To 의 그룹만 이미지 생성.
+// 모델은 위 드롭다운(Flow/Nano Banana 2/Genspark)을 그대로 따름 (_runRunPodImageGeneration 경유).
+async function generateRangeGroupImages() {
+  const proj = window._currentProject;
+  if (!proj || !proj.groups || proj.groups.length === 0) {
+    alert('먼저 대본을 분할하세요');
+    return;
+  }
+  const totalGroups = proj.groups.length;
+  const fromRaw = (document.getElementById('imageRangeFrom')?.value || '').trim();
+  const toRaw   = (document.getElementById('imageRangeTo')?.value || '').trim();
+  const from = fromRaw ? parseInt(fromRaw, 10) : 1;
+  const to   = toRaw   ? parseInt(toRaw,   10) : totalGroups;
+  if (isNaN(from) || from < 1 || from > totalGroups) {
+    alert(`시작 그룹 번호가 유효하지 않습니다 (1 ~ ${totalGroups})`);
+    return;
+  }
+  if (isNaN(to) || to < from || to > totalGroups) {
+    alert(`끝 그룹 번호가 유효하지 않습니다 (${from} ~ ${totalGroups})`);
+    return;
+  }
+  const targets = proj.groups.filter(g => g.num >= from && g.num <= to);
+  if (targets.length === 0) {
+    alert(`그룹 ${from}~${to} 에 해당하는 그룹이 없습니다.`);
+    return;
+  }
+  const _m = (document.getElementById('runpodImageModel') || {}).value || 'flow';
+  const _msg = _m === 'genspark'
+    ? `🌌 Genspark 로 그룹 ${from}~${to} (${targets.length}개) 이미지 생성/재생성. 자동화 크롬 창이 열립니다 (Genspark 로그인 필요 · 무료 크레딧 소진 주의). 진행할까요?`
+    : _m.startsWith('gemini')
+    ? `🍌 Nano Banana 2(API)로 그룹 ${from}~${to} (${targets.length}개) 이미지 생성/재생성 (유료 크레딧). 진행할까요?`
+    : `🌐 Flow(브라우저 자동화)로 그룹 ${from}~${to} (${targets.length}개) 이미지 생성/재생성. Chrome 자동화 창이 열립니다. 진행할까요?`;
+  if (!confirm(_msg)) return;
+  await _runRunPodImageGeneration(targets.map(g => g.id), `범위[${from}~${to}]`);
 }
 
 // 무료 Google 번역 — 키 불필요. gemini-image-tester.js 의 _translateToEnglish 와 동일.
@@ -13767,6 +13851,12 @@ async function _runRunPodImageGeneration(groupIds, label, modelOverride) {
   // modelOverride 가 있으면 그것을 우선 사용.
   const imageModel = modelOverride || (document.getElementById('runpodImageModel') || {}).value || 'flow';
   const isGemini = imageModel.startsWith('gemini');
+  const isGenspark = imageModel === 'genspark';
+
+  // Genspark — genspark.ai 브라우저 자동화 (Nano Banana 2 · 무료). 별도 경로로 위임.
+  if (isGenspark) {
+    return await _runGensparkImageGeneration(groupIds, label);
+  }
 
   // Flow(기본) — 브라우저 자동화 경로로 위임 (main.js start-generation → FlowAutomator)
   if (!isGemini) {
@@ -13879,6 +13969,161 @@ async function _runRunPodImageGeneration(groupIds, label, modelOverride) {
   }
 
   addLog(`[Gemini] ${label} 완료 — 성공 ${success}, 실패 ${failed}`, success > 0 ? 'ok' : 'err');
+}
+
+// ─── 그룹 이미지 생성 (Genspark · genspark.ai Nano Banana 2 브라우저 자동화) ──────────
+// Grok 엔진과 같은 외부사이트 자동화 패턴. 결과는 Gemini 경로와 동일하게 g.imagePath/imageStatus 채움.
+// 같은 채팅 스레드에서 셋업(2K/16:9/자동프롬프트OFF) 1회 후 그룹별 프롬프트만 순차 제출.
+let _gensparkEngineInstance = null;
+function _getGensparkEngine() {
+  if (!_gensparkEngineInstance) {
+    try {
+      const { GensparkEngine } = require('../genspark-engine');
+      const GensparkStore = require('../tts/genspark-store');
+      const cfg = GensparkStore.load();
+      _gensparkEngineInstance = new GensparkEngine({
+        profileId: cfg.profileId,
+        logger: (msg) => addLog(msg, 'info'),
+      });
+    } catch (e) {
+      addLog(`[Genspark] 엔진 로드 실패: ${e.message}`, 'err');
+      return null;
+    }
+  }
+  return _gensparkEngineInstance;
+}
+
+async function _runGensparkImageGeneration(groupIds, label) {
+  const proj = window._currentProject;
+  if (!proj) return;
+  const fs = require('fs');
+  const path = require('path');
+
+  const ChannelStore = require('../core/channel-store');
+  const channel = (typeof _activeChannelId !== 'undefined' && _activeChannelId)
+    ? ChannelStore.getById(_activeChannelId) : null;
+  const baseOutDir = _resolveOutputDir(channel);
+  if (!baseOutDir) {
+    alert('출력 폴더를 먼저 선택하세요 (또는 채널을 등록하세요)');
+    return;
+  }
+  const imagesDir = path.join(baseOutDir, 'images');
+  fs.mkdirSync(imagesDir, { recursive: true });
+
+  const targets = groupIds.map(id => proj.groups.find(g => g.id === id)).filter(Boolean);
+  if (targets.length === 0) return;
+
+  const engine = _getGensparkEngine();
+  if (!engine) { addLog('[Genspark] 엔진 사용 불가 — 중단', 'err'); return; }
+
+  let batchSize = 6;
+  try { batchSize = Math.min(6, Math.max(1, require('../tts/genspark-store').load().batchSize || 6)); } catch (_) {}
+
+  addLog(`[Genspark] ${label} ${targets.length}개 그룹 이미지 생성 시작 (genspark.ai · Nano Banana 2 · 한 번에 ${batchSize}장)`, 'info');
+
+  window._imageGenStop = false;
+  window._gensparkGenActive = true;
+  try { const _sb = document.getElementById('stopBtn'); if (_sb) _sb.style.display = ''; } catch (_) {}
+  const _abort = () => (!window._gensparkGenActive) || window._imageGenStop;
+
+  // ── Phase A: 모든 대상 그룹의 프롬프트를 먼저 빌드 (Gemini 경로와 동일 구조) ──
+  let stylePrompt = '';
+  try { const styleObj = _getActiveStylePrompt(); stylePrompt = (styleObj && styleObj.prompt) ? styleObj.prompt.trim() : ''; } catch (_) {}
+  let presetEn = '';
+  try {
+    const _pk = (document.getElementById('presetPrompt')?.value || '').trim();
+    if (_pk) presetEn = (await _translateKoToEn(_pk)) || _pk;
+  } catch (_) {}
+
+  const items = [];  // { g, num, prompt, outputPath }
+  for (const g of targets) {
+    if (_abort()) break;
+    const koreanText = _buildGroupParagraph(g, proj).slice(0, 800);
+    if (!koreanText) { addLog(`[Genspark] 그룹 ${g.num} — 텍스트 없음, 스킵`, 'warn'); continue; }
+    let prompt;
+    if (g.imagePrompt && g.imagePrompt.trim()) {
+      const cparts = [];
+      if (stylePrompt) cparts.push(stylePrompt);
+      cparts.push(g.imagePrompt.trim());
+      if (presetEn) cparts.push(presetEn);
+      prompt = cparts.join(', ');
+    } else {
+      let englishText = await _translateKoToEn(koreanText);
+      if (!englishText) englishText = await _translateKoToEn(koreanText);
+      const parts = [];
+      if (stylePrompt) parts.push(stylePrompt);
+      parts.push(`scene: ${englishText || koreanText}`);
+      if (presetEn) parts.push(`setting: ${presetEn}`);
+      prompt = parts.join(', ');
+    }
+    const filename = `그룹${String(g.num).padStart(2, '0')}_${Date.now()}_${items.length}.png`;
+    items.push({ g, num: g.num, prompt, outputPath: path.join(imagesDir, filename) });
+  }
+  addLog(`[Genspark] 프롬프트 ${items.length}개 준비 · 스타일 ${stylePrompt ? '✓' : '미선택'} · 사전설정 ${presetEn ? '✓' : '없음'}`, 'info');
+
+  // ── Phase B: batchSize 단위로 줄바꿈 나열 → 한 번에 제출 ──
+  let success = 0, failed = 0;
+  try {
+    const totalB = Math.ceil(items.length / batchSize);
+    for (let b = 0; b < items.length; b += batchSize) {
+      if (_abort()) { addLog('[Genspark] ⏹ 중지 — 이미지 생성 중단', 'warn'); break; }
+      const chunk = items.slice(b, b + batchSize);
+      const bn = Math.floor(b / batchSize) + 1;
+      addLog(`[Genspark] 배치 ${bn}/${totalB} — ${chunk.length}장 (그룹 ${chunk.map(c => c.num).join(',')})`, 'info');
+
+      chunk.forEach(c => { c.g.imageStatus = 'generating'; _markGroupImageGenerating(c.g.id); });
+
+      const results = await engine.generateImagesBatch({
+        prompts: chunk.map(c => c.prompt),
+        outputPaths: chunk.map(c => c.outputPath),
+        abortSignal: _abort,
+      });
+
+      chunk.forEach((c, i) => {
+        const r = results[i];
+        if (r && r.path) {
+          c.g.imageStatus = 'done';
+          _setGroupImageThumbnail(c.g.id, r.path);
+          success++;
+        } else {
+          failed++;
+          try { c.g.imageStatus = 'fail'; _markGroupImageFailed(c.g.id); } catch (_) {}
+          addLog(`[Genspark] 그룹 ${c.num} ❌ ${(r && r.error) || '알 수 없는 오류'}`, 'err');
+        }
+      });
+
+      // anti-detect: 다음 배치 전 8~15초 (1초 단위 분할로 중단 반영)
+      if (b + batchSize < items.length && !_abort()) {
+        const waitMs = 8000 + Math.floor(Math.random() * 7001);
+        const startWait = Date.now();
+        while (Date.now() - startWait < waitMs) {
+          if (_abort()) break;
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+    }
+  } finally {
+    window._gensparkGenActive = false;
+    // 배치 종료 — 자동화 크롬 닫기 (다음 호출 때 새로 시작)
+    try { if (_gensparkEngineInstance) { await _gensparkEngineInstance.stop(); } } catch (_) {}
+    _gensparkEngineInstance = null;
+  }
+
+  addLog(`[Genspark] ${label} 완료 — 성공 ${success}, 실패 ${failed}`, success > 0 ? 'ok' : 'err');
+}
+
+/** Genspark 로그인 페이지로 이동 — 이미지 생성 전 사용자가 미리 로그인해두는 용도. */
+async function openGensparkLogin() {
+  try {
+    addLog('[Genspark] 로그인 페이지 열기 — 자동화 크롬 시작 중 (첫 실행 시 프로필 복사 10~30초)...', 'info');
+    const engine = _getGensparkEngine();
+    if (!engine) return;
+    await engine.openLoginPage();
+    addLog('[Genspark] 로그인 페이지 열림 — 이미 로그인돼있으면 자동으로 진행됩니다', 'ok');
+  } catch (e) {
+    addLog(`[Genspark] 로그인 페이지 열기 실패: ${e.message}`, 'err');
+    console.error('[openGensparkLogin]', e);
+  }
 }
 
 // ─── 비디오 생성은 Grok 전용 (convertGroupRangeVideo / convertSelectedGroupsVideo) ───

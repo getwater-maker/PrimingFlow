@@ -53,6 +53,47 @@ function wavToMp3(wavPath, mp3Path) {
   }
 }
 
+// 모든 WAV 문장을 MP3 로 **병렬** 사전 변환 (동시 N개). 반환: Map<wavPath, mp3Path>.
+// 기존엔 빌드 루프에서 spawnSync 로 1개씩 직렬 변환 → 366개면 ~9분. 이걸 비동기 spawn 병렬로
+// 바꿔 수십 초로 단축 + 변환 중 메인 스레드가 양보되어 진행률 UI 도 갱신됨. (MP3 출력 유지 = 형식 안전)
+async function preConvertWavsToMp3(sentences, log, concurrency = 8) {
+  const { spawn } = require('child_process');
+  const map = new Map();
+  if (!_ffmpegPath || !fs.existsSync(_ffmpegPath)) return map;  // ffmpeg 없으면 루프가 wav 그대로 폴백
+  const uniq = [...new Set(
+    (sentences || [])
+      .map(s => s && s.ttsAudioPath)
+      .filter(p => p && path.extname(p).toLowerCase() === '.wav' && fs.existsSync(p))
+  )];
+  if (!uniq.length) return map;
+  log(`[Vrew] WAV→MP3 병렬 변환 시작 — ${uniq.length}개 (동시 ${concurrency})`);
+
+  let idx = 0, done = 0;
+  const convertOne = (wavPath) => new Promise((resolve) => {
+    const mp3Path = path.join(os.tmpdir(), `pf_tts_${sid()}.mp3`);
+    let p;
+    try {
+      p = spawn(_ffmpegPath, [
+        '-y', '-i', wavPath,
+        '-codec:a', 'libmp3lame', '-b:a', '192k', '-ar', '24000', '-ac', '1',
+        mp3Path,
+      ], { stdio: 'ignore' });
+    } catch (_) { done++; return resolve(); }
+    p.on('close', (code) => {
+      if (code === 0 && fs.existsSync(mp3Path)) map.set(wavPath, mp3Path);
+      done++;
+      if (done % 20 === 0 || done === uniq.length) log(`[Vrew] WAV→MP3 변환 ${done}/${uniq.length}`);
+      resolve();
+    });
+    p.on('error', () => { done++; resolve(); });
+  });
+
+  const worker = async () => { while (idx < uniq.length) { await convertOne(uniq[idx++]); } };
+  await Promise.all(Array.from({ length: Math.min(concurrency, uniq.length) }, worker));
+  log(`[Vrew] WAV→MP3 변환 완료 — 성공 ${map.size}/${uniq.length}`);
+  return map;
+}
+
 // Vrew 본가가 STT 로 만드는 word 단위 자막을 흉내 — 공백 기준 어절 분리.
 // 빈 입력은 [원문] 그대로 1개 토큰으로 처리해 트랙이 깨지지 않게 함.
 function splitWordsForVrew(text) {
@@ -700,6 +741,9 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
   const missingTts = [];
   const clipDurations = []; // index = transcript clip 순번 (0-based), value = 초
 
+  // ★ WAV→MP3 를 빌드 루프 전에 병렬 사전 변환 (직렬 spawnSync 9분 → 병렬 수십 초). MP3 출력 유지.
+  const _mp3Cache = await preConvertWavsToMp3(sentences, log, 8);
+
   for (const s of sentences) {
     if (!s.ttsAudioPath || !fs.existsSync(s.ttsAudioPath)) {
       missingTts.push(s.num);
@@ -715,13 +759,21 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
     let outExt  = srcExt;
     let codec   = (srcExt === 'wav') ? 'wav' : 'mp3';
     if (srcExt === 'wav') {
-      const mp3Path = path.join(os.tmpdir(), `pf_tts_${ttsMid}.mp3`);
-      if (wavToMp3(s.ttsAudioPath, mp3Path)) {
-        ttsSrc = mp3Path;
+      // 1순위: 병렬 사전 변환 캐시. 미스(변환 실패)면 동기 1회 폴백, 그래도 실패면 wav 그대로.
+      const cachedMp3 = _mp3Cache.get(s.ttsAudioPath);
+      if (cachedMp3 && fs.existsSync(cachedMp3)) {
+        ttsSrc = cachedMp3;
         outExt = 'mp3';
         codec  = 'mp3';
       } else {
-        log(`[Vrew] wav→mp3 변환 실패 — wav 그대로 사용: ${path.basename(s.ttsAudioPath)}`);
+        const mp3Path = path.join(os.tmpdir(), `pf_tts_${ttsMid}.mp3`);
+        if (wavToMp3(s.ttsAudioPath, mp3Path)) {
+          ttsSrc = mp3Path;
+          outExt = 'mp3';
+          codec  = 'mp3';
+        } else {
+          log(`[Vrew] wav→mp3 변환 실패 — wav 그대로 사용: ${path.basename(s.ttsAudioPath)}`);
+        }
       }
     }
     const ttsFn = `${ttsMid}.${outExt}`;

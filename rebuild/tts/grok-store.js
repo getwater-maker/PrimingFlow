@@ -27,6 +27,8 @@ const DEFAULTS = {
   videoResolution: '720p',     // '480p' | '720p' (사용자 정책: 720p 기본)
   videoDuration:   '10s',      // '6s' | '10s' (사용자 정책: 10s 기본)
   videoAspect:     '16:9 Widescreen',  // '16:9 Widescreen' | '9:16 Vertical' | '1:1 Square' | '2:3 Tall' | '3:2 Wide'
+  // 모션 프롬프트 타이핑 속도 — 글자당 고정 ms (길이와 무관하게 일관). 'fast'|'normal'|'slow'|'instant'
+  typingSpeed:     'normal',
   // v1.13.42: 사용자 요청으로 기본값 0(무제한) 로 변경. 0 이상 양수면 그 값이 일일 한도.
   // 0 으로 두면 checkDailyLimit() 가 항상 통과 — Grok 측 자체 한도/차단만 신뢰.
   maxDailyVideos: 0,

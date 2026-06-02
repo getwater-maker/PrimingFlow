@@ -436,8 +436,8 @@ function buildGroupsHybrid(items, thresholds) {
   return { sentences, groups };
 }
 
-// 도입부 비디오 한도 — 안전 마진 1초 두고 9초 (실제 비디오 클립 최대 10초)
-const INTRO_VIDEO_MAX_SEC_DEFAULT = 9;
+// 도입부 클립 길이 한도 — 16초 (사용자 설정: 1클립 ≈ 16초 근처로 묶음). 방식은 동일, 시간만 9→16.
+const INTRO_VIDEO_MAX_SEC_DEFAULT = 16;
 
 /**
  * 도입부 그룹을 TTS 실제 재생 시간 기준으로 재배치.
@@ -478,7 +478,7 @@ function regroupIntroByTtsDuration(project, opts) {
 
   // 새 도입부 그룹 재구성 — 누적 TTS 길이 기준
   const newIntroGroups = [];
-  const overGroupRefs = []; // 9초 초과 그룹 참조 (id 확정 전이라 참조로 보관)
+  const overGroupRefs = []; // 16초 초과 그룹 참조 (id 확정 전이라 참조로 보관)
   let currentGroup = null;
   let currentSec = 0;
 
@@ -539,7 +539,7 @@ function _groupTtsSec(group, sentMap) {
 /**
  * 주어진 그룹을 바로 위(앞) 그룹과 합치기.
  * - 첫 그룹이거나 위 그룹과 isIntro 가 다르면 거부.
- * - 합치기 후 도입부면 isOverDuration 재평가 (9초 한도).
+ * - 합치기 후 도입부면 isOverDuration 재평가 (16초 한도).
  * - 자산(imagePath/videoPath/...) 정리는 호출자 책임 (충돌 검사 + 사용자 confirm).
  *
  * @returns {{ok: boolean, reason?: string, newGroupId?: string}}
@@ -563,7 +563,7 @@ function mergeGroupWithPrev(project, groupId, opts) {
 
   // curr 제거
   project.groups.splice(idx, 1);
-  // 도입부면 9초 평가
+  // 도입부면 16초 평가
   if (prev.isIntro) {
     const sentMap = new Map(project.sentences.map(s => [s.id, s]));
     prev.isOverDuration = _groupTtsSec(prev, sentMap) > maxSec;
@@ -609,7 +609,7 @@ function splitGroupAt(project, groupId, splitAtSentenceId, opts) {
   // groups 배열에 새 그룹을 src 바로 뒤에 삽입
   project.groups.splice(gIdx + 1, 0, newGroup);
 
-  // 도입부면 각 그룹 9초 평가
+  // 도입부면 각 그룹 16초 평가
   if (src.isIntro || newGroup.isIntro) {
     const sentMap = new Map(project.sentences.map(s => [s.id, s]));
     if (src.isIntro) src.isOverDuration = _groupTtsSec(src, sentMap) > maxSec;
