@@ -301,9 +301,10 @@ class GensparkEngine {
       this.log(`[Genspark] ⚠️ 크기 선택 실패: ${e.message}`);
     }
 
-    // 4. 종횡비 선택 (cfg.ratio = '16:9') — 검증 후 안 맞으면 1회 재클릭
+    // 4. 종횡비 선택 — 프로젝트 비율(쇼츠=9:16) override 우선, 없으면 cfg.ratio(기본 16:9).
+    const _ratio = this._aspectRatio || cfg.ratio || '16:9';
     try {
-      const ratioLoc = this.page.locator(GENSPARK_SELECTORS.ratioOption, { hasText: cfg.ratio });
+      const ratioLoc = this.page.locator(GENSPARK_SELECTORS.ratioOption, { hasText: _ratio });
       if (await ratioLoc.count()) {
         let sel = '';
         for (let attempt = 0; attempt < 3; attempt++) {
@@ -312,13 +313,13 @@ class GensparkEngine {
           catch (_) { await ratioLoc.first().click({ timeout: 4000, force: true }).catch(() => {}); }
           await this.page.waitForTimeout(300);
           sel = await this.page.$eval(GENSPARK_SELECTORS.ratioSelected, el => (el.textContent || '').trim()).catch(() => '');
-          if (sel.includes(cfg.ratio)) break;
+          if (sel.includes(_ratio)) break;
         }
-        if (verbose || !sel.includes(cfg.ratio)) {
-          this.log(`[Genspark] 종횡비: ${cfg.ratio} 선택 (현재 선택=${sel || '?'})`);
+        if (verbose || !sel.includes(_ratio)) {
+          this.log(`[Genspark] 종횡비: ${_ratio} 선택 (현재 선택=${sel || '?'})`);
         }
       } else {
-        this.log(`[Genspark] ⚠️ 종횡비 '${cfg.ratio}' 못 찾음 — 기본값 유지`);
+        this.log(`[Genspark] ⚠️ 종횡비 '${_ratio}' 못 찾음 — 기본값 유지`);
       }
     } catch (e) {
       this.log(`[Genspark] ⚠️ 종횡비 선택 실패: ${e.message}`);

@@ -7,7 +7,7 @@
  *
  * 저장 항목:
  *   - profileId   : Genspark 자동화에 쓸 크롬 프로필 (Flow/Grok 과 별개로 분리 가능)
- *   - imageSize   : 이미지 크기 — '자동' | '0.5K' | '1K' | '2K' | '4K' (사용자 정책: 2K 고정)
+ *   - imageSize   : 이미지 크기 — '자동' | '0.5K' | '1K' | '2K' | '4K' (사용자 정책: 1K 고정)
  *   - ratio       : 종횡비 — '16:9' | '9:16' | '1:1' 등 (사용자 정책: 16:9 고정, 롱폼)
  *   - autoPrompt  : 자동 프롬프트 토글 — 반드시 false (우리가 만든 프롬프트를 그대로 입력)
  *   - maxDaily    : 하루 한도 (0 = 무제한 — Genspark 측 자체 한도/차단만 신뢰)
@@ -26,7 +26,7 @@ const STORE_PATH = path.join(STORE_DIR, 'genspark-config.json');
 
 const DEFAULTS = {
   profileId: 'default',
-  imageSize: '2K',     // 사용자 정책: 2K 고정
+  imageSize: '1K',     // 사용자 정책: 1K 고정
   ratio: '16:9',       // 사용자 정책: 16:9 고정 (롱폼)
   autoPrompt: false,   // 반드시 OFF — 우리 프롬프트를 그대로 입력
   batchSize: 6,        // 한 번에 제출할 프롬프트 수 (줄바꿈 나열 → N장 동시 생성). 1 이면 단일 모드.

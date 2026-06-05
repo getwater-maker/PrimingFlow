@@ -150,6 +150,7 @@ class Project {
     this.sentences = sentences || [];
     this.groups = groups || [];
 
+    this.aspect = '16:9';   // 영상 비율 — '16:9'(롱폼) | '9:16'(쇼츠). 이미지·렌더·내보내기 공통.
     this.ttsSettings = { defaultPresetId: null };
     this.imgSettings = {};
   }

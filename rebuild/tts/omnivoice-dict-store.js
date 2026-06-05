@@ -92,6 +92,18 @@ async function _doRefresh() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const entries = Array.isArray(data.entries) ? data.entries : [];
+    // 🛡 파괴적 동기화 방지 — 서버가 빈 사전을 반환했는데 로컬에 항목이 있으면,
+    //   (백엔드 재시작·FLOW_DICT_PATH 미설정·일시 초기화 등으로 빈 응답이 온 것일 가능성 큼)
+    //   로컬을 덮어쓰지 말고 보존 + 로컬을 서버로 되올려 복구(self-heal). → 등록분 영구 소실 방지.
+    if (entries.length === 0) {
+      const local = loadAll();
+      if (local.length > 0) {
+        console.warn('[omnivoice-dict-store] 서버 사전이 비어있음 — 로컬 보존 + 서버로 복구(self-heal):', local.length, '건');
+        saveAll(local);   // 로컬 → 서버 PUT (다른 사용자도 다시 받을 수 있게)
+        _online = true;
+        return { ok: true, source: 'local-heal' };
+      }
+    }
     _writeLocal(entries);
     _online = true;
     return { ok: true, source: 'remote', version: data.version };

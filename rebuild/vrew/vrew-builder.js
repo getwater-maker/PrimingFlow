@@ -297,7 +297,7 @@ function estimateAudioDuration(filePath) {
 }
 
 // AI 고지 자막 트랙 추가 (Vrew 4.0.1 web 텍스트박스)
-function addAiNoticeTrack(pj, opt, clipDurations, log) {
+function addAiNoticeTrack(pj, opt, clipDurations, log, frameRatio) {
   const text = String(opt.text || '').trim();
   if (!text) {
     log('[Vrew] AI 고지 자막 텍스트 비어있음 — 트랙 생략');
@@ -386,7 +386,7 @@ function addAiNoticeTrack(pj, opt, clipDurations, log) {
     customAttributes,
     assetEffectInfo: { type: 'fade-in', duration: opt.fadeMs || 1500, startDelay: startDelayMs },
     stats: { styledInFloatingMenu: true, styledInPanel: false },
-    scaleFactor: 1.7777777777777777,
+    scaleFactor: frameRatio || 1.7777777777777777,
   };
 
   const aid = uid();
@@ -556,6 +556,21 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
     throw new Error(`template 첫 mp4 항목 (${FIXED_MP4_MEDIA_ID}) 누락 — vrew-template.json 손상`);
   }
 
+  // (쇼츠) 출력 비율 — 9:16 이면 캔버스·비율·자막 scaleFactor 를 세로로 (쇼츠브루.vrew 샘플 검증값).
+  // 16:9 면 템플릿 기본값(1920×1080 / 1.7778) 그대로 유지.
+  const _aspect = opts.aspect === '9:16' ? '9:16' : '16:9';
+  const _frameRatio = _aspect === '9:16' ? 0.5625 : 1.7777777777777777;
+  const _canvasW = _aspect === '9:16' ? 1080 : 1920;
+  const _canvasH = _aspect === '9:16' ? 1920 : 1080;
+  if (pj.props && pj.props.videoSize) { pj.props.videoSize.width = _canvasW; pj.props.videoSize.height = _canvasH; }
+  if (pj.props && pj.props.initProjectVideoSize) { pj.props.initProjectVideoSize.width = _canvasW; pj.props.initProjectVideoSize.height = _canvasH; }
+  // 🔴 Vrew 가 실제 화면비를 그리는 필드. 이게 누락돼 캔버스는 세로인데 16:9 로 렌더되던 버그 fix.
+  if (pj.props) { pj.props.videoRatio = _frameRatio; }
+  if (pj.props && pj.props.globalCaptionStyle && pj.props.globalCaptionStyle.captionStyleSetting) {
+    pj.props.globalCaptionStyle.captionStyleSetting.scaleFactor = _frameRatio;
+  }
+  log(`[Vrew] 출력 비율 ${_aspect} (캔버스 ${_canvasW}×${_canvasH}, ratio ${_frameRatio})`);
+
   // 사용자가 프리셋에서 지정한 자막 옵션을 기본값에 병합 (없으면 기본값 사용)
   const _userCap = opts.captionStyle || {};
 
@@ -591,6 +606,7 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
   };
   const captionStyle = {
     ...CAPTION_STYLE,
+    scaleFactor: _frameRatio,   // (쇼츠) 9:16=0.5625 / 16:9=1.7778
     ...(resolvedYOffset != null ? { yOffset: resolvedYOffset } : {}),
     ...(_userCap.width   != null ? { width:   _userCap.width   } : {}),
     customAttributes: CAPTION_STYLE.customAttributes.map(a => {
@@ -627,7 +643,9 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
   const missingImg = [];
   for (const g of groups) {
     // (a) 비디오가 있으면 비디오 자산 + video/videoAudio 두 트랙 생성 (음소거)
-    if (g.videoPath && fs.existsSync(g.videoPath)) {
+    //     단 쇼츠(9:16)는 켄번스 이미지 전용 — 그록 영상이 붙어있어도 무시하고 이미지 사용
+    //     (9:16 캔버스에 16:9 영상이 들어가 흰 여백 생기는 문제 차단)
+    if (_aspect !== '9:16' && g.videoPath && fs.existsSync(g.videoPath)) {
       const mid = uid();
       const aid = uid();
       const videoTid = sid();
@@ -722,9 +740,9 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
     const kb = KEN_BURNS_PATTERNS[_pickKenBurnsIndex(groupIdx)];
     pj.props.tracks[tid] = {
       trackId: tid, mediaId: mid,
-      xPos: -0.004, yPos: 0, height: 1, width: 1.008,
+      xPos: _aspect === '9:16' ? 0 : -0.004, yPos: 0, height: 1, width: _aspect === '9:16' ? 1 : 1.008,
       rotation: 0, zIndex: groupIdx, type: 'image',
-      originalWidthHeightRatio: 1.7778,
+      originalWidthHeightRatio: _frameRatio,
       kenburnsAnimationInfo: { type: 'custom', from: { ...kb.from }, to: { ...kb.to } },
       editInfo: {},
       stats: { fillType: 'cut', fillMenu: 'floating', rearrangeCount: 0 },
@@ -934,7 +952,7 @@ async function buildVrew({ sentences, groups, vrewPath, opts = {} }) {
   // ---------- 2.5. AI 고지 자막 (web 트랙) ----------
   if (opts.aiNotice && opts.aiNotice.enabled) {
     try {
-      addAiNoticeTrack(pj, opts.aiNotice, clipDurations, log);
+      addAiNoticeTrack(pj, opts.aiNotice, clipDurations, log, _frameRatio);
     } catch (e) {
       log(`[Vrew] AI 고지 자막 추가 실패: ${e.message}`);
     }

@@ -56,6 +56,9 @@ const GROK_SELECTORS = {
   // (순서: 2:3 Tall, 3:2 Wide, 1:1 Square, 9:16 Vertical, 16:9 Widescreen)
   aspectMenu16x9:    '[role="menu"] > div:nth-child(5), [role="menu"] [role="menuitem"]:nth-child(5), [data-radix-popper-content-wrapper] [role="menuitem"]:nth-child(5)',
   aspectMenuFallback:'[role="menuitem"]:has-text("Widescreen"), [role="option"]:has-text("Widescreen"), [role="menuitem"]:has-text("16:9")',
+  // 쇼츠(9:16 Vertical) — 메뉴 4번째 항목
+  aspectMenu9x16:    '[role="menu"] > div:nth-child(4), [role="menu"] [role="menuitem"]:nth-child(4), [data-radix-popper-content-wrapper] [role="menuitem"]:nth-child(4)',
+  aspectMenu9x16Fallback:'[role="menuitem"]:has-text("Vertical"), [role="option"]:has-text("Vertical"), [role="menuitem"]:has-text("9:16")',
   // Submit — form 안에서만 (form 밖의 다른 button 안 잡힘)
   submitButton:      'form button[type="submit"]',
   // 완성된 video element
@@ -136,6 +139,7 @@ class GrokEngine {
     this.logger = typeof opts.logger === 'function' ? opts.logger : () => {};
     this.context = null;
     this.page = null;
+    this._aspectRatio = null;   // '9:16'(쇼츠) 이면 6s + 9:16 Vertical 강제 (UI 가 생성 전 설정)
   }
 
   log(msg) { this.logger(msg); }
@@ -153,6 +157,58 @@ class GrokEngine {
       }
       if (attempts > 0) this.log(`[Grok] dialog backdrop 닫음 (ESC ${attempts}회)`);
     } catch {}
+  }
+
+  // 해상도 칩 선택 — 720p 요청이어도 한도(빨간 계기판 아이콘)로 막혀 비활성이면 480p 로 자동 전환.
+  //   영상 생성을 멈추지 않고 480p 로 계속 진행. 반환값 = 실제 선택된 해상도.
+  async _selectResolutionChip(want) {
+    try {
+      if (want !== '720p') {
+        const c = await this.page.$(GROK_SELECTORS.res480Chip);
+        if (c) { await c.click(); await this.page.waitForTimeout(300); }
+        return '480p';
+      }
+      const chip720 = await this.page.$(GROK_SELECTORS.res720Chip);
+      let blocked = false;
+      if (chip720) {
+        // 720p 칩이 disabled / aria-disabled / pointer-events:none / 반투명 / 비활성 래퍼 → 한도로 막힘
+        blocked = await chip720.evaluate(el => {
+          const dis = el.disabled || el.getAttribute('aria-disabled') === 'true' || el.hasAttribute('disabled');
+          const cs = getComputedStyle(el);
+          const noClick = cs.pointerEvents === 'none' || parseFloat(cs.opacity || '1') < 0.5;
+          const wrapDis = !!el.closest('[aria-disabled="true"],[disabled]');
+          return !!(dis || noClick || wrapDis);
+        }).catch(() => false);
+      } else {
+        // 720p 칩이 안 보이는데 480p 칩은 있으면 = 720p 만 막힌 것 (칩 미로딩과 구분)
+        const c480exists = await this.page.$(GROK_SELECTORS.res480Chip);
+        blocked = !!c480exists;
+      }
+      if (blocked) {
+        this.log('[Grok] ⚠️ 720p 한도/비활성 감지 — 480p 로 자동 전환 (영상은 계속 생성)');
+        await this._dumpResChips();   // 실제 마크업 확인용 1회 덤프 (셀렉터 정밀화에 사용)
+        const c480 = await this.page.$(GROK_SELECTORS.res480Chip);
+        if (c480) { await c480.click(); await this.page.waitForTimeout(300); }
+        return '480p';
+      }
+      await chip720.click();
+      await this.page.waitForTimeout(300);
+      return '720p';
+    } catch (e) {
+      this.log(`[Grok] 해상도 칩 선택 예외(무시): ${e.message}`);
+      return want;
+    }
+  }
+
+  // 720p 막힘이 의심될 때 해상도 칩 영역 DOM 을 로그로 덤프 — 빨간 계기판 아이콘/disabled 마크업 확인용.
+  async _dumpResChips() {
+    try {
+      const html = await this.page.$eval(
+        `${CHIPS_CONTAINER} > div:nth-child(3)`,
+        el => (el.outerHTML || '').replace(/\s+/g, ' ').slice(0, 400)
+      ).catch(() => null);
+      if (html) this.log(`[Grok] [DUMP 해상도칩] ${html}`);
+    } catch (_) {}
   }
 
   async start() {
@@ -332,39 +388,39 @@ class GrokEngine {
         }
       }
 
-      // 5-2. 비디오 해상도 / 길이 / 비율 옵션 적용 (grok-store 설정값)
+      // 5-2. 비디오 해상도 / 길이 / 비율 옵션 적용
+      // 쇼츠(9:16) 프로젝트면: 길이 6s + 비율 9:16 Vertical 강제. 그 외(롱폼)는 grok-store 설정값.
       const grokCfg = GrokStore.load();
-      const resChipSel = grokCfg.videoResolution === '720p'
-        ? GROK_SELECTORS.res720Chip : GROK_SELECTORS.res480Chip;
-      const durChipSel = grokCfg.videoDuration === '10s'
+      const _shorts = this._aspectRatio === '9:16';
+      // 쇼츠는 6s, 롱폼은 cfg(기본 10s)
+      const durChipSel = (!_shorts && grokCfg.videoDuration === '10s')
         ? GROK_SELECTORS.dur10sChip : GROK_SELECTORS.dur6sChip;
+      const aspMenuSel  = _shorts ? GROK_SELECTORS.aspectMenu9x16 : GROK_SELECTORS.aspectMenu16x9;
+      const aspFallback = _shorts ? GROK_SELECTORS.aspectMenu9x16Fallback : GROK_SELECTORS.aspectMenuFallback;
+      const aspLabel    = _shorts ? '9:16 Vertical' : '16:9 Widescreen';
+      const durLabel    = (!_shorts && grokCfg.videoDuration === '10s') ? '10s' : '6s';
       try {
-        const resChip = await this.page.$(resChipSel);
-        if (resChip) { await resChip.click(); await this.page.waitForTimeout(300); }
+        const _actualRes = await this._selectResolutionChip(grokCfg.videoResolution);
         const durChip = await this.page.$(durChipSel);
         if (durChip) { await durChip.click(); await this.page.waitForTimeout(300); }
 
-        // 비율 dropdown — div:nth-child(5) 트리거 클릭 → 메뉴 5번째 항목 (16:9 Widescreen) 클릭
+        // 비율 dropdown 트리거 클릭 → 쇼츠면 9:16 Vertical(4번째), 롱폼이면 16:9 Widescreen(5번째)
         const aspectTrigger = await this.page.$(GROK_SELECTORS.aspectChipTrigger);
         if (aspectTrigger) {
           await aspectTrigger.click();
           await this.page.waitForTimeout(500);
-          // 1순위: 메뉴의 5번째 div = "16:9 Widescreen" (사용자 캡처 기준)
-          let menuItem = await this.page.$(GROK_SELECTORS.aspectMenu16x9);
-          // 2순위: 텍스트 "Widescreen" / "16:9" 포함 항목
-          if (!menuItem) {
-            menuItem = await this.page.$(GROK_SELECTORS.aspectMenuFallback);
-          }
+          let menuItem = await this.page.$(aspMenuSel);
+          if (!menuItem) menuItem = await this.page.$(aspFallback);   // 텍스트 매칭 폴백
           if (menuItem) {
             await menuItem.click();
             await this.page.waitForTimeout(300);
-            this.log(`[Grok] 비율 선택: 16:9 Widescreen`);
+            this.log(`[Grok] 비율 선택: ${aspLabel}`);
           } else {
             this.log(`[Grok] ⚠️ 비율 메뉴 항목 못 찾음 — 현재 비율 유지 (ESC)`);
             await this.page.keyboard.press('Escape').catch(() => {});
           }
         }
-        this.log(`[Grok] 옵션: ${grokCfg.videoResolution} · ${grokCfg.videoDuration} · ${grokCfg.videoAspect}`);
+        this.log(`[Grok] 옵션: ${_actualRes} · ${durLabel} · ${aspLabel}${_shorts ? ' (쇼츠)' : ''}`);
       } catch (e) {
         this.log(`[Grok] 비디오 옵션 적용 중 예외 (무시): ${e.message}`);
       }
@@ -597,4 +653,4 @@ class GrokEngine {
   }
 }
 
-module.exports = { GrokEngine, GROK_SELECTORS, PROFILE_BASE };
+module.exports = { GrokEngine, GROK_SELECTORS, PROFILE_BASE, _ensureUserChromeProfileCopy };

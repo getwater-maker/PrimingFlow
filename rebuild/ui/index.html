@@ -276,7 +276,7 @@
   .aux-panel > .preset-area { flex: 1; overflow-y: auto; }
   .aux-panel > .log-panel   { flex: 1; min-height: 0; }
   .aux-panel > .advanced    { flex: 1; overflow-y: auto; }
-  .aux-panel > .wiz-step    { flex: 1; overflow-y: auto; padding-right: 4px; }
+  .aux-panel > .wiz-step    { flex: 1; overflow-y: auto; overflow-x: hidden; padding-right: 4px; min-width: 0; }
   /* 탭바 6개 — 좁으면 줄바꿈 허용 */
   .aux-tabs { flex-wrap: wrap; }
   .col-wiz .aux-tab { flex: 1 1 auto; min-width: 56px; padding: 8px 4px; font-size: 13px; }
@@ -920,6 +920,18 @@
     background: color-mix(in srgb, var(--info) 12%, var(--bg-soft));
     border-bottom-color: color-mix(in srgb, var(--info) 30%, var(--border-soft));
   }
+  /* 쇼츠 3편 색상 구분 — 한눈에 대비되도록 (1편 청록 / 2편 보라 / 3편 주황) */
+  .group-card.shorts-1 { border-color:#2ea88a; background:color-mix(in srgb,#2ea88a 10%,var(--bg-elevated)); }
+  .group-card.shorts-1 .group-card-header { color:#2ea88a; background:color-mix(in srgb,#2ea88a 16%,var(--bg-soft)); border-bottom-color:color-mix(in srgb,#2ea88a 35%,var(--border-soft)); }
+  .group-card.shorts-2 { border-color:#9b6dd6; background:color-mix(in srgb,#9b6dd6 10%,var(--bg-elevated)); }
+  .group-card.shorts-2 .group-card-header { color:#9b6dd6; background:color-mix(in srgb,#9b6dd6 16%,var(--bg-soft)); border-bottom-color:color-mix(in srgb,#9b6dd6 35%,var(--border-soft)); }
+  .group-card.shorts-3 { border-color:#e0892e; background:color-mix(in srgb,#e0892e 10%,var(--bg-elevated)); }
+  .group-card.shorts-3 .group-card-header { color:#e0892e; background:color-mix(in srgb,#e0892e 16%,var(--bg-soft)); border-bottom-color:color-mix(in srgb,#e0892e 35%,var(--border-soft)); }
+  /* 편별 미리듣기 버튼 색상 (카드와 동일 계열) */
+  .shorts-prev-btn.shorts-1 { border-color:#2ea88a; color:#2ea88a; }
+  .shorts-prev-btn.shorts-2 { border-color:#9b6dd6; color:#9b6dd6; }
+  .shorts-prev-btn.shorts-3 { border-color:#e0892e; color:#e0892e; }
+  .shorts-prev-btn { font-weight:600; }
   .group-card-header {
     padding: 8px 14px;
     background: var(--bg-soft);
@@ -954,6 +966,12 @@
     transition: transform 0.15s ease;
   }
   .group-image:hover { transform: scale(1.02); }
+  /* 쇼츠(9:16) — 세로 박스 (높이 유지, 폭만 9:16) */
+  .group-image.vertical {
+    width: 140px;
+    height: 248px;
+    flex: 0 0 140px;
+  }
   .group-image.has-image {
     border-style: solid;
     background-size: cover;
@@ -1262,6 +1280,101 @@
     0%, 100% { box-shadow: 0 0 0 0 rgba(232,168,76,0.6), var(--shadow-lg); }
     50%      { box-shadow: 0 0 0 8px rgba(232,168,76,0), var(--shadow-lg); }
   }
+  /* ── 발행 패키지 카드 ── */
+  .pub-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+  }
+  .pub-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .pub-card-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-strong);
+  }
+  .pub-card-body {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-soft);
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: inherit;
+  }
+  .pub-item-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border-soft);
+  }
+  .pub-item-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+  .pub-item-label {
+    flex: 0 0 auto;
+    font-weight: 700;
+    color: var(--accent-hover, #b07a3f);
+    white-space: nowrap;
+  }
+  .pub-item-prev {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--text-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pub-item-btn.copied { color: var(--ok, #4a8a5a); }
+  /* 발행탭 이미지 프롬프트 — 스타일 선택 + 생성 */
+  .pub-style-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 0 4px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border-soft);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-strong);
+  }
+  .pub-style-select {
+    flex: 0 1 auto;
+    max-width: 180px;
+    background: var(--bg-input);
+    border: 1px solid var(--border, #d8c4a8);
+    color: var(--text-base);
+    border-radius: 6px;
+    padding: 4px 6px;
+    font-size: 12px;
+  }
+  .pub-style-hint { font-size: 10px; font-weight: 400; color: var(--text-muted); }
+  .pub-genitem { display: flex; align-items: stretch; gap: 4px; }
+  .pub-genitem .pub-item-btn { flex: 1 1 auto; }
+  .pub-gen-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--accent, #d4a574);
+    color: #fff;
+  }
+  .pub-gen-btn:disabled { opacity: .65; cursor: default; }
 </style>
 </head>
 <body>
@@ -1476,9 +1589,11 @@
                 <button class="btn-sm" id="undoGroupBtn" onclick="undoGroupChange()" disabled title="마지막 그룹 구조 변경(합치기/나누기/재배치) 되돌리기 — Ctrl+Z" style="font-size:12px; padding:4px 10px; opacity:0.5;">↶ 되돌리기</button>
               </div>
               <!-- 2행: 첨부한 대본 파일명 + RTF 배지 -->
-              <div style="display:flex; align-items:center; gap:8px; min-height:18px;">
+              <div style="display:flex; align-items:center; gap:8px; min-height:18px; flex-wrap:wrap;">
                 <span id="taskListFileName" title=""
                       style="display:none; font-size:12px; color:var(--text-soft); min-width:0; flex:0 1 auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></span>
+                <!-- 쇼츠 편별 전체 미리듣기 + 길이 (쇼츠 프로젝트에서만 표시) -->
+                <span id="shortsPreviewBar" style="display:none; align-items:center; gap:6px; flex:none;"></span>
                 <span id="rtfBadge" class="section-title-badge" title="Real-Time Factor — 작업시간 / 오디오길이. 낮을수록 빠름" style="flex:none; font-size:11px;">RTF —</span>
               </div>
             </div>
@@ -1533,6 +1648,7 @@
         <button class="aux-tab active" data-tab="preset">1 🎙 프리셋</button>
         <button class="aux-tab" data-tab="script">2 📝 대본</button>
         <button class="aux-tab" data-tab="image">3 🎬 제작</button>
+        <button class="aux-tab" data-tab="publish">4 📤 발행</button>
         <button class="aux-tab" data-tab="log">📋 로그</button>
         <button class="aux-tab" data-tab="adv">⚙ 고급</button>
       </div>
@@ -1567,12 +1683,13 @@
 
           <!-- 작업 시작 버튼 6개 (3-col) -->
           <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin-bottom:6px;">
-            <button class="btn-sm" onclick="openFile()" style="padding:6px 10px;">📂 대본 첨부</button>
+            <button class="btn-sm" onclick="openFile('16:9')" title="가로 롱폼(16:9) 대본 첨부" style="padding:6px 10px;">📂 롱폼대본</button>
+            <button class="btn-sm" onclick="openFile('9:16')" title="세로 쇼츠(9:16) 대본 첨부 — 제작 탭이 쇼츠 구성으로 전환" style="padding:6px 10px;">📱 쇼츠대본</button>
             <button class="btn-sm" onclick="openScriptInputModal()" style="padding:6px 10px;">✏️ 직접 입력</button>
             <button class="btn-sm" id="clearScriptBtn" onclick="clearScript()" title="모두 지우고 처음 상태로" style="padding:6px 10px;">🗑 초기화</button>
+            <button class="btn-sm" onclick="loadProjectFile()" title="저장한 project.pflow 를 열어 작업 이어가기" style="padding:6px 10px;">📂 불러오기</button>
             <!-- 수동 저장 제거 — 자동저장(변경마다 자동)과 중복. 그 자리에 자동저장 상태 표시 -->
             <div id="autoSaveIndicator" title="자동 저장 상태 — 변경 시 자동 저장됩니다 (수동 저장 불필요)" style="display:flex; align-items:center; justify-content:center; padding:6px 6px; font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; background:var(--bg-soft); border-radius:6px;">— 미저장</div>
-            <button class="btn-sm" onclick="loadProjectFile()" title="저장한 project.pflow 를 열어 작업 이어가기" style="padding:6px 10px;">📂 불러오기</button>
           </div>
 
           <!-- 분할 옵션 — 변경 시 자동 재분할 -->
@@ -1614,8 +1731,8 @@
             <div id="splitGroupCountPreview" style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--border-soft); font-size:13px; font-weight:700; color:var(--text-strong); text-align:center;"></div>
           </div>
 
-          <!-- 🎬 도입부 비디오 준비 — 도입부 TTS + 16초 재배치 (동영상 탭에서 이동) -->
-          <div style="border-top:1px solid var(--border-soft); padding-top:10px; margin-top:10px;">
+          <!-- 🎬 도입부 비디오 준비 — 도입부 TTS + 16초 재배치 (롱폼 전용 · 쇼츠 모드에선 숨김) -->
+          <div data-aspect-only="16:9" style="border-top:1px solid var(--border-soft); padding-top:10px; margin-top:10px;">
             <div style="font-size:12px; font-weight:700; color:var(--text-strong); margin-bottom:6px;">🎬 도입부 비디오 준비</div>
             <button class="btn-sm" id="prepareIntroVideosBtn" onclick="prepareIntroVideos()" title="도입부 sentence 전체 TTS 합성 후 실제 음성 길이 16초 한도로 그룹을 다시 묶습니다. 자산이 이미 있으면 확인 후 초기화."
                     style="width:100%; padding:8px 12px; background:var(--accent-soft); color:var(--accent-hover); border:1px solid var(--accent); font-weight:600;">
@@ -1624,8 +1741,8 @@
             <div id="prepareIntroProgress" style="font-size:11px; color:var(--text-muted); margin-top:6px; text-align:center;">—</div>
           </div>
 
-          <!-- 🤖 AI 이미지 프롬프트 — 대본 맥락 반영해 인물/성별 일관성 강화 -->
-          <div style="border-top:1px solid var(--border-soft); padding-top:10px; margin-top:10px;">
+          <!-- 🤖 AI 이미지 프롬프트 (내보내기/가져오기/API) — 롱폼 전용. 쇼츠는 대본에 프롬프트 내장이라 숨김 -->
+          <div data-aspect-only="16:9" style="border-top:1px solid var(--border-soft); padding-top:10px; margin-top:10px;">
             <div style="font-size:12px; font-weight:700; color:var(--text-strong); margin-bottom:6px;">🤖 AI 이미지 프롬프트 (선택)</div>
 
             <!-- (0) 영상 프롬프트 범위 — 비워두면 도입부만 / 다중 구간 지원 -->
@@ -1664,6 +1781,8 @@
       <div class="aux-panel" id="auxImage" hidden>
         <div class="wiz-step">
           <div style="font-size:13px; font-weight:700; color:var(--text-strong); margin-bottom:8px;">🎬 3단계 — 제작 (이미지 · 영상)</div>
+          <!-- 대본 종류(롱폼/쇼츠)에 따른 제작 모드 배너 — _applyAspectModeUI() 가 갱신 -->
+          <div id="aspectModeBanner" style="display:flex; align-items:center; gap:6px; margin-bottom:10px; padding:6px 10px; border-radius:6px; font-size:12px; font-weight:600; background:var(--bg-soft); color:var(--text-soft); border:1px solid var(--border-soft);">🖥 롱폼 모드 (16:9 가로)</div>
 
           <!-- Google Flow 계정 프로필 (Flow 이미지 생성용 로그인) -->
           <div style="display:flex; gap:6px; margin-bottom:12px; align-items:center;">
@@ -1720,16 +1839,25 @@
 
           <!-- ── 영상 (Grok) ───────────────────────────────── -->
           <div style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:14px;">
-            <div style="font-size:12px; font-weight:700; color:var(--text-strong); margin-bottom:8px;">🎬 영상 변환 (Grok)</div>
+            <div style="font-size:12px; font-weight:700; color:var(--text-strong); margin-bottom:8px;">🎬 영상 변환</div>
 
-            <!-- 🎬 Grok 비디오 모션 프롬프트 -->
+            <!-- 영상 엔진 선택 — Grok(무료) / Flow Veo(유료 크레딧) -->
+            <div style="margin-bottom:8px; display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-muted);">
+              <label for="videoEngineSelect" style="white-space:nowrap;">🎞 영상 엔진</label>
+              <select id="videoEngineSelect" onchange="onVideoEngineChange()" title="이미지를 영상으로 변환할 엔진. Grok=무료(X 로그인), Flow Veo=Veo 3.1(유료 크레딧·고품질)." style="flex:1; padding:5px 8px; border-radius:6px; font-size:12px;">
+                <option value="grok">🪐 Grok (무료 · 기본)</option>
+                <option value="flowveo">🎬 Flow Veo (유료 크레딧 · 고품질)</option>
+              </select>
+            </div>
+
+            <!-- 🎬 비디오 모션 프롬프트 -->
             <div style="margin-bottom:8px;">
               <label for="grokMotionPromptInput" style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:3px;">
                 모션 프롬프트 <span style="color:var(--text-soft); font-size:10px;">(이미지 → 애니메이션 변환 시 사용)</span>
               </label>
               <textarea id="grokMotionPromptInput" rows="2"
                 style="width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); color:var(--text-strong); padding:6px 8px; border-radius:6px; font-size:12px; resize:vertical;"
-                placeholder="예: natural slow motion, cinematic feel"
+                placeholder="예: dynamic cinematic camera, push-in, wind & drifting dust, lively motion (역동적으로!)"
                 title="이 문구가 Grok 비디오 생성 시 모션 프롬프트로 전달됩니다. 입력 끝낼 때 자동 저장 (~/.flow-app/grok-config.json)."
                 onchange="onGrokMotionPromptChange()"></textarea>
             </div>
@@ -1773,10 +1901,50 @@
             </button>
           </div>
 
-          <!-- 저장 (.vrew / 프리미어 XML) -->
+          <!-- 영상 비율 (쇼츠 모드) — 이미지 생성·렌더·내보내기 전체에 적용 -->
+          <div style="display:flex; align-items:center; gap:8px; margin-top:12px;">
+            <span style="font-size:12px; font-weight:600; color:var(--text-strong); white-space:nowrap;">영상 비율</span>
+            <div class="chip-group" id="aspectChips" style="flex:1;">
+              <div class="chip active" data-val="16:9" style="flex:1; text-align:center;" title="가로 롱폼 1920×1080">🖥 16:9 롱폼</div>
+              <div class="chip" data-val="9:16" style="flex:1; text-align:center;" title="세로 쇼츠 1080×1920">📱 9:16 쇼츠</div>
+            </div>
+          </div>
+
+          <!-- 저장 (.vrew / 프리미어 XML / mp4) -->
           <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px; margin-top:12px;">
             <button class="btn btn-sm-action" onclick="saveVrew()" title="현재 프로젝트를 Vrew 4.0.1 호환 .vrew 파일로 저장">💾 Vrew</button>
             <button class="btn btn-sm-action" onclick="savePremiereXml()" title="Adobe Premiere Pro (FCP7 XML) 형식으로 시퀀스 저장 + 자막 .srt 동봉. 이미지·오디오·자막 트랙 정렬된 상태로 프리미어 가져오기 가능">🎬 프리미어 XML</button>
+          </div>
+          <div style="margin-top:6px;">
+            <button class="btn btn-sm-action" onclick="saveVideoMp4()" style="width:100%;" title="유튜브에 바로 올릴 수 있는 최종 mp4 로 직접 렌더링 (켄번스 + 자막 번인 + 음성 + 로고). Vrew/프리미어 없이 완성본 생성">📹 mp4 로 렌더 (유튜브 업로드용)</button>
+          </div>
+          <div style="margin-top:6px; display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-soft);">
+            <span style="white-space:nowrap;">📂 렌더 저장:</span>
+            <span id="renderOutDirLabel" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="">미설정 (프로젝트 출력 폴더 사용)</span>
+            <button class="btn-sm" type="button" onclick="pickRenderOutputDir()" title="렌더링 완료 mp4 를 저장할 폴더 지정" style="white-space:nowrap; padding:2px 8px;">변경</button>
+            <button class="btn-sm" type="button" onclick="_clearRenderOutputDir()" title="설정 해제 (프로젝트 출력 폴더 사용)" style="white-space:nowrap; padding:2px 6px;">✕</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ▣ Step 4 — 발행 패키지 (유튜브 업로드용 항목 복사) -->
+      <div class="aux-panel" id="auxPublish" hidden>
+        <div class="wiz-step">
+          <div style="font-size:13px; font-weight:700; color:var(--text-strong); margin-bottom:8px;">📤 4단계 — 발행 패키지</div>
+          <div style="display:flex; gap:6px; margin-bottom:8px;">
+            <button class="btn-sm" onclick="attachPublishPackage()" title="발행패키지 .md 파일을 직접 선택" style="padding:6px 10px;">📂 발행패키지 첨부</button>
+            <button class="btn-sm" onclick="reloadPublishPackage()" title="원본 md 다시 읽기" style="padding:6px 10px;">🔄 새로고침</button>
+          </div>
+          <div id="publishSourceName" style="font-size:11px; color:var(--text-muted); margin-bottom:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+          <div id="publishSections"><!-- renderPublishPanel() 이 채움 --></div>
+          <div id="publishEmpty" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 20px; color:var(--text-muted); text-align:center;">
+            <div style="font-size:48px; margin-bottom:12px;">📤</div>
+            <div style="font-size:14px; font-weight:600; color:var(--text-soft); margin-bottom:6px;">발행 패키지가 없습니다</div>
+            <div style="font-size:12px; line-height:1.6;">
+              대본을 첨부하면 같은 폴더의<br>
+              <b>발행패키지</b> 를 자동으로 불러옵니다.<br>
+              또는 <b>📂 발행패키지 첨부</b> 로 직접 선택하세요.
+            </div>
           </div>
         </div>
       </div>
@@ -3371,6 +3539,14 @@ document.querySelectorAll('.chip-group').forEach(group => {
       group.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
       if (group.id === 'ratioChips') selectedRatio = chip.dataset.val;
+      if (group.id === 'aspectChips') {
+        // 쇼츠 모드 토글 — 프로젝트 비율(16:9 / 9:16). 이미지 생성·렌더·내보내기가 모두 이 값을 읽음.
+        if (window._currentProject) window._currentProject.aspect = chip.dataset.val;
+        try { _applyAspectModeUI(chip.dataset.val); } catch (_) {}
+        // 작업목록 이미지/영상 박스도 새 비율로 즉시 다시 그림
+        try { if (window._currentProject) renderTaskList(window._currentProject); } catch (_) {}
+        try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch (_) {}
+      }
       if (group.id === 'countChips') selectedCount = chip.dataset.val;
       if (group.id === 'videoRatioChips') selectedVideoRatio = chip.dataset.val;
       if (group.id === 'videoCountChips') selectedVideoCount = chip.dataset.val;
@@ -3686,6 +3862,8 @@ function _applyProjectToUI(p) {
       if (typeof renderPresets === 'function') renderPresets();
     }
   } catch (e) { console.warn('[apply preset]', e.message); }
+  // 발행 패키지 패널 — 활성 프로젝트의 패키지로 다시 렌더
+  try { if (typeof renderPublishPanel === 'function') renderPublishPanel(); } catch {}
 }
 
 // 부팅 시 1개 프로젝트 보장 + 탭 첫 렌더
@@ -3790,7 +3968,416 @@ window._scriptText = '';
 // 대본 첨부 — .txt / .md 지원. 첨부 후 자동 분할.
 // Electron 네이티브 다이얼로그(IPC 'open-file') 사용 — 시작 폴더 지정 가능 + file.path 빈값 문제 회피.
 // 시작 폴더 = 활성 프리셋의 "대본 폴더"(존재 시) → 없으면 다운로드 폴더.
-async function openFile() {
+// ─── 발행 패키지 (유튜브 업로드용 항목 복사) ──────────────────────────
+// 대본과 짝을 이루는 `[날짜] 발행패키지.md` 를 파싱해 항목별 복사 버튼을 제공.
+// 렌더러가 nodeIntegration:true 라 fs/path 직접 사용 (openFile 과 동일 패턴).
+
+// 설명란의 `SEO 태그:` / `추천 검색어:` 라인을 타이틀 없이 해시태그 한 줄로 합침.
+// - SEO 태그: 이미 # 가 붙은 토큰 → 그대로 (없으면 # 추가)
+// - 추천 검색어: `/` 로 구분된 어구 → 각 어구 앞에 # (어구 내부 공백은 유지)
+// 결과: "#유자광 #서얼 ... #유자광 생애 #서얼 출세 조선 ..." 형태.
+function _formatPublishHashtags(body) {
+  const lines = String(body).split('\n');
+  const tags = [];
+  const out = [];
+  lines.forEach(ln => {
+    const seo = ln.match(/SEO\s*태그\s*[:：]\s*(.+)$/);
+    const rec = ln.match(/추천\s*검색어\s*[:：]\s*(.+)$/);
+    if (seo) {
+      seo[1].trim().split(/\s+/).forEach(t => {
+        t = t.trim(); if (!t) return;
+        tags.push(t.startsWith('#') ? t : '#' + t);
+      });
+    } else if (rec) {
+      rec[1].trim().split('/').forEach(t => {
+        t = t.trim(); if (!t) return;
+        tags.push(t.startsWith('#') ? t : '#' + t);
+      });
+    } else {
+      out.push(ln);
+    }
+  });
+  if (!tags.length) return body;            // SEO/추천 라인 없으면 원본 그대로
+  while (out.length && !out[out.length - 1].trim()) out.pop();
+  if (out.length) out.push('');             // 본문과 해시태그 사이 한 줄 띄움
+  out.push(tags.join(' '));
+  return out.join('\n');
+}
+
+// 마크다운 파싱: `**N. 제목**` 헤더를 경계로 섹션 분리.
+// 일부 섹션(썸네일 문구/이미지 프롬프트)은 하위 복사 항목으로 분해.
+function parsePublishPackage(text) {
+  if (!text) return [];
+  const lines = String(text).replace(/\r\n/g, '\n').split('\n');
+  // 헤더 라인 인덱스 수집: **3. 제목**: 내용  /  **4. 설명란**
+  const HEADER = /^\s*\*\*\s*(\d+)\.\s*([^*]+?)\s*\*\*\s*(?::\s*(.*))?$/;
+  const heads = [];
+  lines.forEach((ln, i) => {
+    const m = ln.match(HEADER);
+    if (m) heads.push({ i, num: m[1], title: m[2].trim(), inline: (m[3] || '').trim() });
+  });
+  const sections = [];
+  for (let h = 0; h < heads.length; h++) {
+    const cur = heads[h];
+    const next = heads[h + 1];
+    const bodyLines = [];
+    if (cur.inline) bodyLines.push(cur.inline);
+    const start = cur.i + 1;
+    const end = next ? next.i : lines.length;
+    for (let i = start; i < end; i++) {
+      const ln = lines[i];
+      if (/^\s*---\s*$/.test(ln)) break;       // 구분선에서 멈춤
+      bodyLines.push(ln);
+    }
+    // 끝쪽 빈 줄 정리
+    while (bodyLines.length && !bodyLines[bodyLines.length - 1].trim()) bodyLines.pop();
+    const body = _formatPublishHashtags(bodyLines.join('\n').trim());
+    const section = { num: cur.num, title: cur.title, body, items: [] };
+
+    // 하위 복사 항목 분해
+    // 1) 썸네일 문구 — "A) [태그] 메인: X · 보조: Y" 3세트. 세트별 메인 값/보조 값을 각각 복사 항목으로.
+    if (cur.title.includes('썸네일') && cur.title.includes('문구')) {
+      bodyLines.forEach(ln => {
+        const raw = ln.trim();
+        if (!raw || raw.startsWith('※')) return;   // 깨알 대사 등 부가 라인 제외
+        // 세트 라벨(A/B/C 또는 N)) + 선택적 [태그] 제거
+        const sm = raw.match(/^(?:([A-Za-z])\)|(\d+)[\).])\s*(?:\[[^\]]*\]\s*)?(.+)$/);
+        if (!sm) return;
+        const setLabel = (sm[1] || sm[2] || '').toUpperCase();
+        const content = sm[3].trim();
+        // "메인: X · 보조: Y" 분해 (구분자 · 또는 / , 보조는 없을 수 있음). 메인 값 안의 / 는 보존.
+        const mm = content.match(/메인\s*[:：]\s*(.+?)(?:\s*[·\/]\s*보조\s*[:：]\s*(.+))?\s*$/);
+        if (mm) {
+          const mainVal = (mm[1] || '').trim();
+          const subVal = (mm[2] || '').trim();
+          // 세트(A/B/C) 하나당 "메인 · 보조" 를 한 항목으로 합쳐 표시·복사. 메인 안의 / 는 줄바꿈 표시로 보존.
+          const combined = subVal ? `${mainVal} · ${subVal}` : mainVal;
+          if (combined) section.items.push({ label: setLabel, value: combined });
+        } else if (content) {
+          section.items.push({ label: setLabel || '문구', value: content });
+        }
+      });
+    } else if (cur.title.includes('제목')) {
+      // 2) 제목 — 헤더 뒤 inline = 메인 제목, "- 백업N: ..." = 백업. 각 결과값만 복사.
+      if (cur.inline) section.items.push({ label: '제목', value: cur.inline.trim() });
+      bodyLines.forEach(ln => {
+        const bm = ln.match(/^\s*-?\s*(백업\s*\d*)\s*[:：]\s*(.+)$/);
+        if (bm) section.items.push({ label: bm[1].replace(/\s+/g, ''), value: bm[2].trim() });
+      });
+    } else {
+      // 그 외 섹션 — 메인:/보조: 라인이 있으면 개별 항목
+      bodyLines.forEach(ln => {
+        const mm = ln.match(/^\s*-?\s*(메인|보조)\s*[:：]\s*(.+)$/);
+        if (mm) section.items.push({ label: mm[1], value: mm[2].trim() });
+      });
+    }
+    // 2) 백틱 안 프롬프트 (이미지 프롬프트 ①②③)
+    const codeRe = /`([^`]+)`/g;
+    let cm, idx = 0;
+    const enumMarks = ['①', '②', '③', '④', '⑤'];
+    bodyLines.forEach(ln => {
+      codeRe.lastIndex = 0;
+      while ((cm = codeRe.exec(ln)) !== null) {
+        // 백틱 안 = 이미지 생성용 프롬프트 → kind 표시 (발행탭에서 스타일 선택 + 생성 버튼 노출)
+        section.items.push({ label: enumMarks[idx] || `#${idx + 1}`, value: cm[1].trim(), kind: 'imagePrompt' });
+        idx++;
+      }
+    });
+    sections.push(section);
+  }
+  return sections;
+}
+
+// 클립보드 복사 + 버튼 피드백 (기존 navigator.clipboard 패턴 + execCommand 폴백)
+async function _copyPublishValue(value, btn) {
+  const ok = () => {
+    if (btn) {
+      if (btn.dataset.orig == null) btn.dataset.orig = btn.innerHTML;
+      btn.classList.add('copied');
+      btn.innerHTML = '✓ 복사됨';
+      clearTimeout(btn._copyTimer);
+      btn._copyTimer = setTimeout(() => {
+        btn.innerHTML = btn.dataset.orig;
+        btn.classList.remove('copied');
+      }, 1000);
+    }
+    try { addLog(`발행 항목 복사 (${value.length}자)`, 'ok'); } catch (_) {}
+  };
+  try {
+    await navigator.clipboard.writeText(value);
+    ok();
+  } catch (e) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = value;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      ok();
+    } catch (e2) {
+      try { addLog(`복사 실패: ${e2.message}`, 'err'); } catch (_) {}
+    }
+  }
+}
+
+function _escHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// 현재 프로젝트의 발행패키지를 카드로 렌더
+function renderPublishPanel() {
+  const host = document.getElementById('publishSections');
+  const empty = document.getElementById('publishEmpty');
+  const nameEl = document.getElementById('publishSourceName');
+  if (!host) return;
+  const pkg = (window._currentProject && window._currentProject.publishPackage) || window._publishPackage || null;
+  const sections = pkg && Array.isArray(pkg.sections) ? pkg.sections : [];
+  if (nameEl) {
+    if (pkg && pkg.sourcePath) {
+      try {
+        const path = require('path');
+        nameEl.textContent = '📄 ' + path.basename(pkg.sourcePath);
+        nameEl.title = pkg.sourcePath;
+      } catch (_) { nameEl.textContent = ''; }
+    } else nameEl.textContent = '';
+  }
+  if (!sections.length) {
+    host.innerHTML = '';
+    if (empty) empty.style.display = '';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  host.innerHTML = sections.map((s, si) => {
+    const _trunc = (t) => { t = String(t).replace(/\s+/g, ' ').trim(); return t.length > 36 ? t.slice(0, 36) + '…' : t; };
+    // 이미지 프롬프트 항목(백틱)이 있는 섹션 → 스타일 선택 + 🎨 생성 버튼 노출
+    const hasImagePrompt = (s.items || []).some(it => it.kind === 'imagePrompt');
+    const items = (s.items || []).map((it, ii) => {
+      const copyBtn =
+        `<button class="btn-sm pub-item-btn" data-si="${si}" data-ii="${ii}" title="${_escHtml(it.value)}">` +
+          `<span class="pub-item-label">📋 ${_escHtml(it.label)}</span>` +
+          `<span class="pub-item-prev">${_escHtml(_trunc(it.value))}</span>` +
+        `</button>`;
+      // 이미지 프롬프트도 일반 복사 버튼으로 표시 (🎨 생성 버튼 제거됨 — 스타일은 복사 시 프롬프트 앞에 자동으로 붙음)
+      return copyBtn;
+    }).join('');
+    // 복사 항목(버튼)이 있는 섹션은 본문 텍스트를 숨김 — 복사 버튼만 노출.
+    // 항목이 없는 섹션만 본문을 더보기 없이 전체 표시.
+    const hasItems = !!items;
+    const styleRow = hasImagePrompt
+      ? `<div class="pub-style-row">🎨 스타일 <select class="pub-style-select" data-si="${si}"></select>` +
+          `<span class="pub-style-hint">선택 스타일이 프롬프트 앞에 붙어 생성됩니다</span></div>`
+      : '';
+    return `
+      <div class="pub-card">
+        <div class="pub-card-head">
+          <span class="pub-card-title">${_escHtml(s.num)}. ${_escHtml(s.title)}</span>
+          <button class="btn-sm pub-copy-btn" data-si="${si}" style="padding:4px 10px; font-size:11px;">📋 복사</button>
+        </div>
+        ${hasItems ? '' : `<pre class="pub-card-body" data-si="${si}">${_escHtml(s.body)}</pre>`}
+        ${styleRow}
+        ${items ? `<div class="pub-item-row">${items}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  // 이벤트 위임 대신 직접 바인딩 (innerHTML 재생성마다 새로 부착)
+  host.querySelectorAll('.pub-copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const s = sections[+btn.dataset.si];
+      if (s) _copyPublishValue(s.body, btn);
+    });
+  });
+  host.querySelectorAll('.pub-item-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const si = +btn.dataset.si;
+      const s = sections[si];
+      const it = s && s.items[+btn.dataset.ii];
+      if (!it) return;
+      // 이미지 프롬프트는 선택한 스타일을 앞에 붙여 복사 (생성 버튼과 동일 결과)
+      if (it.kind === 'imagePrompt') {
+        const sel = host.querySelector(`.pub-style-select[data-si="${si}"]`);
+        const styleId = sel ? sel.value : '';
+        _copyPublishValue(_composePublishImagePrompt(it.value, styleId), btn);
+      } else {
+        _copyPublishValue(it.value, btn);
+      }
+    });
+  });
+  // 스타일 select 채우기 (StyleStore)
+  host.querySelectorAll('.pub-style-select').forEach(sel => _populatePublishStyleSelect(sel));
+  // (🎨 생성 버튼 제거됨 — 이미지 프롬프트는 선택 스타일을 앞에 붙여 '복사'만 제공)
+}
+
+// 발행탭 스타일 select 채우기 — 메인 styleSelect 와 동일 목록(StyleStore), 현재값 동기화
+function _populatePublishStyleSelect(sel) {
+  if (!sel) return;
+  let list = [];
+  try { list = require('../core/style-store').loadAll() || []; } catch (_) {}
+  sel.innerHTML = '';
+  for (const s of list) {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.text = s.isBuiltIn ? s.name : (s.name + ' ⭐');
+    if (typeof s.prompt === 'string') opt.dataset.prompt = s.prompt;
+    sel.appendChild(opt);
+  }
+  // 메인 styleSelect 값과 동기화 (없으면 첫 항목)
+  const main = document.getElementById('styleSelect');
+  if (main && main.value && list.some(s => s.id === main.value)) sel.value = main.value;
+  else if (list.length) sel.value = list[0].id;
+}
+
+// 선택 스타일 프롬프트(품질태그 포함) + 썸네일 프롬프트 → 합친 최종 프롬프트.
+// 복사 버튼과 생성 버튼이 동일하게 사용 (복사해도 스타일이 앞에 붙음).
+function _composePublishImagePrompt(promptValue, styleId) {
+  let stylePrompt = '';
+  try {
+    const StyleStore = require('../core/style-store');
+    const sObj = styleId ? StyleStore.getById(styleId) : null;
+    if (sObj && sObj.prompt) stylePrompt = (typeof _appendStyleSuffix === 'function') ? _appendStyleSuffix(sObj.prompt) : sObj.prompt;
+  } catch (_) {}
+  return [stylePrompt, String(promptValue || '').trim()].filter(Boolean).join(', ');
+}
+
+// 선택 스타일 + 썸네일 프롬프트 → 이미지 생성 (그룹 이미지와 동일 경로: image-manager Gemini Nano Banana 2)
+async function _generatePublishThumbnail(promptValue, styleId, btn) {
+  const path = require('path');
+  const fs = require('fs');
+  try {
+    const prompt = _composePublishImagePrompt(promptValue, styleId);
+    if (!prompt) { alert('생성할 프롬프트가 비어있습니다.'); return; }
+
+    // 출력 폴더 — 그룹 이미지와 동일 규칙 (활성 채널 outputFolder → thumbnails/)
+    let baseOutDir = null;
+    try {
+      const ChannelStore = require('../core/channel-store');
+      const channel = (typeof _activeChannelId !== 'undefined' && _activeChannelId) ? ChannelStore.getById(_activeChannelId) : null;
+      baseOutDir = (typeof _resolveOutputDir === 'function') ? _resolveOutputDir(channel) : null;
+    } catch (_) {}
+    if (!baseOutDir && typeof _getProjectOutputDir === 'function') {
+      baseOutDir = _getProjectOutputDir(window._currentProject);
+    }
+    if (!baseOutDir) {
+      const picked = await ipcRenderer.invoke('select-folder').catch(() => null);
+      if (!picked) return;
+      baseOutDir = picked;
+    }
+    const thumbDir = path.join(baseOutDir, 'thumbnails');
+    fs.mkdirSync(thumbDir, { recursive: true });
+    const outputPath = path.join(thumbDir, `thumb_${Date.now()}.png`);
+
+    // 버튼 피드백
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '⏳ 생성 중…';
+    addLog(`[썸네일] 생성 시작 — 스타일 ${styleId || '없음'} + 프롬프트`, 'info');
+
+    const { getInstance: getImageManager } = require('../image/image-manager');
+    const mgr = getImageManager({ logger: addLog });
+    const result = await mgr.synth({ prompt, outputPath, provider: 'gemini', aspectRatio: '16:9' });
+
+    btn.innerHTML = '✓ 생성됨';
+    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 1500);
+    addLog(`[썸네일] ✅ 생성 완료 — ${result.path}`, 'ok');
+    try { await ipcRenderer.invoke('open-folder', thumbDir); } catch (_) {}
+  } catch (e) {
+    addLog(`[썸네일] 생성 실패: ${e.message}`, 'err');
+    btn.innerHTML = '❌ 실패';
+    setTimeout(() => { btn.innerHTML = '🎨 생성'; btn.disabled = false; }, 2000);
+    alert('썸네일 생성 실패:\n' + e.message);
+  }
+}
+
+// 대본 경로 기준으로 짝 발행패키지 md 탐색
+function findPublishPackagePath(scriptPath) {
+  if (!scriptPath) return null;
+  const fs = require('fs');
+  const path = require('path');
+  const dir = path.dirname(scriptPath);
+  if (!fs.existsSync(dir)) return null;
+  const base = path.basename(scriptPath);
+  const pm = base.match(/^\s*(\[[^\]]+\])/);   // 날짜접두사 [0606_토]
+  const prefix = pm ? pm[1] : null;
+  if (!prefix) return null;
+  // 같은 날짜접두사 + '발행' 포함 .md 를 찾는 헬퍼
+  const findIn = (folder) => {
+    let files;
+    try { files = fs.readdirSync(folder); } catch (_) { return null; }
+    const hit = files.find(f =>
+      /\.md$/i.test(f) && f.startsWith(prefix) && f.includes('발행')
+    );
+    return hit ? path.join(folder, hit) : null;
+  };
+  // 1순위: 대본 폴더 하위 "발행패키지" 폴더 (현 구조) → 2순위: 대본과 같은 폴더 (구버전 하위호환)
+  return findIn(path.join(dir, '발행패키지')) || findIn(dir);
+}
+
+// 경로에서 발행패키지 로드 → 파싱 → 현재 프로젝트에 저장 → 렌더
+function loadPublishPackageFromPath(p) {
+  const fs = require('fs');
+  const text = fs.readFileSync(p, 'utf-8');
+  const sections = parsePublishPackage(text);
+  const pkg = { sections, sourcePath: p };
+  window._publishPackage = pkg;
+  if (window._currentProject) window._currentProject.publishPackage = pkg;
+  renderPublishPanel();
+  return sections.length;
+}
+
+// 수동 첨부 (open-file 대화상자 재사용)
+// 시작 폴더 = 활성 프리셋의 "대본 폴더"(존재 시) → 첨부된 대본 파일 폴더 → 다운로드 폴더.
+async function attachPublishPackage() {
+  let defaultPath = '';
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+    let scriptFolder = '';
+    try {
+      const PresetStore = require('../tts/preset-store');
+      const pid = (window._currentProject && window._currentProject.activePresetId)
+        || (typeof _activePresetId !== 'undefined' ? _activePresetId : null);
+      const p = pid ? PresetStore.getById(pid) : null;
+      if (p && p.scriptFolder) scriptFolder = p.scriptFolder;
+    } catch (_) {}
+    if (scriptFolder && fs.existsSync(scriptFolder)) defaultPath = scriptFolder;
+    else if (window._scriptFilePath) defaultPath = path.dirname(window._scriptFilePath);
+    else defaultPath = path.join(os.homedir(), 'Downloads');
+  } catch (_) {}
+  let res;
+  try {
+    res = await ipcRenderer.invoke('open-file', { defaultPath });
+  } catch (e) {
+    addLog(`발행패키지 대화상자 실패: ${e.message}`, 'err');
+    return;
+  }
+  if (!res || !res.path) return;
+  try {
+    const n = loadPublishPackageFromPath(res.path);
+    const path = require('path');
+    addLog(`발행패키지 로드: ${path.basename(res.path)} (섹션 ${n}개)`, 'ok');
+  } catch (e) {
+    addLog(`발행패키지 읽기 실패: ${e.message}`, 'err');
+  }
+}
+
+// 원본 md 다시 읽기
+function reloadPublishPackage() {
+  const pkg = (window._currentProject && window._currentProject.publishPackage) || window._publishPackage || null;
+  if (!pkg || !pkg.sourcePath) { addLog('새로고침할 발행패키지가 없습니다.', 'warn'); return; }
+  try {
+    const n = loadPublishPackageFromPath(pkg.sourcePath);
+    addLog(`발행패키지 새로고침 (섹션 ${n}개)`, 'ok');
+  } catch (e) {
+    addLog(`발행패키지 새로고침 실패: ${e.message}`, 'err');
+  }
+}
+
+async function openFile(aspect) {
+  // aspect: '16:9'(롱폼대본) | '9:16'(쇼츠대본) | undefined(기존 동작/현재 비율 유지)
   // 시작 폴더 결정
   let defaultPath = '';
   try {
@@ -3840,8 +4427,65 @@ async function openFile() {
       fnEl.style.display = '';
     }
     addLog(`대본 로드: ${fname} (${text.length}자)`, 'ok');
-    // 자동 분할
-    splitScript();
+    // 자동 분할 — 쇼츠(9:16) 대본이 쇼츠 형식(## 쇼츠 N + (훅)/(본론)…)이면 전용 파서, 아니면 일반 분할
+    let _usedShorts = false;
+    if (aspect === '9:16') {
+      try {
+        const { isShortsScript, parseShortsScript } = require('../core/shorts-parser');
+        if (isShortsScript(text)) {
+          const r = parseShortsScript(text);
+          if (r.sentences.length) {
+            window._currentProject = {
+              ...(window._currentProject || {}),
+              aspect: '9:16',
+              scriptText: text,
+              scriptFileName: window._scriptFileName,
+              scriptFilePath: window._scriptFilePath,
+              thresholds: (window._currentProject && window._currentProject.thresholds) || { groupSize: 3, shortLen: 10, longLen: 20 },
+              sentences: r.sentences,
+              groups: r.groups,
+              _introPrepared: true,   // 쇼츠는 도입부 16초 재배치 개념 없음 → 내보내기/제작 바로 허용
+              _isShorts: true,
+              _shortsMeta: r.shorts,
+            };
+            _usedShorts = true;
+            addLog(`📱 쇼츠대본 파싱 — ${r.shorts.length}개 쇼츠 · 컷 ${r.sentences.length}개 (각 컷 = 자막+9:16 이미지)`, 'ok');
+            if (Array.isArray(r.warnings) && r.warnings.length) {
+              addLog(`⚠️ 인식 못한 컷 ${r.warnings.length}개 (큰따옴표 확인 필요):`, 'warn');
+              r.warnings.forEach(w => addLog(`   · ${w}`, 'warn'));
+            }
+            try { renderProjectTabs(); } catch (_) {}
+          }
+        }
+      } catch (e) { addLog(`쇼츠대본 파싱 실패 → 일반 분할 사용: ${e.message}`, 'warn'); }
+    }
+    if (!_usedShorts) splitScript();
+
+    // 대본 종류(롱폼/쇼츠)에 따라 프로젝트 비율 설정 → 제작 탭 구성·이미지·렌더가 이 값을 따름
+    if ((aspect === '16:9' || aspect === '9:16') && window._currentProject) {
+      window._currentProject.aspect = aspect;
+      addLog(`[비율] ${aspect === '9:16' ? '📱 쇼츠(9:16)' : '🖥 롱폼(16:9)'} 대본으로 설정`, 'info');
+      try { _syncAspectChips(); } catch (_) {}
+      // 작업목록 이미지/영상 박스를 새 비율(9:16 세로)로 다시 그림
+      try { renderTaskList(window._currentProject); } catch (_) {}
+      try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch (_) {}
+    }
+
+    // 짝 발행패키지 자동 매칭 (같은 폴더 · 같은 날짜접두사 · 이름에 '발행')
+    try {
+      const pkgPath = findPublishPackagePath(window._scriptFilePath);
+      if (pkgPath) {
+        const n = loadPublishPackageFromPath(pkgPath);
+        addLog(`발행패키지 자동 로드: ${path.basename(pkgPath)} (섹션 ${n}개)`, 'ok');
+      } else {
+        // 새 대본에 짝이 없으면 이전 패키지 잔상 제거
+        window._publishPackage = null;
+        if (window._currentProject) window._currentProject.publishPackage = null;
+        try { renderPublishPanel(); } catch (_) {}
+      }
+    } catch (e) {
+      addLog(`발행패키지 자동 매칭 실패: ${e.message}`, 'warn');
+    }
 
     // 캐릭터 이미지 자동 매칭 — IPC 가 같은 폴더의 png/jpg/webp 를 미리 스캔해 줌
     const chars = Array.isArray(res.characters) ? res.characters : [];
@@ -4002,6 +4646,7 @@ async function _loadProjectFromPath(filePath) {
         } catch {}
       }
       window._currentProject = project;
+      project.aspect = project.aspect || '16:9';
       window._scriptText = project.scriptText || '';
       window._scriptFileName = project.scriptFileName || null;
       window._scriptFilePath = project.scriptFilePath || '';
@@ -4063,6 +4708,17 @@ async function _loadProjectFromPath(filePath) {
         addLog(`⚠ 자산 누락: ${parts.join(', ')} — 디스크에서 사라진 파일은 status 'idle' 로 초기화`, 'warn');
       }
       _updateAutoSaveIndicator('saved');
+
+      // 짝 발행패키지 자동 매칭 (대본 파일 경로 기준)
+      try {
+        const pkgPath = findPublishPackagePath(project.scriptFilePath);
+        if (pkgPath) {
+          const n = loadPublishPackageFromPath(pkgPath);
+          addLog(`발행패키지 자동 로드: ${path.basename(pkgPath)} (섹션 ${n}개)`, 'ok');
+        } else {
+          renderPublishPanel();
+        }
+      } catch (_) {}
     } catch (e) {
       addLog(`프로젝트 불러오기 실패: ${e.message}`, 'err');
       alert('프로젝트 불러오기 실패:\n' + e.message);
@@ -5960,8 +6616,10 @@ function _buildPromptRequestText() {
   }
   L.push('- 전체 대본의 맥락을 고려해 **등장인물의 성별·나이·외모·복장을 명시**하고, 모든 그룹에서 **동일 인물은 동일하게** 유지하세요.');
   L.push('- 각 프롬프트는 그 그룹 장면을 시각적으로 묘사하세요 (인물·배경·구도·분위기·조명). 영어로 작성.');
+  L.push('- **🛡 안전 필터 회피 (이미지 생성기)**: 생성기 안전 필터에 걸리는 서술/판단 단어(traitor·배신자, kill·죽이다, blood·유혈, execution·처형, massacre·학살, torture·고문, war crime, suicide, corpse·시신 등)는 프롬프트에 **직접 쓰지 말고**, 그 의미를 **시각적 장면·표정·분위기·조명**으로만 표현하세요. (예: "배신자가 된다" → `a man in dark robes standing alone in deep shadow, cold and conflicted expression`)');
+  L.push('- **🛡 유튜브 수익화(광고주 친화) 안전 — 필수**: 모든 이미지는 유튜브 심의·광고 친화 기준을 통과해야 합니다. **유혈·시신·잔혹한 상처·고문·성적/선정적 묘사·혐오 상징·실제 인물 비방은 금지**. 폭력적·비극적 장면은 **상징적·은유적으로** 표현하세요 — 직접 묘사 대신 실루엣·그림자·뒷모습·사건의 여운을 쓰세요. (예: 전투 → 멀리 보이는 군대와 깃발 / 처형 → 빈 형장과 흩날리는 천 / 죽음 → 꺼져 가는 등불·시든 꽃). 인물은 **다치지 않은 온전한 모습**으로, 핏자국·상흔 없이 그리세요.');
   L.push(`- 화풍(스타일)은 앱이 자동으로 입힙니다${styleName ? ` (현재 스타일: "${styleName}")` : ''} — 화풍 키워드는 생략해도 됩니다.`);
-  L.push('- **(영상)** 표시가 있는 그룹은 이미지를 영상으로 변환합니다. 이 그룹은 `영상:` 줄에 **영어 영상 모션 프롬프트**(카메라 움직임·인물 동작·속도감·분위기)도 작성하세요. 표시 없는 그룹의 `영상:` 줄은 비워두거나 생략해도 됩니다.');
+  L.push('- **(영상)** 표시가 있는 그룹은 이미지를 영상으로 변환합니다. 이 그룹의 `영상:` 줄에 **영어 영상 모션 프롬프트**를 작성하되, **반드시 역동적으로 움직이는 영상**이 되도록 유도하세요 — 정적이거나 거의 멈춘 장면은 금지(비디오의 장점을 살려야 함). 다음 3가지를 구체적으로 명시: ① **뚜렷한 카메라 워크** (slow push-in, dolly in/out, crane up, orbit/arc, tracking shot, whip pan, tilt) ② **인물·사물의 실제 동작** (걷기·돌아보기·손짓·말하기·달리기·전투·쓰러짐 등 구체 행동) ③ **환경의 생동감** (바람에 날리는 머리카락·옷·깃발, 흩날리는 먼지·불씨·낙엽·눈, 일렁이는 불꽃·연기·물결). 예: `cinematic slow push-in as the king slowly turns his head, his robes and the banners behind him billowing in the wind, embers and dust drifting through the air, dynamic camera movement`. 속도감/강도도 함께(slow/gentle vs fast/intense) 명시하세요. 표시 없는 그룹의 `영상:` 줄은 생략해도 됩니다.');
   L.push('- **출력 형식**: 아래 `## [번호] 라벨` 헤더를 그대로 두고, 각 헤더 아래에 다음 두 줄로 적어 주세요. 다른 설명/번호는 넣지 마세요.');
   L.push('    이미지: <영어 이미지 프롬프트>');
   L.push('    영상: <영어 영상 모션 프롬프트 — (영상) 그룹만>');
@@ -5980,7 +6638,7 @@ function _buildPromptRequestText() {
     L.push(`- 대본: ${full}`);
     L.push('');
     L.push('이미지: (여기에 영어 이미지 프롬프트)');
-    if (isVid) L.push('영상: (여기에 영어 영상 모션 프롬프트)');
+    if (isVid) L.push('영상: (여기에 영어 영상 모션 프롬프트 — 역동적 카메라워크 + 인물 동작 + 환경 움직임)');
     L.push('');
   }
   return L.join('\n');
@@ -6122,6 +6780,80 @@ function openImportPromptsModal() {
 function closeImportPromptsModal() {
   const m = document.getElementById('importPromptsModal'); if (m) m.style.display = 'none';
 }
+// 🛡 이미지/영상 프롬프트 안전 치환 — 이중 안전망.
+//   요청서 지침을 LLM 이 100% 따르지 않을 때를 대비, 가져오기 시점에 위험 단어를 자동 순화.
+//   목적: ① 이미지 생성기 콘텐츠 필터 통과 ② 유튜브 수익화(광고주 친화) 심의 통과.
+//   영어 프롬프트 기준 + 한국어 누수 대비. 단어경계/대소문자 무시.
+const _PROMPT_SAFE_RULES = [
+  // 결합 표현 먼저 (개별 규칙보다 우선 매칭 — 중복 치환 방지)
+  [/\bworst traitors?\b/gi, 'controversial figure'],
+  [/\bworst (?:person|man|figure|ruler|king)(?: in power)?\b/gi, 'controversial figure'],
+  [/\bworst\b/gi, 'controversial'],
+  [/\btraitors?\b/gi, 'controversial figure'],
+  [/\btreason(ous)?\b/gi, 'political conflict'],
+  [/\bbetray(?:al|ed|ing|s)?\b/gi, 'turning away'],
+  // 독재·폭정·억압 계열 (정치적 민감 표현 → 중립 시각 묘사)
+  [/\bdictators?\b/gi, 'powerful ruler'],
+  [/\bdictatorship\b/gi, 'authoritarian era'],
+  [/\btyrants?\b/gi, 'stern ruler'],
+  [/\btyrann(?:y|ical|ies)\b/gi, 'stern rule'],
+  [/\bdespot(?:ic|ism)?\b/gi, 'stern ruler'],
+  [/\boppress(?:ed|ion|ive|es|ing)?\b/gi, 'strict control'],
+  [/\btyrannize(?:d|s)?\b/gi, 'rule sternly'],
+  [/\bcorrupt(?:ion|ed|s|ing)?\b/gi, 'troubled'],
+  [/\bsuffering\b/gi, 'hardship'],
+  [/\bsuffer(?:ed|s)?\b/gi, 'endure hardship'],
+  [/\bkill(?:ed|ing|s)?\b/gi, 'defeat'],
+  [/\bmurder(?:ed|ing|s)?\b/gi, 'downfall'],
+  [/\bassassinat(?:e|ed|ion)\b/gi, 'sudden downfall'],
+  [/\bexecut(?:e|ed|ing|ion|ions)\b/gi, 'solemn punishment scene'],
+  [/\bbehead(?:ed|ing|s)?\b/gi, 'solemn punishment scene'],
+  [/\bmassacres?\b/gi, 'great upheaval'],
+  [/\bslaughter(?:ed|ing|s)?\b/gi, 'great upheaval'],
+  [/\btortur(?:e|ed|ing|es)\b/gi, 'harsh ordeal'],
+  [/\btorment(?:ed|ing|s)?\b/gi, 'burdened'],
+  [/\bbloody\b/gi, 'dramatic'],
+  [/\bbloods?(?:hed|tained)?\b/gi, 'dramatic'],
+  [/\bgore\b/gi, ''],
+  [/\bcorpses?\b/gi, 'fallen figure'],
+  [/\bdead bodies?\b/gi, 'fallen figure'],
+  [/\bdead body\b/gi, 'fallen figure'],
+  [/\bsuicide\b/gi, 'tragic end'],
+  [/\bbeautiful (?:women|woman|girls?|ladies)\b/gi, 'court attendants'],
+  [/\bpleasures?\b/gi, 'entertainment'],
+  [/\bseduc(?:e|ed|tive|tion)\b/gi, 'charm'],
+  [/\b(?:nude|naked)\b/gi, 'figure'],
+  [/\bsexual(?:ly)?\b/gi, ''],
+  [/\bconcubines?\b/gi, 'court ladies'],
+  // 한국어 누수 대비
+  [/배신자/g, '문제적 인물'],
+  [/처형|참수/g, '엄숙한 형벌 장면'],
+  [/학살|도륙/g, '대혼란'],
+  [/유혈|피투성이/g, '극적인'],
+  [/시신|시체/g, '쓰러진 인물'],
+  [/고문/g, '시련'],
+  [/독재자|폭군/g, '강압적 통치자'],
+  [/독재|폭정/g, '강압적 통치'],
+  [/탄압|억압/g, '강한 통제'],
+  [/부패/g, '혼란'],
+  [/고통|괴롭힘/g, '고난'],
+];
+function _sanitizeImagePrompt(text) {
+  if (!text) return { text, changed: [] };
+  let out = String(text);
+  const changed = [];
+  for (const [re, rep] of _PROMPT_SAFE_RULES) {
+    const hits = out.match(re);
+    if (hits && hits.length) {
+      changed.push(...hits.map(h => h.trim()).filter(Boolean));
+      out = out.replace(re, rep);
+    }
+  }
+  // 치환 후 공백/구두점 정리
+  out = out.replace(/\s{2,}/g, ' ').replace(/\s+([,.;])/g, '$1').replace(/,\s*,/g, ',').trim();
+  return { text: out, changed: [...new Set(changed.map(s => s.toLowerCase()))] };
+}
+
 // 클로드 답변 텍스트 → 그룹별 imagePrompt/videoPrompt 매핑. num 기준.
 // "이미지:" / "영상:" (Image:/Video:) 라벨 분리. 라벨 없으면 본문 전체=이미지(하위호환).
 // 반환: { groups, img, vid } 적용 개수.
@@ -6132,6 +6864,7 @@ function _applyClaudePrompts(text) {
   const isPlaceholder = s => !s || /여기에|placeholder|<.*프롬프트.*>/i.test(s);
   const re = /##\s*\[(\d+)\][^\n]*\n([\s\S]*?)(?=\n##\s*\[\d+\]|$)/g;
   let m, groups = 0, img = 0, vid = 0;
+  const _sanLog = [];   // 🛡 안전 치환된 항목 모음 (사용자 안내용)
   while ((m = re.exec(text)) !== null) {
     const num = parseInt(m[1], 10);
     const lines = (m[2] || '').split('\n').map(l => l.trim());
@@ -6153,9 +6886,22 @@ function _applyClaudePrompts(text) {
     const g = proj.groups.find(x => x.num === num);
     if (!g) continue;
     let did = false;
-    if (imgP) { g.imagePrompt = imgP; img++; did = true; }
-    if (vidP) { g.videoPrompt = vidP; vid++; did = true; }
+    if (imgP) {
+      const s = _sanitizeImagePrompt(imgP);
+      if (s.changed.length) _sanLog.push(`#${num} 이미지: ${s.changed.join(', ')}`);
+      g.imagePrompt = s.text; img++; did = true;
+    }
+    if (vidP) {
+      const s2 = _sanitizeImagePrompt(vidP);
+      if (s2.changed.length) _sanLog.push(`#${num} 영상: ${s2.changed.join(', ')}`);
+      g.videoPrompt = s2.text; vid++; did = true;
+    }
     if (did) groups++;
+  }
+  // 🛡 안전 치환 발생 시 사용자에게 무엇을 순화했는지 안내 (필터·수익화 안전)
+  if (_sanLog.length) {
+    addLog(`🛡 안전 치환 ${_sanLog.length}건 — 콘텐츠 필터/유튜브 수익화 위험 단어를 순화했습니다:`, 'warn');
+    for (const line of _sanLog.slice(0, 30)) addLog(`   ${line}`, 'info');
   }
   return { groups, img, vid };
 }
@@ -7177,6 +7923,7 @@ function _splitScriptImpl() {
   // (PR2) 활성 탭의 메타데이터(id / scriptFileName / outputDir / activeTasks …)는 스프레드로 보존
   window._currentProject = {
     ...(window._currentProject || {}),
+    aspect: (window._currentProject && window._currentProject.aspect) || '16:9',
     scriptText: text,
     thresholds: {
       shortLen, longLen,
@@ -7257,6 +8004,8 @@ function _refreshGroupRangeInputs(project) {
 }
 
 function renderTaskList(project) {
+  try { _syncAspectChips(); } catch (_) {}   // 비율 토글 활성칩을 현재 프로젝트와 동기화
+  try { _renderShortsPreviewBar(project); } catch (_) {}   // 쇼츠: 파일명 옆 편별 미리듣기/길이
   const empty = document.getElementById('taskEmpty');
   const groupsBox = document.getElementById('taskListGroups');
   const progressEl = document.getElementById('taskListProgress');
@@ -7290,6 +8039,8 @@ function renderTaskList(project) {
     const card = document.createElement('div');
     card.className = 'group-card';
     if (g.isIntro) card.classList.add('group-card-intro');
+    // 쇼츠 편별 색상 구분 (1/2/3편 순환)
+    if (g.shortsNum) card.classList.add('shorts-' + (((g.shortsNum - 1) % 3) + 1));
     card.dataset.groupId = g.id;
 
     // 헤더 (체크박스 + 그룹 라벨 + 클립 수 + 이미지 상태)
@@ -7348,7 +8099,8 @@ function renderTaskList(project) {
     body.className = 'group-card-body';
 
     const img = document.createElement('div');
-    img.className = 'group-image';
+    // 쇼츠(9:16) 프로젝트면 세로 박스 — 작업목록 이미지/영상 첨부 영역 비율을 9:16 으로
+    img.className = 'group-image' + (_projectAspect() === '9:16' ? ' vertical' : '');
     img.dataset.groupId = g.id;
     img.dataset.groupNum = g.num;
     // 비디오가 완성됐으면 비디오 미리보기 (자동재생 안 함, 첫 프레임만), 아니면 이미지
@@ -12393,14 +13145,19 @@ async function previewAllSentences(startGroupId) {
     return;
   }
 
-  window._taskPreviewActive = true;
-  if (btn) btn.textContent = '⏸ 전체 중지';
   addLog(`[Preview] 전체 미리듣기 시작 (${ready.length}개 문장)`, 'info');
+  await _runPreviewQueue(ready, btn, '🔊 전체 미리듣기');
+  addLog('[Preview] 전체 미리듣기 완료', 'ok');
+}
 
+// 미리듣기 재생 큐 — 문장 리스트를 순차 재생 (전체/편별 공통). 그룹 미디어 미리보기 + 버튼 라벨 토글.
+async function _runPreviewQueue(ready, btn, restoreLabel) {
+  const proj = window._currentProject;
+  window._taskPreviewActive = true;
+  if (btn) btn.textContent = '⏸ 중지';
   let _curPrevGroupId = null;
   for (const s of ready) {
     if (!window._taskPreviewActive) break;
-    // 그룹이 바뀌면 이전 그룹 미디어 정지 + 새 그룹 미디어(비디오/Ken Burns) 시작
     if (s.groupId !== _curPrevGroupId) {
       if (_curPrevGroupId) { try { _stopGroupMediaPreview(_curPrevGroupId); } catch (_) {} }
       _curPrevGroupId = s.groupId;
@@ -12421,13 +13178,61 @@ async function previewAllSentences(startGroupId) {
       audio.play().catch(resolve);
     });
   }
-
   if (_curPrevGroupId) { try { _stopGroupMediaPreview(_curPrevGroupId); } catch (_) {} }
   window._taskPreviewActive = false;
   window._sentencePlayingSid = null;
   document.querySelectorAll('.sentence-row.preview-active').forEach(r => r.classList.remove('preview-active'));
-  if (btn) btn.textContent = '🔊 전체 미리듣기';
-  addLog('[Preview] 전체 미리듣기 완료', 'ok');
+  if (btn) btn.textContent = restoreLabel;
+}
+
+// 쇼츠 편별 전체 미리듣기 (1/2/3편) — 그 편 컷들만 순차 재생
+async function previewShorts(n) {
+  const proj = window._currentProject;
+  if (!proj || !proj.groups) return;
+  const btn = document.getElementById('shortsPrevBtn' + n);
+  if (window._taskPreviewActive) {
+    _stopAllPreviews();
+    try { _renderShortsPreviewBar(proj); } catch (_) {}
+    addLog('[Preview] 편별 미리듣기 중지', 'info');
+    return;
+  }
+  _stopAllPreviews();
+  const fs = require('fs');
+  const gids = new Set(proj.groups.filter(g => g.shortsNum === n).map(g => g.id));
+  const ready = (proj.sentences || []).filter(s => gids.has(s.groupId) && s.ttsAudioPath && fs.existsSync(s.ttsAudioPath));
+  if (!ready.length) { addLog(`${n}편: TTS 변환된 문장이 없습니다 — 먼저 🎙 TTS 변환`, 'err'); return; }
+  addLog(`[Preview] ${n}편 전체 미리듣기 (${ready.length}컷)`, 'info');
+  await _runPreviewQueue(ready, btn, `▶ ${n}편`);
+}
+
+// 쇼츠 프로젝트면 파일명 옆에 편별 미리듣기 버튼 + 길이 표시. 아니면 숨김 + 전체 미리듣기 복원.
+function _renderShortsPreviewBar(project) {
+  const bar = document.getElementById('shortsPreviewBar');
+  const allBtn = document.getElementById('previewAllBtn');
+  if (!bar) return;
+  const isShorts = !!(project && project._isShorts && Array.isArray(project.groups) && project.groups.some(g => g.shortsNum));
+  if (!isShorts) {
+    bar.style.display = 'none'; bar.innerHTML = '';
+    if (allBtn) allBtn.style.display = '';
+    return;
+  }
+  if (allBtn) allBtn.style.display = 'none';   // 쇼츠는 통합 전체 미리듣기 불필요 → 편별로 대체
+  let fs = null; try { fs = require('fs'); } catch (_) {}
+  const nums = [...new Set(project.groups.map(g => g.shortsNum).filter(Boolean))].sort((a, b) => a - b);
+  bar.innerHTML = nums.map(n => {
+    const gids = new Set(project.groups.filter(g => g.shortsNum === n).map(g => g.id));
+    const sents = (project.sentences || []).filter(s => gids.has(s.groupId));
+    const total = sents.length;
+    const doneSents = sents.filter(s => s.ttsStatus === 'done' && s.ttsDurationSec);
+    const dur = doneSents.reduce((a, s) => a + (s.ttsDurationSec || 0), 0);
+    let durTxt;
+    if (total > 0 && doneSents.length === total) durTxt = `${dur.toFixed(1)}초`;
+    else if (doneSents.length > 0) durTxt = `${dur.toFixed(1)}초+`;   // 일부만 변환됨
+    else durTxt = '미변환';
+    const cls = 'shorts-' + (((n - 1) % 3) + 1);
+    return `<button class="btn-sm shorts-prev-btn ${cls}" id="shortsPrevBtn${n}" onclick="previewShorts(${n})" title="${n}편 전체 미리듣기 (다시 누르면 중지)" style="font-size:11px; padding:3px 8px;">▶ ${n}편 <span style="opacity:.75; font-weight:400;">${durTxt}</span></button>`;
+  }).join('');
+  bar.style.display = 'inline-flex';
 }
 
 // 그룹 단위 TTS 일괄 변환 — 그룹 카드의 [🎙 그룹 TTS 변환] 버튼
@@ -12445,8 +13250,22 @@ function _initGrokMotionPromptInput() {
     if (el && typeof cfg.defaultMotionPrompt === 'string') el.value = cfg.defaultMotionPrompt;
     const spd = document.getElementById('grokTypingSpeed');
     if (spd && cfg.typingSpeed) spd.value = cfg.typingSpeed;
+    // 영상 엔진 선택 복원
+    const veng = document.getElementById('videoEngineSelect');
+    if (veng) { try { veng.value = localStorage.getItem('pf_video_engine') || 'grok'; } catch (_) {} }
   } catch (e) {
     console.error('[grok-motion-prompt init]', e);
+  }
+}
+// 영상 엔진 선택 저장 (Grok 무료 / Flow Veo 유료). 다음 변환부터 적용.
+function onVideoEngineChange() {
+  try {
+    const sel = document.getElementById('videoEngineSelect');
+    if (!sel) return;
+    localStorage.setItem('pf_video_engine', sel.value);
+    addLog(`🎞 영상 엔진: ${sel.value === 'flowveo' ? 'Flow Veo (유료 크레딧 · 고품질)' : 'Grok (무료)'}`, 'info');
+  } catch (e) {
+    console.error('[video-engine save]', e);
   }
 }
 function onGrokMotionPromptChange() {
@@ -12479,6 +13298,29 @@ if (document.readyState === 'loading') {
 
 // 싱글톤 GrokEngine 인스턴스 — 한 번 띄운 브라우저는 다음 변환에서도 재사용
 let _grokEngineInstance = null;
+let _flowVeoEngineInstance = null;
+
+// 영상 엔진 선택 — 'grok'(무료) | 'flowveo'(Veo, 유료 크레딧). 드롭다운에서 저장.
+function _getVideoEngineChoice() {
+  try { return localStorage.getItem('pf_video_engine') || 'grok'; } catch (_) { return 'grok'; }
+}
+// 선택된 영상 엔진 인스턴스 반환 (grok-engine 과 동일 인터페이스: generateVideoFromImage, _aspectRatio, stop)
+function _getVideoEngine() {
+  if (_getVideoEngineChoice() === 'flowveo') return _getFlowVeoEngine();
+  return _getGrokEngine();
+}
+function _getFlowVeoEngine() {
+  if (!_flowVeoEngineInstance) {
+    try {
+      const { FlowVeoEngine } = require('../flow-veo-engine');
+      _flowVeoEngineInstance = new FlowVeoEngine({ logger: (msg) => addLog(msg, 'info') });
+    } catch (e) {
+      addLog(`[Flow Veo] 엔진 로드 실패: ${e.message}`, 'err');
+      return null;
+    }
+  }
+  return _flowVeoEngineInstance;
+}
 function _getGrokEngine() {
   if (!_grokEngineInstance) {
     try {
@@ -12573,9 +13415,11 @@ async function _convertGroupVideoBody(projectId, groupId, opts = {}) {
 
     let engine;
     try {
-      engine = _getGrokEngine();
+      engine = _getVideoEngine();   // 드롭다운 선택: Grok(무료) 또는 Flow Veo(유료)
+      // 쇼츠(9:16) 프로젝트면 옵션을 9:16 로 (롱폼이면 16:9)
+      if (engine) engine._aspectRatio = (proj && proj.aspect) || '16:9';
     } catch (e) {
-      addLog(`[Grok] 엔진 로드 실패: ${e.message}`, 'err');
+      addLog(`[영상] 엔진 로드 실패: ${e.message}`, 'err');
       g.videoStatus = 'fail';
       if (_selfManaged) window._grokConvertActive = false;
       if (window._activeProjectId === projectId) renderTaskList(proj);
@@ -12677,15 +13521,20 @@ async function _convertGroupListToVideo(groupIds, label) {
   } catch (e) {
     console.error('[grok wrap-up]', e);
   }
-  // 작업 끝 — Grok Chrome 자동 닫기
+  // 작업 끝 — 영상 엔진 Chrome 자동 닫기 (선택된 엔진 무엇이든)
   try {
     if (_grokEngineInstance) {
       await _grokEngineInstance.stop();
       _grokEngineInstance = null;
       addLog(`[Grok] 자동화 Chrome 창 닫음`, 'info');
     }
+    if (_flowVeoEngineInstance) {
+      await _flowVeoEngineInstance.stop();
+      _flowVeoEngineInstance = null;
+      addLog(`[Flow Veo] 자동화 Chrome 창 닫음`, 'info');
+    }
   } catch (e) {
-    console.error('[grok stop]', e);
+    console.error('[video engine stop]', e);
   }
 }
 
@@ -13841,7 +14690,8 @@ async function _runRunPodImageGeneration(groupIds, label, modelOverride) {
   const ChannelStore = require('../core/channel-store');
   const channel = (typeof _activeChannelId !== 'undefined' && _activeChannelId)
     ? ChannelStore.getById(_activeChannelId) : null;
-  const baseOutDir = _resolveOutputDir(channel);
+  // 이미지는 .vrew 와 같은 프로젝트 폴더(날짜_대본명 하위폴더)에 저장 — 그 안의 images/ 로
+  const baseOutDir = _getProjectOutputDir(proj) || _resolveOutputDir(channel);
   if (!baseOutDir) {
     alert('출력 폴더를 먼저 선택하세요 (또는 채널을 등록하세요)');
     return;
@@ -13952,7 +14802,7 @@ async function _runRunPodImageGeneration(groupIds, label, modelOverride) {
         prompt,
         outputPath,
         provider: 'gemini',
-        aspectRatio: '16:9',
+        aspectRatio: _projectAspect(),   // 쇼츠 모드면 9:16 세로 이미지 생성
       });
 
       g.imageStatus = 'done';
@@ -14002,7 +14852,8 @@ async function _runGensparkImageGeneration(groupIds, label) {
   const ChannelStore = require('../core/channel-store');
   const channel = (typeof _activeChannelId !== 'undefined' && _activeChannelId)
     ? ChannelStore.getById(_activeChannelId) : null;
-  const baseOutDir = _resolveOutputDir(channel);
+  // 이미지는 .vrew 와 같은 프로젝트 폴더(날짜_대본명 하위폴더)에 저장 — 그 안의 images/ 로
+  const baseOutDir = _getProjectOutputDir(proj) || _resolveOutputDir(channel);
   if (!baseOutDir) {
     alert('출력 폴더를 먼저 선택하세요 (또는 채널을 등록하세요)');
     return;
@@ -14014,6 +14865,7 @@ async function _runGensparkImageGeneration(groupIds, label) {
   if (targets.length === 0) return;
 
   const engine = _getGensparkEngine();
+  if (engine) engine._aspectRatio = _projectAspect();   // 쇼츠 모드면 9:16 비율로 셋업
   if (!engine) { addLog('[Genspark] 엔진 사용 불가 — 중단', 'err'); return; }
 
   let batchSize = 6;
@@ -14092,9 +14944,24 @@ async function _runGensparkImageGeneration(groupIds, label) {
         }
       });
 
-      // anti-detect: 다음 배치 전 8~15초 (1초 단위 분할로 중단 반영)
+      // anti-detect 휴먼 페이싱 (방식 B) — 젠스파크 토큰 한도/세션 차단(5시간 제한) 회피.
+      //   · 첫 배치 직후: 60~120초 긴 대기 — 세션이 첫 생성을 처리·안정시킬 시간 확보
+      //     (곧장 다음 배치를 던지면 "요청이 중단되었습니다" 충돌·throttle 발생)
+      //   · 이후: 배치가 거듭될수록 간격을 늘리는 점증 대기 (누적 throttle 회피)
+      //   (1초 분할 대기로 중지 즉시 반영)
       if (b + batchSize < items.length && !_abort()) {
-        const waitMs = 8000 + Math.floor(Math.random() * 7001);
+        let waitMs, _label;
+        if (bn === 1) {
+          waitMs = 60000 + Math.floor(Math.random() * 60001);   // 첫 배치 후 60~120초
+          _label = '🛌 첫 배치 후 긴 대기';
+        } else {
+          const BASE = 30000, STEP = 15000, MAX = 150000;       // 30초 시작, 배치당 +15초, 상한 150초
+          const grow = Math.min(MAX, BASE + (bn - 1) * STEP);
+          const jitter = Math.floor(grow * 0.2 * (Math.random() * 2 - 1));  // ±20% 흔들기
+          waitMs = Math.max(20000, grow + jitter);
+          _label = '⏳ 점증 대기';
+        }
+        addLog(`[Genspark] ${_label} ${Math.round(waitMs / 1000)}초 — 토큰 한도 회피 (배치 ${bn}/${totalB} 완료)`, 'info');
         const startWait = Date.now();
         while (Date.now() - startWait < waitMs) {
           if (_abort()) break;
@@ -14376,9 +15243,11 @@ async function generateAll() {
   try { _resetRtf(); } catch (_) {}
 
   // 진행 모달 — 4 단계 (이미지 / TTS / 도입부 영상 / Vrew 빌드)
-  const _autoIntroOn = document.getElementById('autoIntroVideoToggle')?.checked ?? true;
+  // 쇼츠(9:16)는 켄번스 이미지로만 진행 — 그록 자동 영상화 안 함 (도입부 없어 1~10 폴백으로 잘못 잡히던 버그 차단)
+  const _autoIntroOn = !proj._isShorts && (document.getElementById('autoIntroVideoToggle')?.checked ?? true);
   // 자동 영상화 대상 + 랜덤 갯수(9~13). 같은 대본/조건이어도 매 실행 갯수가 달라져 "공장형 대량생산 템플릿" 인상 방지.
   let _autoVideoGroups = _autoIntroOn ? _getAutoVideoTargetGroups(proj) : [];
+  if (proj._isShorts) addLog('[쇼츠] 켄번스 이미지 전용 — 그록 자동 영상화 건너뜀', 'info');
   if (_autoVideoGroups.length > 0) {
     const _capRand = 9 + Math.floor(Math.random() * 5); // 9,10,11,12,13 중 랜덤
     const _fullN = _autoVideoGroups.length;
@@ -14560,6 +15429,27 @@ async function generateAll() {
     return;
   }
 
+  // ⛔ 이미지 부족 게이트 — 사용 한도(rate-skipped) 감지 또는 대량 누락 시 .vrew/.fcpxml 자동 빌드 보류.
+  //    반쪽짜리(검은 슬라이드) 결과물을 막고, TTS·이미지는 보존 → 한도 풀린 뒤 재실행 시 재사용.
+  const _imgMissing = groupCount - imgDone;
+  const _rateSkipped = proj.groups.filter(g => g.imageStatus === 'rate-skipped').length;
+  const _missingRatio = groupCount > 0 ? _imgMissing / groupCount : 0;
+  const _IMG_GATE_RATIO = 0.2;   // 20% 이상 누락이면 게이트
+  if (_imgMissing > 0 && (_rateSkipped > 0 || _missingRatio >= _IMG_GATE_RATIO)) {
+    const _reason = _rateSkipped > 0
+      ? `사용 한도 감지 (한도로 스킵 ${_rateSkipped}개)`
+      : `이미지 누락 ${_imgMissing}/${groupCount} (${Math.round(_missingRatio * 100)}%)`;
+    addLog(`⛔ ${_reason} — .vrew/.fcpxml 자동 빌드를 건너뜁니다 (반쪽 파일 방지).`, 'warn');
+    addLog(`   TTS ${ttsDone}/${sentenceCount} · 이미지 ${imgDone}/${groupCount} 는 보존됩니다. 한도가 풀린 뒤(보통 몇 시간) '자동제작'을 다시 누르면 빠진 이미지만 생성하고 .vrew 를 만듭니다.`, 'info');
+    _updateAutoStep('vrew', { status: `건너뜀 — ${_reason}`, fail: true });
+    try { const _v = document.getElementById('progVrewTxt'); if (_v && proj === window._currentProject) _v.textContent = '건너뜀(이미지 부족)'; } catch (_) {}
+    try { _finishAutoProgress('⛔ 이미지 부족 — .vrew 빌드 보류'); } catch (_) {}
+    try {
+      alert(`이미지가 ${imgDone}/${groupCount} 만 생성되어 .vrew 빌드를 보류했습니다.\n\n사유: ${_reason}\n\nGenspark 한도가 풀린 뒤(보통 몇 시간) '자동제작'을 다시 누르면, 이미 만든 이미지·TTS 는 재사용하고 빠진 이미지만 생성한 뒤 .vrew 를 만듭니다.`);
+    } catch (_) {}
+    return;
+  }
+
   // Vrew 자동 빌드 — embedded 모드 (saveVrew 가 모달을 새로 띄우지 않고 기존 step 갱신만)
   try {
     _updateAutoStep('vrew', { status: '빌드 시작...' });
@@ -14608,7 +15498,8 @@ async function _runGroupImageGeneration(groupIds, label) {
 
   const ChannelStore = require('../core/channel-store');
   const channel = _activeChannelId ? ChannelStore.getById(_activeChannelId) : null;
-  const baseOutDir = _resolveOutputDir(channel);
+  // 이미지는 .vrew 와 같은 프로젝트 폴더(날짜_대본명)에 저장 — 일관성
+  const baseOutDir = _getProjectOutputDir(_projForValidation) || _resolveOutputDir(channel);
   if (!baseOutDir) {
     alert('출력 폴더를 먼저 선택하세요 (또는 채널을 등록하세요)');
     return;
@@ -14866,7 +15757,7 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
     customPrompts,    // 대괄호 그룹은 한국어+스타일 그대로, null 인 idx 는 기존 영문 흐름
     mediaType: 'image',
     style: document.getElementById('styleSelect').value,
-    ratio: selectedRatio,
+    ratio: _projectAspect(),   // 쇼츠 모드면 9:16 (Flow 도 9:16 지원) — 옛 selectedRatio(고정) 대체
     model: document.getElementById('modelSelect')?.value || 'Nano Banana 2',
     count: selectedCount,
     withSubtitle: false,  // .vrew 자막 트랙만 사용 (이미지에 합성 안 함)
@@ -15129,6 +16020,7 @@ async function savePremiereXml() {
       groups: proj.groups,
       xmlPath,
       opts: {
+        aspect: _projectAspect(),   // 쇼츠 모드면 9:16 세로 시퀀스
         // (v1.13.16) buildPremiereXml 내부 진행 로그를 modal step 메시지로 반영.
         logger: (m) => {
           addLog(m, 'info');
@@ -15142,10 +16034,10 @@ async function savePremiereXml() {
 
     addLog(
       `[프리미어 XML] ✅ 저장 완료 — 총 ${result.totalSeconds.toFixed(1)}초, ` +
-      `이미지 ${result.videoClipCount}개, 오디오 ${result.audioClipCount}개, 자막 ${result.titleClipCount || 0}개`,
+      `이미지 ${result.videoClipCount}개, 오디오 ${result.audioClipCount}개, 자막 ${result.srtCueCount || 0}큐`,
       'ok'
     );
-    addLog(`[프리미어 XML] 자막 SRT 동봉: ${result.srtPath}`, 'info');
+    addLog(`[프리미어 XML] 자막은 동봉된 .srt 를 프리미어 File>Import 로 불러오세요: ${result.srtPath}`, 'info');
     setPxmlStep({
       status: `✅ 완료 — ${result.videoClipCount} 비디오 + ${result.audioClipCount} 오디오 + ${result.titleClipCount || 0} 자막, ${result.totalSeconds.toFixed(1)}초`,
       done: true,
@@ -15163,6 +16055,174 @@ async function savePremiereXml() {
     setPxmlStep({ status: `실패: ${e.message}`, fail: true });
     _finishAutoProgress('실패');
     alert('프리미어 XML 생성 실패:\n' + e.message);
+  }
+}
+
+// ─── 영상 비율 (쇼츠 모드) — 단일 진실원: project.aspect ('16:9' | '9:16') ───
+function _projectAspect() {
+  const p = window._currentProject;
+  if (!p) return '16:9';
+  // aspect 우선, 비어있으면 쇼츠 프로젝트는 9:16 폴백 (aspect 필드 유실 대비)
+  return p.aspect || (p._isShorts ? '9:16' : '16:9');
+}
+function _syncAspectChips() {
+  const cur = _projectAspect();
+  const grp = document.getElementById('aspectChips');
+  if (grp) grp.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.val === cur));
+  _applyAspectModeUI(cur);
+}
+// 대본 종류(롱폼/쇼츠)에 따라 제작 탭 화면 구성 전환:
+//  - 모드 배너 텍스트/색상
+//  - data-aspect-only="9:16" 요소는 쇼츠에서만, "16:9" 요소는 롱폼에서만 표시
+function _applyAspectModeUI(cur) {
+  cur = (cur === '9:16') ? '9:16' : '16:9';
+  const isShorts = cur === '9:16';
+  const banner = document.getElementById('aspectModeBanner');
+  if (banner) {
+    banner.textContent = isShorts ? '📱 쇼츠 모드 (9:16 세로)' : '🖥 롱폼 모드 (16:9 가로)';
+    banner.style.background = isShorts ? 'rgba(212,165,116,0.18)' : 'var(--bg-soft)';
+    banner.style.color = isShorts ? 'var(--accent-hover, #b07a3f)' : 'var(--text-soft)';
+    banner.style.border = '1px solid ' + (isShorts ? 'var(--accent, #d4a574)' : 'var(--border-soft)');
+  }
+  document.querySelectorAll('[data-aspect-only]').forEach(el => {
+    el.style.display = (el.getAttribute('data-aspect-only') === cur) ? '' : 'none';
+  });
+}
+
+// ─── 렌더 저장 폴더 설정 (localStorage 영구) ───────────────────────────
+function _getRenderOutputDir() {
+  try {
+    const d = localStorage.getItem('pf_renderOutputDir');
+    if (d && require('fs').existsSync(d)) return d;
+  } catch (_) {}
+  return null;
+}
+async function pickRenderOutputDir() {
+  const picked = await ipcRenderer.invoke('select-folder').catch(() => null);
+  if (!picked) return;
+  try { localStorage.setItem('pf_renderOutputDir', picked); } catch (_) {}
+  _refreshRenderOutputDirLabel();
+  addLog(`[mp4 렌더] 저장 폴더 설정: ${picked}`, 'ok');
+}
+function _clearRenderOutputDir() {
+  try { localStorage.removeItem('pf_renderOutputDir'); } catch (_) {}
+  _refreshRenderOutputDirLabel();
+}
+function _refreshRenderOutputDirLabel() {
+  const el = document.getElementById('renderOutDirLabel');
+  if (!el) return;
+  const d = _getRenderOutputDir();
+  el.textContent = d || '미설정 (프로젝트 출력 폴더 사용)';
+  el.title = d || '';
+}
+try { document.addEventListener('DOMContentLoaded', () => { try { _refreshRenderOutputDirLabel(); } catch (_) {} }); } catch (_) {}
+
+// ─── mp4 직접 렌더 (유튜브 업로드용) ───────────────────────────────
+// savePremiereXml 과 동일한 입력(sentences + groups). core/video-renderer 로 최종 mp4 생성.
+async function saveVideoMp4() {
+  if (!_ensureActivePreset()) return;
+
+  const proj = window._currentProject;
+  if (!proj || !proj.groups || proj.groups.length === 0) {
+    alert('먼저 대본을 분할하세요');
+    return;
+  }
+
+  // TTS 미변환 확인 — 음성 없는 문장은 타임라인에서 빠지므로 사전 안내.
+  const noTts = proj.sentences.filter(s => s.ttsStatus !== 'done' || !s.ttsAudioPath);
+  if (noTts.length > 0) {
+    if (noTts.length === proj.sentences.length) {
+      alert('TTS 변환된 문장이 하나도 없습니다.\n먼저 🎙 TTS 변환을 실행한 뒤 렌더하세요.');
+      return;
+    }
+    const ok = confirm(
+      `TTS 미변환 ${noTts.length}/${proj.sentences.length}개.\n\n` +
+      `[확인] = 음성 있는 문장만으로 렌더 (미변환 문장은 영상에서 제외)\n` +
+      `[취소] = 먼저 🎙 TTS 변환 후 다시 시도`
+    );
+    if (!ok) return;
+  }
+
+  _showAutoProgress('mp4 렌더링 중', [{ id: 'rmp4', label: '📹 mp4 렌더' }]);
+  _updateAutoStep('rmp4', { status: '준비 중' });
+  await new Promise(resolve => requestAnimationFrame(() => resolve()));
+  const setStep = (patch) => { try { _updateAutoStep('rmp4', patch); } catch {} };
+
+  const path = require('path');
+  const safe = (s) => String(s || '').replace(/[\\/:*?"<>|]/g, '').trim();
+
+  // 출력 폴더 — 설정된 "렌더 저장 폴더" 우선 → 프로젝트 출력 폴더 → 폴더 선택
+  let finalDir = _getRenderOutputDir() || _getProjectOutputDir(proj);
+  if (!finalDir) {
+    addLog('[mp4 렌더] 출력 폴더 미설정 — 폴더 선택 대화상자 오픈', 'info');
+    setStep({ status: '출력 폴더 선택 대기' });
+    const picked = await ipcRenderer.invoke('select-folder').catch(() => null);
+    if (!picked) {
+      addLog('[mp4 렌더] 사용자 취소', 'info');
+      setStep({ status: '취소됨', fail: true });
+      _finishAutoProgress('사용자 취소');
+      return;
+    }
+    finalDir = picked;
+  }
+
+  try {
+    const { buildVideoMp4 } = require('../core/video-renderer');
+    // 파일명 = 대본 파일명 그대로 (혼란 방지). 없으면 프로젝트명/기본값.
+    const baseName = safe(proj.scriptFileName || window._scriptFileName || proj.name || proj.title || 'video') || 'video';
+    const outPath = path.join(finalDir, baseName + '.mp4');
+
+    // 로고 — collectLogoOpts (활성 프리셋/채널 logoPath) 재사용
+    let logoPath = '';
+    try {
+      const logo = (typeof collectLogoOpts === 'function') ? collectLogoOpts() : null;
+      if (logo && logo.enabled && logo.path) logoPath = logo.path;
+    } catch {}
+
+    // 본문 자막 스타일 + AI 고지 문구 — vrew 와 동일한 수집 함수 사용 (프리셋 설정 반영)
+    let captionStyle = null, aiNotice = null;
+    try { if (typeof collectCaptionStyleOpts === 'function') captionStyle = collectCaptionStyleOpts(); } catch {}
+    try { if (typeof collectAiNoticeOpts === 'function') aiNotice = collectAiNoticeOpts(); } catch {}
+
+    addLog(`[mp4 렌더] 시작 — ${outPath}`, 'info');
+    addLog(`[mp4 렌더] 자막 ${captionStyle ? '✓' : '기본'} · AI고지 ${aiNotice && aiNotice.enabled ? '✓' : '꺼짐'} · 로고 ${logoPath ? '✓' : '없음'}`, 'info');
+    setStep({ status: `렌더 준비 (그룹 ${proj.groups.length}, 문장 ${proj.sentences.length})` });
+
+    const result = await buildVideoMp4({
+      sentences: proj.sentences,
+      groups: proj.groups,
+      outPath,
+      opts: {
+        aspect: _projectAspect(),   // 쇼츠 모드면 9:16 세로 렌더
+        logoPath,
+        subtitle: true,
+        captionStyle,
+        aiNotice,
+        logger: (m) => {
+          addLog(m, 'info');
+          const s = String(m || '').replace(/^\[Render\]\s*/, '');
+          setStep({ status: s.length > 80 ? s.slice(0, 80) + '…' : s });
+        },
+        onProgress: (pct, label) => {
+          setStep({ status: `${label || '렌더'} ${Math.round(pct)}%` });
+        },
+      },
+    });
+
+    addLog(`[mp4 렌더] ✅ 완료 — ${result.outPath} (${result.totalSeconds.toFixed(1)}초, 세그먼트 ${result.segmentCount}개)`, 'ok');
+    setStep({ status: `✅ 완료 — ${result.totalSeconds.toFixed(1)}초, 세그먼트 ${result.segmentCount}개`, done: true });
+    _finishAutoProgress('mp4 렌더 완료');
+
+    try {
+      await ipcRenderer.invoke('open-folder', finalDir);
+    } catch (e) {
+      addLog(`[mp4 렌더] 폴더 열기 실패: ${e.message}`, 'info');
+    }
+  } catch (e) {
+    addLog(`[mp4 렌더] 실패: ${e.message}`, 'err');
+    setStep({ status: `실패: ${e.message}`, fail: true });
+    _finishAutoProgress('실패');
+    alert('mp4 렌더 실패:\n' + e.message);
   }
 }
 
@@ -15288,6 +16348,7 @@ async function saveVrew(opts = {}) {
       groups: proj.groups,
       vrewPath,
       opts: {
+        aspect: (proj.aspect || (proj._isShorts ? '9:16' : '16:9')),   // 쇼츠면 9:16 .vrew (aspect 유실 대비 _isShorts 폴백)
         kenburnsSpeed: selectedKenburnsSpeed || 'normal',
         aiNotice: collectAiNoticeOpts(),
         logo: collectLogoOpts(),
@@ -16054,6 +17115,10 @@ function searchTaskListNext() {
       // 고급 탭을 열면 등록된 API 키를 저장소에서 로드 (프리셋/전역 모달과 동기화 보장)
       if (key === 'adv') {
         try { _loadAdvApiKeys(); } catch (_) {}
+      }
+      // 발행 탭을 열면 현재 프로젝트의 발행패키지를 다시 렌더
+      if (key === 'publish') {
+        try { renderPublishPanel(); } catch (_) {}
       }
     });
   });

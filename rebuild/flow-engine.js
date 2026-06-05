@@ -1176,76 +1176,73 @@ class FlowAutomator {
     } catch { return false; }
   }
 
-  // ─── v2.0: 설정 통합 메서드 ───
+  // ─── v2.0: 설정 통합 메서드 (role="tab" 기반 — 실제 Flow DOM 검증 2026-06-05) ───
+  // Flow 설정 팝업: 칩(🍌 Nano Banana/Veo … xN) 클릭 → role="tab" 요소들이 등장.
+  //   · 이미지/동영상 토글: tab "이미지" / "동영상"
+  //   · 비율: tab "16:9" "4:3" "1:1" "3:4" "9:16" (동영상 모드는 16:9/9:16만)
+  //   · 매수: tab "1x" "x2" "x3" "x4"
+  //   · 모델: button "🍌 Nano Banana 2" / "Veo 3.1 …" (드롭다운)
+  // 접근성 이름이 정확히 그 텍스트라, Playwright getByRole 로 안정적으로 선택 (옛 텍스트/innerText 매칭 폐기).
   async _configureSettings(opts) {
     this.log(`  [설정] 미디어 ${opts.mediaType}, 비율 ${opts.ratio}, 매수 ${opts.count}, 모델 ${opts.model}`);
-    await this._openSettingsPopup();
-    await this.page.waitForTimeout(1500);
 
-    // popup 열림 검증 — 비율 텍스트가 button/div/span 어디든 있으면 OK
-    // (v1.13.15 Flow selector fix) 새 Flow UI 의 비율 button 이 svg+span 다층 구조라
-    // 옛 leaf 검색 (children.length === 0) 이 매칭 실패하던 결함. 5개 비율 텍스트가
-    // body.innerText 에 모두 노출되면 popup 열림으로 확신.
+    // 1) 팝업 열기 — 칩 1회 클릭 후 비율 탭(role=tab)이 보일 때까지 확인. 이미 열려 있으면 재클릭 안 함(토글 닫힘 방지).
     let popupOpened = false;
-    for (let r = 0; r < 5; r++) {
-      popupOpened = await this.page.evaluate(() => {
-        const bodyText = (document.body.innerText || '').trim();
-        const ratios = ['16:9', '4:3', '1:1', '3:4', '9:16'];
-        return ratios.every(r => bodyText.includes(r));
-      });
-      if (popupOpened) break;
-      await this._openSettingsPopup();
-      await this.page.waitForTimeout(1500);
+    for (let r = 0; r < 3 && !popupOpened; r++) {
+      const alreadyOpen = await this._isTabVisible(opts.ratio);
+      if (!alreadyOpen) { await this._openSettingsPopup(); await this.page.waitForTimeout(800); }
+      popupOpened = await this._isTabVisible(opts.ratio);
     }
 
     if (!popupOpened) {
-      this.log('  [!] 미디어 설정 popup 안 열림. Flow UI 진단 dump 시작...');
-      // 보이는 모든 짧은 텍스트 + role 있는 요소 dump → 사용자가 복사해서 알려주면 fix 가능
-      try {
-        const dump = await this.page.evaluate(() => {
-          const rows = [];
-          document.querySelectorAll('button, [role="radio"], [role="tab"], [role="option"], [role="menuitem"]').forEach(el => {
-            if (!el.offsetParent) return;
-            const t = (el.innerText || el.textContent || '').trim();
-            if (t && t.length < 30) {
-              rows.push({ text: t, role: el.getAttribute('role') || el.tagName.toLowerCase(), aria: el.getAttribute('aria-label') || '' });
-            }
-          });
-          return rows;
-        });
-        this.log(`  [DUMP] 보이는 button/option ${dump.length}개:`);
-        for (const r of dump.slice(0, 60)) {
-          this.log(`    "${r.text}" (${r.role}${r.aria ? `, aria="${r.aria.substring(0, 40)}"` : ''})`);
-        }
-        this.log('  [DUMP 끝] 위 리스트에서 비율(16:9 등)·매수(1x 등) 항목의 정확한 text 를 알려주세요');
-      } catch (e) {
-        this.log(`  [DUMP 실패: ${e.message}]`);
-      }
+      this.log('  [!] 미디어 설정 popup 안 열림 (role=tab 비율 미검출) — 진단 덤프:');
+      await this._dumpRatioButtons(opts.ratio);
       this.log('  → 기본 설정으로 진행.');
       return;
     }
 
-    // 이미지/동영상 탭 클릭
-    const tabText = opts.mediaType === 'video' ? '동영상' : '이미지';
-    await this.page.evaluate((t) => {
-      const all = Array.from(document.querySelectorAll('button, [role="tab"]'));
-      const m = all.find(b => b.offsetParent && (b.innerText || '').trim() === t);
-      if (m) m.click();
-    }, tabText);
-    await this.page.waitForTimeout(400);
+    // 2) 이미지/동영상 토글
+    const mediaTab = opts.mediaType === 'video' ? '동영상' : '이미지';
+    if (await this._clickTab(mediaTab)) this.log(`  [설정] ${mediaTab} 탭 ✓`);
+    await this.page.waitForTimeout(400);   // 토글 후 비율/매수 재렌더 대기
 
-    await this._selectRatio(opts.ratio);
-    await this.page.waitForTimeout(300);
-    await this._selectCount(opts.count);
-    await this.page.waitForTimeout(300);
+    // 3) 비율
+    if (await this._clickTab(opts.ratio)) this.log(`  [설정] 비율 ${opts.ratio} ✓`);
+    else this.log(`  [!] 비율 ${opts.ratio} 탭 못 찾음`);
+    await this.page.waitForTimeout(200);
 
+    // 4) 매수 — Flow 표기 "1x"/"x2"/"x3"/"x4" (x1 입력은 1x 로 보정)
+    const cm = String(opts.count || '').match(/(\d+)/);
+    const countName = cm ? (cm[1] === '1' ? '1x' : `x${cm[1]}`) : String(opts.count || '');
+    if (countName && await this._clickTab(countName)) this.log(`  [설정] 매수 ${countName} ✓`);
+    await this.page.waitForTimeout(200);
+
+    // 5) 모델 — 기본값과 다를 때만 드롭다운에서 변경
     const defaultModel = opts.mediaType === 'video' ? 'Veo 3.1 - Fast' : 'Nano Banana 2';
-    if (opts.model !== defaultModel) {
+    if (opts.model && opts.model !== defaultModel) {
       await this._selectModel(opts.model);
     }
 
     await this.page.keyboard.press('Escape');
     await this.page.waitForTimeout(500);
+  }
+
+  // Flow 설정 팝업의 role="tab" 가시성 확인 (팝업 열림 판별에 사용)
+  async _isTabVisible(name) {
+    try {
+      return await this.page.getByRole('tab', { name, exact: true }).first().isVisible({ timeout: 800 });
+    } catch (_) { return false; }
+  }
+
+  // Flow 설정 팝업의 role="tab" 클릭 (이미지/동영상·비율·매수 공통). 성공 시 true.
+  async _clickTab(name) {
+    try {
+      const tab = this.page.getByRole('tab', { name, exact: true }).first();
+      await tab.waitFor({ state: 'visible', timeout: 2500 });
+      await tab.click({ timeout: 3000 });
+      await this.page.waitForTimeout(150);
+      return true;
+    } catch (_) { return false; }
   }
 
   // ─── v2.0: 403 감지 + 쿨다운 + 세션 복구 ───
@@ -2004,23 +2001,32 @@ class FlowAutomator {
   }
 
   async _openSettingsPopup() {
-    // dump 분석 결과: "🍌 Nano Banana 2\ncrop_16_9\n1x" 통합 button. evaluate 로 직접 매칭.
+    // 설정 칩 = 프롬프트 바에서 제출(→) 버튼 바로 왼쪽 버튼. 라벨은 모델·비율·매수·모드에 따라
+    // 수시로 바뀜(예: "🍌 Nano Banana 2 crop_16_9 1x", "Veo 3.1 - Lite … x4", "동영상 x4").
+    // → 라벨 변화에 안 흔들리는 단서로 찾는다:
+    //   ① 매수 토큰(1x~x4 / x1~x4)으로 끝남 (모델·모드 무관 항상 존재) ← 1순위
+    //   ② 모델/아이콘 키워드(Nano Banana/Veo/Imagen/Gemini/crop_) ← 보조
+    //   (그래도 못 열면 _configureSettings 의 role=tab 재확인이 재시도 + 화살표 폴백으로 보강)
     const result = await this.page.evaluate(() => {
-      const all = Array.from(document.querySelectorAll('button'));
-      const m = all.find(b => {
-        if (!b.offsetParent) return false;
+      const all = Array.from(document.querySelectorAll('button')).filter(b => b.offsetParent);
+      const COUNT_RE = /(?:^|\s)(?:[1-4]x|x[1-4])\s*$/;       // 끝이 매수 토큰
+      const KW_RE = /Nano Banana|Veo|Imagen|Gemini|crop_/i;   // 모델/비율 아이콘 키워드
+      const candidates = all.filter(b => {
         const t = (b.innerText || b.textContent || '').trim();
-        return /Nano Banana|Veo|crop_/.test(t) && t.length < 120;
+        return t.length > 0 && t.length < 120 && (COUNT_RE.test(t) || KW_RE.test(t));
       });
+      // 매수 토큰으로 끝나는 후보 우선 (가장 안정적), 없으면 키워드 후보
+      const m = candidates.find(b => COUNT_RE.test((b.innerText || b.textContent || '').trim()))
+             || candidates[0];
       if (m) {
         m.click();
-        return { ok: true, text: m.innerText.trim().substring(0, 60).replace(/\n/g, ' | ') };
+        return { ok: true, text: (m.innerText || '').trim().substring(0, 60).replace(/\n/g, ' | ') };
       }
       return { ok: false };
     });
     if (result.ok) this.debug(`  [popup] 설정 button 클릭: "${result.text}"`);
     else {
-      this.debug('  [popup] Nano Banana/Veo button 못 찾음 — arrow 폴백');
+      this.debug('  [popup] 설정 칩 못 찾음 — arrow 폴백');
       await this._clickArrowButton();
     }
   }
@@ -2086,11 +2092,110 @@ class FlowAutomator {
 
   async _selectRatio(ratio) {
     try {
-      const result = await this._clickLeafText([ratio]);
-      if (result.ok) this.log(`  [설정] 비율 ${ratio} 클릭 ✓ (via ${result.via})`);
-      else this.log(`  [!] 비율 ${ratio} leaf text 못 찾음`);
+      // 1차: 기존 정확 텍스트 매칭 (회귀 방지 — 16:9 등 잘 되던 경로 유지)
+      let result = await this._clickLeafText([ratio]);
+      if (result.ok) { this.log(`  [설정] 비율 ${ratio} 클릭 ✓ (text/${result.via})`); return; }
+
+      // 2차: 견고 매칭 — aria-label/title/부분포함 + 클릭가능 조상
+      result = await this._clickRatioRobust(ratio);
+      if (result.ok) { this.log(`  [설정] 비율 ${ratio} 클릭 ✓ (robust/${result.via})`); return; }
+
+      // 3차: 실패 → 비율 버튼 실제 DOM 덤프 (사용자 보고용)
+      this.log(`  [!] 비율 ${ratio} 자동 클릭 실패 — 진단 덤프:`);
+      await this._dumpRatioButtons(ratio);
     } catch (e) {
       this.log(`  [!] 비율 클릭 실패: ${e.message}`);
+    }
+  }
+
+  // 견고 매처 — aria-label / title / 정확텍스트 / 짧은부분포함 순으로 비율 버튼을 찾아 클릭.
+  // svg+span 다층 구조나 아이콘/aria-only 버튼도 잡도록 매칭 폭을 넓힘.
+  async _clickRatioRobust(ratio) {
+    return await this.page.evaluate((rawRatio) => {
+      const norm = (s) => (s || '').replace(/\s+/g, '').toLowerCase();   // '9 : 16' → '9:16'
+      const target = norm(rawRatio);
+
+      const clickClickable = (el) => {
+        let p = el;
+        for (let i = 0; i < 6 && p && p !== document.body; i++) {
+          const role = p.getAttribute && p.getAttribute('role');
+          const hasTab = p.getAttribute && p.getAttribute('tabindex') !== null;
+          if (p.tagName === 'BUTTON' || role === 'radio' || role === 'option' || role === 'tab' || role === 'menuitem' || hasTab) {
+            p.click();
+            return `${p.tagName}/${role || (hasTab ? 'tabindex' : '-')}`;
+          }
+          p = p.parentElement;
+        }
+        el.click();
+        return `${el.tagName}/self`;
+      };
+
+      const all = Array.from(document.querySelectorAll('*')).filter(el => el.offsetParent);
+
+      // 우선순위 1: aria-label 정확/포함
+      for (const el of all) {
+        const aria = norm(el.getAttribute && el.getAttribute('aria-label'));
+        if (aria && (aria === target || aria.includes(target))) return { ok: true, via: 'aria=' + clickClickable(el) };
+      }
+      // 우선순위 2: title 정확/포함
+      for (const el of all) {
+        const title = norm(el.getAttribute && el.getAttribute('title'));
+        if (title && (title === target || title.includes(target))) return { ok: true, via: 'title=' + clickClickable(el) };
+      }
+      // 우선순위 3: 텍스트 정확 일치 (공백 무시)
+      for (const el of all) {
+        if (el.children.length > 0) continue;   // leaf 우선
+        const t = norm(el.textContent);
+        if (t === target) return { ok: true, via: 'text=' + clickClickable(el) };
+      }
+      // 우선순위 4: 짧은 텍스트 부분 포함 (큰 컨테이너 오매칭 방지)
+      for (const el of all) {
+        const t = norm(el.innerText || el.textContent);
+        if (t && t.length <= 8 && t.includes(target)) return { ok: true, via: 'contains=' + clickClickable(el) };
+      }
+      return { ok: false };
+    }, ratio);
+  }
+
+  // 실패 시 — 비율 패턴이 들어간 보이는 요소를 실제 DOM 구조와 함께 로그로 덤프.
+  async _dumpRatioButtons(ratio) {
+    try {
+      const dump = await this.page.evaluate(() => {
+        const RATIO_RE = /16:9|9:16|4:3|3:4|1:1/;
+        const rows = [];
+        const seen = new Set();
+        Array.from(document.querySelectorAll('*')).forEach(el => {
+          if (!el.offsetParent) return;
+          const text = (el.innerText || el.textContent || '').trim();
+          const aria = el.getAttribute('aria-label') || '';
+          const title = el.getAttribute('title') || '';
+          if (!(RATIO_RE.test(text) || RATIO_RE.test(aria) || RATIO_RE.test(title))) return;
+          // leaf 또는 짧은 텍스트 요소만 (거대 컨테이너 제외)
+          if (el.children.length > 0 && text.length > 40 && !aria && !title) return;
+          const html = (el.outerHTML || '').replace(/\s+/g, ' ').slice(0, 120);
+          if (seen.has(html)) return;
+          seen.add(html);
+          const parent = el.parentElement;
+          rows.push({
+            text: text.slice(0, 24),
+            tag: el.tagName.toLowerCase(),
+            role: el.getAttribute('role') || '',
+            aria: aria.slice(0, 30),
+            title: title.slice(0, 30),
+            parent: parent ? `${parent.tagName.toLowerCase()}${parent.getAttribute('role') ? '[' + parent.getAttribute('role') + ']' : ''}` : '',
+            html,
+          });
+        });
+        return rows;
+      });
+      this.log(`  [DUMP] 비율 관련 요소 ${dump.length}개:`);
+      for (const r of dump.slice(0, 40)) {
+        this.log(`    "${r.text}" <${r.tag}${r.role ? ' role=' + r.role : ''}>${r.aria ? ' aria="' + r.aria + '"' : ''}${r.title ? ' title="' + r.title + '"' : ''} parent=${r.parent}`);
+        this.log(`        html: ${r.html}`);
+      }
+      this.log(`  [DUMP 끝] 위에서 "${ratio}" 항목의 정확한 aria-label/text/구조를 알려주시면 정확히 고정합니다.`);
+    } catch (e) {
+      this.log(`  [DUMP 실패: ${e.message}]`);
     }
   }
 

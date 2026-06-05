@@ -64,6 +64,55 @@ function _runFfmpeg(args) {
 }
 
 /**
+ * ffmpeg 를 spawn 하여 stderr 를 통째로 돌려줌. ffmpeg 는 출력 파일이 없으면 종료코드 1 이지만
+ * 그래도 stderr 에 미디어 정보(Duration/해상도)를 찍으므로, 코드와 무관하게 stderr 를 resolve.
+ */
+function _probeFfmpeg(filePath) {
+  _ensureFfmpeg();
+  return new Promise((resolve, reject) => {
+    let stderr = '';
+    const child = spawn(_ffmpegPath, ['-hide_banner', '-i', filePath], { stdio: ['ignore', 'ignore', 'pipe'] });
+    child.stderr.on('data', (c) => { stderr += c.toString(); if (stderr.length > 65536) stderr = stderr.slice(0, 65536); });
+    child.on('error', (e) => reject(new Error('ffmpeg probe 실패: ' + e.message)));
+    child.on('close', () => resolve(stderr));
+  });
+}
+
+/**
+ * 미디어 파일의 정확한 길이(초)와 (영상/이미지면) 해상도를 측정.
+ * 파일 크기 추정 대신 ffmpeg 가 실제로 디코드한 메타데이터를 파싱.
+ * @param {string} filePath
+ * @returns {Promise<{ durationSec: number|null, width: number|null, height: number|null }>}
+ */
+async function getMediaInfo(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return { durationSec: null, width: null, height: null };
+  let info = '';
+  try { info = await _probeFfmpeg(filePath); } catch { return { durationSec: null, width: null, height: null }; }
+
+  let durationSec = null;
+  const dm = info.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+  if (dm) durationSec = (+dm[1]) * 3600 + (+dm[2]) * 60 + parseFloat(dm[3]);
+
+  let width = null, height = null;
+  const vline = info.split('\n').find(l => /\bVideo:/.test(l));
+  if (vline) {
+    const rm = vline.match(/(\d{3,5})x(\d{3,5})/);   // 1920x1080 형태 (3자리 이상으로 오탐 방지)
+    if (rm) { width = +rm[1]; height = +rm[2]; }
+  }
+  return { durationSec, width, height };
+}
+
+/**
+ * 오디오/영상 길이(초)만 정확히 측정. 실패 시 null.
+ * @param {string} filePath
+ * @returns {Promise<number|null>}
+ */
+async function getMediaDuration(filePath) {
+  const { durationSec } = await getMediaInfo(filePath);
+  return durationSec;
+}
+
+/**
  * 동영상에서 오디오 트랙만 mp3 로 추출 (192k, 원본 샘플레이트 유지).
  * @param {string} videoPath - 입력 동영상 (mp4/mov/webm/mkv 등)
  * @param {string} outMp3Path - 출력 mp3 절대경로
@@ -126,6 +175,8 @@ async function convertToRefWav(inPath, outWavPath, opts = {}) {
 module.exports = {
   getFfmpegPath,
   tmpFile,
+  getMediaInfo,
+  getMediaDuration,
   extractAudioMp3,
   convertToRefWav,
 };

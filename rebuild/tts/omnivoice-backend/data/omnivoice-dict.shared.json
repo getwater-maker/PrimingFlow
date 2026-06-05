@@ -68,5 +68,15 @@
     "source": "10월",
     "pron": "시월",
     "enabled": true
+  },
+  {
+    "source": "견훤",
+    "pron": "견헌",
+    "enabled": true
+  },
+  {
+    "source": "쎘기",
+    "pron": "쎄기",
+    "enabled": true
   }
 ]
