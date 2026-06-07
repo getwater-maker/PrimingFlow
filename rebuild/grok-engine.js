@@ -473,6 +473,25 @@ class GrokEngine {
       this.log(`[Grok] 이미지 업로드: ${path.basename(imagePath)}`);
       if (abortSignal && abortSignal()) return { success: false, error: '사용자 중단' };
 
+      // 6-b. ⚠️ 720p 한도 재확인 — 이 위치가 핵심.
+      //   해상도 선택(5-2, _selectResolutionChip)은 이미지 첨부 *전*이라 빨간 계기판이 아직 안 떠서
+      //   한도를 못 본다. 계기판은 이미지 첨부 후에만 등장(openclaude 실측 2026-06-07).
+      //   따라서 첨부 직후 다시 확인해서 720p 한도면 480p 로 선제 전환한다.
+      if (grokCfg.videoResolution === '720p') {
+        const lim2 = await this._check720pLimit();
+        if (lim2.limited) {
+          this.log(`[Grok] ⚠️ (이미지 첨부 후) 720p 한도 감지 — 480p 로 선제 전환 (영상은 계속 생성) | ${lim2.label}`);
+          const c480 = await this.page.$(GROK_SELECTORS.res480Chip);
+          if (c480) {
+            await c480.click();
+            await this.page.waitForTimeout(400);
+            this.log('[Grok] 480p 칩 클릭 완료 — 480p 로 진행');
+          } else {
+            this.log('[Grok] ⚠️ 480p 칩을 못 찾음 — 720p 그대로 진행 (생성 중 자동 강등 안전망에 의존)');
+          }
+        }
+      }
+
       // 7. 모션 프롬프트 입력 — 일관된 타이핑 페이스.
       //    배경: Playwright keyboard.type 의 { delay } 옵션은 OS 스케줄링 의존이라
       //    자동제작 중(이미지/TTS 동시 진행으로 main thread 부하 ↑) vs 단독 호출 시
