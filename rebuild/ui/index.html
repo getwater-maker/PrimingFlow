@@ -1587,6 +1587,8 @@
                 <button class="btn-sm" id="previewAllBtn" onclick="previewAllSentences()" title="작업 목록의 모든 TTS 음성을 순차 재생 (다시 누르면 중지)" style="font-size:12px; padding:4px 10px;">🔊 전체 미리듣기</button>
                 <button class="btn-sm" id="editScriptBtn" onclick="openScriptInputModal()" title="대본 전체 수정 — 모달에서 textarea 로 일괄 편집" style="font-size:12px; padding:4px 10px; display:none;">✏️ 대본 수정</button>
                 <button class="btn-sm" id="undoGroupBtn" onclick="undoGroupChange()" disabled title="마지막 그룹 구조 변경(합치기/나누기/재배치) 되돌리기 — Ctrl+Z" style="font-size:12px; padding:4px 10px; opacity:0.5;">↶ 되돌리기</button>
+                <button class="btn-sm" id="selectAllGroupsBtn" onclick="_toggleAllGroupChecks()" title="작업 목록 모든 그룹 체크박스 전체 선택/해제 ('선택 그룹 이미지'·'선택 영상'에 사용)" style="font-size:12px; padding:4px 10px;">☑ 전체 선택</button>
+                <button class="btn-sm" id="removeSelectedAssetsBtn" onclick="_removeSelectedGroupAssets()" title="체크한 그룹의 이미지/영상을 작업 목록에서 제거 (디스크 파일은 삭제 안 됨 — 다시 생성·첨부 가능)" style="font-size:12px; padding:4px 10px;">🗑 선택 자산 제거</button>
               </div>
               <!-- 2행: 첨부한 대본 파일명 + RTF 배지 -->
               <div style="display:flex; align-items:center; gap:8px; min-height:18px; flex-wrap:wrap;">
@@ -1773,6 +1775,8 @@
               <button class="btn-sm" onclick="exportGroupPromptsForClaude()" title="그룹별 대본 요청서를 클립보드에 복사 — 웹 LLM(claude.ai 등)에 붙여넣기">📤 내보내기</button>
               <button class="btn-sm" onclick="openImportPromptsModal()" title="웹 LLM 이 만든 영어 프롬프트를 붙여넣거나 파일로 가져와 그룹에 저장">📥 가져오기</button>
             </div>
+            <!-- 가져오기 적용 상태 표시 — 그룹별 AI 프롬프트 보유 현황 -->
+            <div id="importStatusBadge" style="display:none; margin-top:6px; font-size:11px; font-weight:600; text-align:center; padding:4px 8px; border-radius:6px;" title="현재 프로젝트 그룹 중 AI 이미지 프롬프트(가져오기/복원)가 있는 비율"></div>
           </div>
         </div>
       </div>
@@ -1901,13 +1905,10 @@
             </button>
           </div>
 
-          <!-- 영상 비율 (쇼츠 모드) — 이미지 생성·렌더·내보내기 전체에 적용 -->
+          <!-- 영상 비율 — 대본 종류로 자동 결정 (롱폼=16:9 / 쇼츠=9:16). 선택 항목 아님, 읽기 전용 표시. -->
           <div style="display:flex; align-items:center; gap:8px; margin-top:12px;">
             <span style="font-size:12px; font-weight:600; color:var(--text-strong); white-space:nowrap;">영상 비율</span>
-            <div class="chip-group" id="aspectChips" style="flex:1;">
-              <div class="chip active" data-val="16:9" style="flex:1; text-align:center;" title="가로 롱폼 1920×1080">🖥 16:9 롱폼</div>
-              <div class="chip" data-val="9:16" style="flex:1; text-align:center;" title="세로 쇼츠 1080×1920">📱 9:16 쇼츠</div>
-            </div>
+            <span id="aspectIndicator" title="대본 종류로 자동 결정됩니다 (롱폼 대본=16:9 가로, 쇼츠 대본=9:16 세로). 수동 선택 항목이 아닙니다." style="flex:1; text-align:center; font-size:12px; font-weight:600; padding:6px 8px; border-radius:6px; background:var(--bg-soft); color:var(--text-soft); border:1px solid var(--border-soft);">🖥 16:9 롱폼 (대본 기준 자동)</span>
           </div>
 
           <!-- 저장 (.vrew / 프리미어 XML / mp4) -->
@@ -2270,6 +2271,8 @@
           <div style="display:flex; align-items:center; gap:4px; background:var(--bg-soft); border:1px solid var(--border-soft); border-radius:6px; padding:2px 4px;" title="Ctrl+F 로 빠르게 검색창에 포커스. Enter=다음, Shift+Enter=이전, Esc=닫기">
             <input type="text" id="scriptSearchInput" placeholder="🔍 찾기..."
               oninput="_scriptSearchUpdate()"
+              oncompositionstart="_scriptSearchComposing=true"
+              oncompositionend="_scriptSearchComposing=false; _scriptSearchUpdate()"
               onkeydown="_scriptSearchKey(event)"
               style="width:140px; background:transparent; border:none; outline:none; font-size:13px; color:var(--text-strong); padding:4px 6px;">
             <span id="scriptSearchInfo" style="font-size:11px; color:var(--text-muted); min-width:48px; text-align:center;">—</span>
@@ -4470,6 +4473,10 @@ async function openFile(aspect) {
       try { renderTaskList(window._currentProject); } catch (_) {}
       try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch (_) {}
     }
+
+    // 저장된 작업(.pflow)의 이미지/영상 프롬프트 자동 복원 — 대본을 새로 분할해도 가져오기 반복 불필요.
+    //   (본문 텍스트가 일치하는 그룹만 복원 → 미스매치 원천 차단)
+    try { await _maybeRestoreSavedPrompts(window._currentProject); } catch (_) {}
 
     // 짝 발행패키지 자동 매칭 (같은 폴더 · 같은 날짜접두사 · 이름에 '발행')
     try {
@@ -6922,6 +6929,76 @@ function applyImportedPrompts() {
   }
 }
 
+// 대본을 새로 분할(.md 불러오기)했을 때, 저장된 작업(.pflow)의 이미지/영상 프롬프트를 자동 복원.
+//   · 자동저장 경로(~/.flow-app/projects/<대본이름>.pflow)에서 찾음
+//   · 본문 텍스트가 일치하는 그룹에만 적용 → 대본이 바뀌었어도 엉뚱한 그룹에 붙는 미스매치 차단
+async function _maybeRestoreSavedPrompts(proj) {
+  if (!proj || !Array.isArray(proj.groups) || !proj.groups.length || !proj.scriptFileName) return;
+  // 이미 프롬프트가 있으면(예: 쇼츠 내장) 복원 불필요
+  if (proj.groups.some(g => g.imagePrompt && String(g.imagePrompt).trim())) return;
+  let fs, path, ProjectStore;
+  try { fs = require('fs'); path = require('path'); ProjectStore = require('../core/project-store'); } catch (_) { return; }
+  const safe = String(proj.scriptFileName).replace(/\.pflow$/i, '').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/\s+/g, ' ').trim();
+  const candidate = path.join(ProjectStore.getProjectsDir(), safe + '.pflow');
+  if (!fs.existsSync(candidate)) return;
+  let saved;
+  try { const raw = JSON.parse(fs.readFileSync(candidate, 'utf8')); saved = raw.project || raw; } catch (_) { return; }
+  const savedGroups = (saved && saved.groups) || [];
+  const savedSents  = (saved && saved.sentences) || [];
+  if (!savedGroups.length) return;
+  const norm = t => String(t || '').replace(/\s+/g, ' ').trim();
+  const sMap = new Map(savedSents.map(s => [s.id, s]));
+  const promptByText = new Map();
+  for (const g of savedGroups) {
+    if (!g.imagePrompt && !g.videoPrompt) continue;
+    const txt = norm((g.sentenceIds || []).map(id => (sMap.get(id) || {}).text || '').join(' '));
+    if (txt) promptByText.set(txt, { imagePrompt: g.imagePrompt || null, videoPrompt: g.videoPrompt || null });
+  }
+  if (!promptByText.size) return;
+  const curSMap = new Map((proj.sentences || []).map(s => [s.id, s]));
+  const apply = [];
+  for (const g of proj.groups) {
+    const txt = norm((g.sentenceIds || []).map(id => (curSMap.get(id) || {}).text || '').join(' '));
+    const p = txt && promptByText.get(txt);
+    if (p) apply.push([g, p]);
+  }
+  if (!apply.length) return;
+  const ok = confirm(`'${proj.scriptFileName}' 의 저장된 작업에서 AI 이미지/영상 프롬프트 ${apply.length}개를 찾았습니다.\n(전에 내보내기/가져오기로 만든 것)\n\n복원할까요?\n→ 복원하면 가져오기를 다시 안 해도 됩니다.\n(본문이 똑같은 그룹만 정확히 복원 — 미스매치 없음)`);
+  if (!ok) return;
+  let img = 0, vid = 0;
+  for (const [g, p] of apply) {
+    if (p.imagePrompt) { g.imagePrompt = p.imagePrompt; img++; }
+    if (p.videoPrompt) { g.videoPrompt = p.videoPrompt; vid++; }
+  }
+  addLog(`♻ 저장된 프롬프트 복원 — 이미지 ${img} · 영상 ${vid} (본문 일치 그룹만 · 미스매치 없음)`, 'ok');
+  try { renderTaskList(proj); } catch (_) {}
+  try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch (_) {}
+}
+
+// 내보내기/가져오기 적용 상태 배지 — 현재 프로젝트 그룹의 AI 프롬프트 보유 현황 표시 (renderTaskList 에서 호출)
+function _updateImportStatusBadge() {
+  const el = document.getElementById('importStatusBadge');
+  if (!el) return;
+  const proj = window._currentProject;
+  const groups = (proj && proj.groups) || [];
+  if (!groups.length) { el.style.display = 'none'; return; }
+  const withPrompt = groups.filter(g => g.imagePrompt && String(g.imagePrompt).trim()).length;
+  el.style.display = '';
+  if (withPrompt === 0) {
+    el.textContent = '🔸 가져오기 안 함 — 한글대본 직접 사용';
+    el.style.background = 'var(--bg-soft)';
+    el.style.color = 'var(--text-muted)';
+  } else if (withPrompt >= groups.length) {
+    el.textContent = `✅ 가져오기 완료 — ${withPrompt}/${groups.length} 그룹`;
+    el.style.background = 'var(--accent)';
+    el.style.color = '#fff';
+  } else {
+    el.textContent = `◑ 일부 가져옴 — ${withPrompt}/${groups.length} 그룹`;
+    el.style.background = '#c98a3f';
+    el.style.color = '#fff';
+  }
+}
+
 // 모달의 스타일 select 옵션을 StyleStore 에서 직접 채움 — prompt 도 dataset 에 함께 저장
 // 현재 선택값은 메인 styleSelect 와 동기화
 function _syncScriptCopyStyleOptions() {
@@ -7135,8 +7212,11 @@ function copyScriptToClipboard() {
 let _scriptSearchMatches = [];   // [start, ...]  각 매치의 시작 인덱스
 let _scriptSearchIndex   = -1;
 let _scriptSearchTerm    = '';
+let _scriptSearchComposing = false;   // 한글/IME 조합 중 — 검색·자동이동 보류 (조합 깨짐·포커스 이탈 방지)
 
 function _scriptSearchUpdate() {
+  // 한글 조합 중('힘'의 ㅎ→히→힘)에는 검색/자동이동 안 함 — 조합 완료 후 1회만 실행.
+  if (_scriptSearchComposing) return;
   const input = document.getElementById('scriptSearchInput');
   const ta = document.getElementById('scriptInputModalArea');
   if (!input || !ta) return;
@@ -7165,7 +7245,7 @@ function _scriptSearchUpdate() {
     let next = _scriptSearchMatches.findIndex(m => m >= caret);
     if (next < 0) next = 0;
     _scriptSearchIndex = next;
-    _scrollScriptSearchToMatch();
+    _scrollScriptSearchToMatch(false);   // 타이핑 중 자동이동 — 본문에 포커스 뺏지 않음(검색어 계속 입력)
   }
   _updateScriptSearchInfo();
 }
@@ -7173,14 +7253,14 @@ function _scriptSearchUpdate() {
 function _scriptSearchNext() {
   if (_scriptSearchMatches.length === 0) return;
   _scriptSearchIndex = (_scriptSearchIndex + 1) % _scriptSearchMatches.length;
-  _scrollScriptSearchToMatch();
+  _scrollScriptSearchToMatch(true);   // Enter/▼ — 명시적 이동(본문 포커스 + 선택)
   _updateScriptSearchInfo();
 }
 
 function _scriptSearchPrev() {
   if (_scriptSearchMatches.length === 0) return;
   _scriptSearchIndex = (_scriptSearchIndex - 1 + _scriptSearchMatches.length) % _scriptSearchMatches.length;
-  _scrollScriptSearchToMatch();
+  _scrollScriptSearchToMatch(true);   // Shift+Enter/▲ — 명시적 이동(본문 포커스 + 선택)
   _updateScriptSearchInfo();
 }
 
@@ -7219,13 +7299,13 @@ function _updateScriptSearchInfo() {
   }
 }
 
-function _scrollScriptSearchToMatch() {
+function _scrollScriptSearchToMatch(focusTextarea = false) {
   const ta = document.getElementById('scriptInputModalArea');
   if (!ta || _scriptSearchIndex < 0) return;
   const pos = _scriptSearchMatches[_scriptSearchIndex];
   const len = _scriptSearchTerm.length;
-  // textarea selection — 브라우저가 자동 스크롤
-  ta.focus();
+  // 명시적 이동(Enter/▲▼)일 때만 본문에 포커스 — 타이핑 중 자동이동은 검색창 포커스 유지(한글 조합 깨짐 방지).
+  if (focusTextarea) ta.focus();
   try { ta.setSelectionRange(pos, pos + len); } catch (_) {}
   // 브라우저별 자동 스크롤이 약할 수 있어 — 줄 단위 위치로 스크롤 강제
   try {
@@ -8005,6 +8085,8 @@ function _refreshGroupRangeInputs(project) {
 
 function renderTaskList(project) {
   try { _syncAspectChips(); } catch (_) {}   // 비율 토글 활성칩을 현재 프로젝트와 동기화
+  try { _syncSelectAllGroupsBtn(); } catch (_) {}   // 전체 선택/해제 버튼 라벨 동기화
+  try { _updateImportStatusBadge(); } catch (_) {}   // 내보내기/가져오기 적용 상태 배지
   try { _renderShortsPreviewBar(project); } catch (_) {}   // 쇼츠: 파일명 옆 편별 미리듣기/길이
   const empty = document.getElementById('taskEmpty');
   const groupsBox = document.getElementById('taskListGroups');
@@ -13557,6 +13639,52 @@ function _toggleGroupCheck(groupId, checked) {
   if (!proj) return;
   const g = proj.groups.find(x => x.id === groupId);
   if (g) g._uiChecked = !!checked;
+  try { _syncSelectAllGroupsBtn(); } catch (_) {}
+}
+
+// 작업 목록 그룹 체크박스 전체 선택/해제 토글 — 전부 선택돼 있으면 해제, 아니면 전체 선택.
+function _toggleAllGroupChecks() {
+  const proj = window._currentProject;
+  if (!proj || !Array.isArray(proj.groups) || !proj.groups.length) return;
+  const allChecked = proj.groups.every(g => g._uiChecked);
+  const next = !allChecked;
+  proj.groups.forEach(g => { g._uiChecked = next; });
+  // DOM 체크박스 즉시 반영 (재렌더 없이)
+  document.querySelectorAll('input.group-select').forEach(cb => { cb.checked = next; });
+  _syncSelectAllGroupsBtn();
+}
+
+// 선택(체크)한 그룹의 이미지/영상을 작업 목록에서 제거 — 디스크 파일은 삭제하지 않음(경로만 비움).
+function _removeSelectedGroupAssets() {
+  const proj = window._currentProject;
+  if (!proj || !Array.isArray(proj.groups)) return;
+  const sel = proj.groups.filter(g => g._uiChecked);
+  if (sel.length === 0) { alert('선택된 그룹이 없습니다.\n그룹 카드 왼쪽 체크박스로 먼저 선택하세요.'); return; }
+  const withAsset = sel.filter(g => g.imagePath || g.videoPath);
+  if (withAsset.length === 0) { alert('선택한 그룹에 제거할 이미지/영상이 없습니다.'); return; }
+  if (!confirm(`선택한 ${sel.length}개 그룹의 이미지/영상을 작업 목록에서 제거할까요?\n(디스크 파일은 삭제되지 않습니다 — 다시 생성하거나 첨부할 수 있어요)`)) return;
+  let imgN = 0, vidN = 0;
+  for (const g of sel) {
+    if (g.imagePath) { g.imagePath = null; imgN++; }
+    g.imageStatus = 'idle';
+    if (g.videoPath) { g.videoPath = null; vidN++; }
+    g.videoStatus = 'idle';
+    if ('videoDowngradedTo480p' in g) g.videoDowngradedTo480p = false;
+  }
+  try { renderTaskList(proj); } catch (_) {}
+  try { if (typeof _autoSaveProject === 'function') _autoSaveProject(); } catch (_) {}
+  try { if (typeof _refreshProgPanel === 'function') _refreshProgPanel(proj); } catch (_) {}
+  addLog(`🗑 선택 자산 제거 — 이미지 ${imgN} · 영상 ${vidN} (그룹 ${sel.length}개 · 디스크 파일은 유지)`, 'ok');
+}
+
+// 전체 선택 버튼 라벨을 현재 선택 상태와 동기화 (renderTaskList·개별 토글 후 호출)
+function _syncSelectAllGroupsBtn() {
+  const btn = document.getElementById('selectAllGroupsBtn');
+  if (!btn) return;
+  const proj = window._currentProject;
+  const groups = (proj && proj.groups) || [];
+  const allChecked = groups.length > 0 && groups.every(g => g._uiChecked);
+  btn.textContent = allChecked ? '☐ 전체 해제' : '☑ 전체 선택';
 }
 
 // 자동 영상화 대상 그룹 — '그룹 시작~끝' 범위 입력 기준 (기본 1~10).
@@ -13985,11 +14113,18 @@ async function prepareIntroVideos() {
   addLog(`[도입부] 일괄 TTS 시작 — ${introSentences.length}문장`, 'info');
   _setTtsConvertActive(true);
 
-  let success = 0, fail = 0, stopped = false;
+  let success = 0, fail = 0, skipped = 0, stopped = false;
   let idx = 0;
+  const _fsIntro = require('fs');
   for (const s of introSentences) {
     idx++;
     if (!window._ttsConvertActive) { stopped = true; break; }
+    // 이미 변환된 문장은 재변환하지 않고 스킵 — 음성은 그대로 두고 16초 재배치만 (시간 절약)
+    if (s.ttsStatus === 'done' && s.ttsAudioPath && _fsIntro.existsSync(s.ttsAudioPath)) {
+      skipped++; success++;
+      _updateIntroProgress({ current: idx, total: introSentences.length, ok: success, fail, text: `이미 변환됨 — 스킵 (${skipped})` });
+      continue;
+    }
     const preview = (s.text || '').slice(0, 16);
     setProgress(`합성 중 ${idx}/${introSentences.length} — "${preview}"`);
     _updateIntroProgress({ current: idx - 1, total: introSentences.length, ok: success, fail, text: `합성 중 — "${preview}…"` });
@@ -13998,6 +14133,7 @@ async function prepareIntroVideos() {
     _updateIntroProgress({ current: idx, total: introSentences.length, ok: success, fail });
   }
   _setTtsConvertActive(false);
+  if (skipped > 0) addLog(`[도입부] 이미 변환된 ${skipped}문장 스킵 — 새로 변환 ${success - skipped}문장`, 'info');
 
   if (stopped) {
     setProgress(`중지됨 — 성공 ${success} / 실패 ${fail}`);
@@ -14406,6 +14542,9 @@ async function convertAllSentences(opts = {}) {
     } catch (_) {}
     const ok = await convertSentence(s.id, { silent: true });
     if (ok) success++; else fail++;
+    // 제작 진행률 패널(🎙 TTS x/N) 실시간 갱신 — 단독 'TTS 일괄 변환' 에서도 카운트가 올라가도록.
+    //   (자동제작은 별도 폴링이 갱신하지만, 단독 변환은 이 호출이 없으면 0/N 에서 멈춰 보임)
+    try { if (proj === window._currentProject) _refreshProgPanel(proj); } catch (_) {}
 
     if ((i + 1) % 10 === 0 || i === remaining.length - 1) {
       const elapsed = Math.round((Date.now() - startTime) / 1000);
@@ -15592,7 +15731,7 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
         // 품질태그는 스타일에서 제거했으므로 여기서 1회만 부착 (highly detailed 포함).
         const tail = presetPromptText ? `, ${presetPromptText}` : '';
         const head = userStylePrompt ? `${userStylePrompt}, ` : '';
-        return `${head}${g.imagePrompt.trim()}${tail}, highly detailed, no text, no watermark`;
+        return `${head}${g.imagePrompt.trim()}${tail}, highly detailed, no text, no watermark, full-bleed composition filling the entire frame edge to edge, no border, no white margin, no frame`;
       }
       if (!g.isBracket) return null;
       const body = paragraphs[i].trim();
@@ -15602,7 +15741,7 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
         : userStylePrompt;
       // 스타일 + 사전설정 + 품질태그 + 빈 줄 + 본문. 사전설정은 "모든 장면 공통 적용" UI 약속에 따라 prepend.
       // 품질태그는 스타일에서 제거됐으므로 여기서 부착. 단 인포그래픽은 화면에 한글 텍스트가 필요하므로 'no text' 제외.
-      const qual = isInfographicGroup ? '' : 'highly detailed, no text, no watermark';
+      const qual = isInfographicGroup ? '' : 'highly detailed, no text, no watermark, full-bleed composition filling the entire frame edge to edge, no border, no white margin, no frame';
       const head = [stylePrompt, presetPromptText, qual].filter(Boolean).join(', ');
       return head ? `${head}\n\n${body}` : body;
     });
@@ -16067,6 +16206,16 @@ function _projectAspect() {
 }
 function _syncAspectChips() {
   const cur = _projectAspect();
+  // 읽기 전용 비율 표시 — 대본 종류로 자동 결정 (수동 토글 폐지)
+  const ind = document.getElementById('aspectIndicator');
+  if (ind) {
+    const isShorts = cur === '9:16';
+    ind.textContent = isShorts ? '📱 9:16 쇼츠 (대본 기준 자동)' : '🖥 16:9 롱폼 (대본 기준 자동)';
+    ind.style.background  = isShorts ? 'rgba(212,165,116,0.18)' : 'var(--bg-soft)';
+    ind.style.color       = isShorts ? 'var(--accent-hover, #b07a3f)' : 'var(--text-soft)';
+    ind.style.borderColor = isShorts ? 'var(--accent, #d4a574)' : 'var(--border-soft)';
+  }
+  // (하위호환) 옛 토글 칩이 남아있으면 동기화 — 없으면 no-op
   const grp = document.getElementById('aspectChips');
   if (grp) grp.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.val === cur));
   _applyAspectModeUI(cur);

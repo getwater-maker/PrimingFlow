@@ -170,8 +170,15 @@ class GrokEngine {
       }
       const chip720 = await this.page.$(GROK_SELECTORS.res720Chip);
       let blocked = false;
-      if (chip720) {
-        // 720p 칩이 disabled / aria-disabled / pointer-events:none / 반투명 / 비활성 래퍼 → 한도로 막힘
+      let limitLabel = '';
+
+      // 1순위: 빨간 계기판 aria-label = 가장 신뢰할 수 있는 720p 한도 신호.
+      //   (검증됨: 한도여도 720p 칩 자체는 활성 상태라서 칩 검사만으론 못 잡음)
+      const lim = await this._check720pLimit();
+      if (lim.limited) { blocked = true; limitLabel = lim.label; }
+
+      // 2순위(보조): 칩 자체가 disabled / pointer-events:none / 반투명 / 비활성 래퍼 → 막힘
+      if (!blocked && chip720) {
         blocked = await chip720.evaluate(el => {
           const dis = el.disabled || el.getAttribute('aria-disabled') === 'true' || el.hasAttribute('disabled');
           const cs = getComputedStyle(el);
@@ -179,14 +186,16 @@ class GrokEngine {
           const wrapDis = !!el.closest('[aria-disabled="true"],[disabled]');
           return !!(dis || noClick || wrapDis);
         }).catch(() => false);
-      } else {
-        // 720p 칩이 안 보이는데 480p 칩은 있으면 = 720p 만 막힌 것 (칩 미로딩과 구분)
+      }
+      // 3순위(보조): 720p 칩이 아예 안 보이는데 480p 칩은 있으면 = 720p 만 막힌 것 (칩 미로딩과 구분)
+      if (!blocked && !chip720) {
         const c480exists = await this.page.$(GROK_SELECTORS.res480Chip);
         blocked = !!c480exists;
       }
+
       if (blocked) {
-        this.log('[Grok] ⚠️ 720p 한도/비활성 감지 — 480p 로 자동 전환 (영상은 계속 생성)');
-        await this._dumpResChips();   // 실제 마크업 확인용 1회 덤프 (셀렉터 정밀화에 사용)
+        this.log(`[Grok] ⚠️ 720p 한도 감지 — 480p 로 선제 전환 (영상은 계속 생성)${limitLabel ? ` | ${limitLabel}` : ''}`);
+        if (!limitLabel) await this._dumpResChips();   // aria-label 못 잡은 경우만 마크업 덤프 (셀렉터 정밀화용)
         const c480 = await this.page.$(GROK_SELECTORS.res480Chip);
         if (c480) { await c480.click(); await this.page.waitForTimeout(300); }
         return '480p';
@@ -197,6 +206,34 @@ class GrokEngine {
     } catch (e) {
       this.log(`[Grok] 해상도 칩 선택 예외(무시): ${e.message}`);
       return want;
+    }
+  }
+
+  // 720p 한도 감지 (검증됨 2026-06-07, openclaude 실측).
+  //   grok.com 은 720p 한도 도달 시 칩을 비활성화하지 않는다(720p 칩은 계속 활성/클릭 가능).
+  //   대신 입력창 우하단에 빨간 계기판 아이콘을 띄운다:
+  //     <button class="... text-fg-danger" aria-label="동영상 (720p, 10초) 생성 한도에 도달했습니다: 오후 6:01에 다시 사용 가능">
+  //       <svg class="lucide lucide-gauge"> ... </svg>
+  //   → 이 aria-label("한도에 도달") + 빨간 계기판(text-fg-danger)이 유일하게 신뢰할 수 있는 한도 신호.
+  //   반환: { limited: boolean, label: string }  (label = aria-label, 재사용 시각 포함)
+  async _check720pLimit() {
+    try {
+      return await this.page.evaluate(() => {
+        const gauges = [...document.querySelectorAll('svg.lucide-gauge')];
+        for (const g of gauges) {
+          const btn = g.closest('button') || g.parentElement;
+          const cls = (btn && btn.className) || '';
+          const aria = (btn && btn.getAttribute('aria-label')) || '';
+          const danger = /text-fg-danger|danger/i.test(cls);
+          const limitTxt = /한도에\s*도달|limit\s*reached|generation\s*limit/i.test(aria);
+          const is720 = /720p|720/i.test(aria);
+          if ((danger || limitTxt) && is720) return { limited: true, label: aria.trim() };
+          if (danger && limitTxt) return { limited: true, label: aria.trim() };
+        }
+        return { limited: false, label: '' };
+      });
+    } catch (_) {
+      return { limited: false, label: '' };
     }
   }
 

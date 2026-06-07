@@ -481,14 +481,17 @@ class GensparkEngine {
       // N 장 새 이미지 등장 폴링
       const POLL = 3000;
       const TIMEOUT_MS = Math.max(4 * 60 * 1000, N * 45 * 1000);
+      const GRACE_MS = 180 * 1000;   // 막판 1~2장만 남았을 때 추가로 더 기다리는 유예 (안정 우선 — 미스매치 방지)
       const startedAt = Date.now();
       let newSrcs = [];
       let limitMsg = null;
-      while (Date.now() - startedAt < TIMEOUT_MS) {
+      let _gracedLogged = false;
+      while (true) {
         if (abortSignal && abortSignal()) return fail('사용자 중단');
         await this.page.waitForTimeout(POLL);
         newSrcs = (await this._resultSrcsInOrder()).filter(s => !beforeSrcs.has(s));
-        const elapsed = Math.round((Date.now() - startedAt) / 1000);
+        const elapsedMs = Date.now() - startedAt;
+        const elapsed = Math.round(elapsedMs / 1000);
         if (newSrcs.length >= N) {
           // 안정화: 한 번 더 확인 (로딩 중 transient 회피)
           await this.page.waitForTimeout(1500);
@@ -504,6 +507,15 @@ class GensparkEngine {
             break;
           }
         }
+        // ⏱ 막판 유예 — 5장(N-1) 이상 완료됐는데 마지막 1~2장이 안 끝나면, 기본 타임아웃에서
+        //   멈추지 말고 GRACE_MS 까지 더 기다린다. (이전: 6장 중 5장 떠도 타임아웃에 6장 통째로 버림)
+        const almostDone = N >= 2 && newSrcs.length >= N - 1;
+        const effTimeout = almostDone ? TIMEOUT_MS + GRACE_MS : TIMEOUT_MS;
+        if (almostDone && elapsedMs >= TIMEOUT_MS && !_gracedLogged) {
+          _gracedLogged = true;
+          this.log(`[Genspark] 막판 ${N - newSrcs.length}장 대기 — 최대 ${Math.round(GRACE_MS / 1000)}초 추가 유예 (배치 통째 버림 방지)`);
+        }
+        if (elapsedMs >= effTimeout) break;
         this.log(`[Genspark] 배치 생성 대기... ${newSrcs.length}/${N} (${elapsed}초)`);
       }
 
