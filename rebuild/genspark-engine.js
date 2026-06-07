@@ -359,6 +359,37 @@ class GensparkEngine {
     }
   }
 
+  /** 현재 실제로 선택된 크기/비율을 팝오버를 다시 열어 읽어 검증.
+   *  (genspark 설정은 sticky — 팝오버를 다시 열어도 직전 선택이 .selected 로 유지됨)
+   *  반환: { sizeOk, ratioOk, sizeSel, ratioSel, wantSize, wantRatio } */
+  async _verifyAppliedSettings() {
+    const cfg = GensparkStore.load();
+    const wantSize = cfg.imageSize || '1K';
+    const wantRatio = this._aspectRatio || cfg.ratio || '16:9';
+    let sizeSel = '', ratioSel = '';
+    try {
+      await this._dismissAnyDialog();
+      const settingBtn = this.page.locator(GENSPARK_SELECTORS.settingButton).first();
+      let opened = false;
+      for (let a = 0; a < 2 && !opened; a++) {
+        await settingBtn.click({ timeout: 5000 }).catch(() => {});
+        opened = await this.page.waitForSelector(GENSPARK_SELECTORS.sizeOption, { timeout: 3000, state: 'visible' })
+          .then(() => true).catch(() => false);
+      }
+      await this.page.waitForTimeout(300);
+      sizeSel = await this.page.$eval(GENSPARK_SELECTORS.sizeSelected, el => (el.textContent || '').trim()).catch(() => '');
+      ratioSel = await this.page.$eval(GENSPARK_SELECTORS.ratioSelected, el => (el.textContent || '').trim()).catch(() => '');
+      try { await this.page.keyboard.press('Escape'); await this.page.waitForTimeout(300); } catch {}
+    } catch (e) {
+      this.log(`[Genspark] 설정 검증 예외(무시): ${e.message}`);
+    }
+    return {
+      sizeOk: !!sizeSel && sizeSel.includes(wantSize),
+      ratioOk: !!ratioSel && ratioSel.includes(wantRatio),
+      sizeSel, ratioSel, wantSize, wantRatio,
+    };
+  }
+
   /** textarea 에 텍스트 채우고 전송. 여러 줄(\n) 도 지원 — React setter 로 값 주입(타이핑 X)
    *  이라 \n 이 Enter 제출로 새지 않음. 단일/배치 공용. (라이브 검증 2026-06-01) */
   async _fillAndSubmit(text) {
@@ -465,8 +496,28 @@ class GensparkEngine {
     }
     await this.start();
     if (abortSignal && abortSignal()) return fail('사용자 중단');
-    await this._applySettings(!this._appliedOnce);
-    this._appliedOnce = true;
+
+    // 설정(크기/비율) 확정 — 적용 후 실제 선택값을 검증해서 1K/16:9 가 맞을 때까지 최대 3회 재적용.
+    //   끝내 확인 안 되면 이 배치를 생성하지 않고 실패 반환 → 잘못된 크기 이미지가 폴더에
+    //   섞이는 미스매치를 원천 차단 (사용자 정책: 안정·미스매치 방지 우선).
+    let _verified = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await this._applySettings(!this._appliedOnce);
+      this._appliedOnce = true;
+      if (abortSignal && abortSignal()) return fail('사용자 중단');
+      _verified = await this._verifyAppliedSettings();
+      if (_verified.sizeOk && _verified.ratioOk) {
+        this.log(`[Genspark] ✅ 설정 확인: 크기=${_verified.sizeSel} · 비율=${_verified.ratioSel}`);
+        break;
+      }
+      this.log(`[Genspark] ⚠️ 설정 미일치 (시도 ${attempt}/3) — 크기=${_verified.sizeSel || '?'}(원함 ${_verified.wantSize}) · 비율=${_verified.ratioSel || '?'}(원함 ${_verified.wantRatio}) — 재적용`);
+      if (abortSignal && abortSignal()) return fail('사용자 중단');
+    }
+    if (!_verified || !_verified.sizeOk || !_verified.ratioOk) {
+      const msg = `Genspark 설정 적용 실패 (원함 ${_verified ? _verified.wantSize : '1K'}/${_verified ? _verified.wantRatio : '16:9'} · 실제 크기=${_verified ? (_verified.sizeSel || '?') : '?'}/비율=${_verified ? (_verified.ratioSel || '?') : '?'}) — 잘못된 크기 방지 위해 이 배치를 생성하지 않음`;
+      this.log(`[Genspark] ❌ ${msg}`);
+      return fail(msg);
+    }
     if (abortSignal && abortSignal()) return fail('사용자 중단');
 
     const t0 = Date.now();
