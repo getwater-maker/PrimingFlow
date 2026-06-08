@@ -1839,6 +1839,7 @@
             <button class="btn btn-sm-action" id="imageBatchAttachBtn" onclick="openImageBatchAttach()" title="외부 이미지/동영상 파일을 그룹 제목 또는 그룹 번호(예: '그룹 01_...')와 매칭해서 자동 첨부">📎 이미지·영상 첨부</button>
             <button class="btn btn-sm-action" id="gensparkLoginBtn" onclick="openGensparkLogin()" title="Genspark 자동화 크롬을 띄우고 genspark.ai 로그인 페이지로 이동 (이미지 모델 Genspark 사용 전 로그인 권장 · 첫 실행 시 프로필 복사 10~30초)">🔑 Genspark 로그인</button>
           </div>
+          <button class="btn btn-sm-action" onclick="showAccountImageCounts()" style="width:100%; margin-top:6px;" title="Flow 계정별 오늘 성공 이미지 장수 — 한국시각(PC 로컬) 자정에 0으로 초기화">📊 계정별 오늘 이미지</button>
           <input type="file" id="imageBatchInput" multiple accept="image/jpeg,image/png,image/jpg,image/webp,video/mp4,video/webm,video/x-matroska,video/quicktime" style="display:none;">
 
           <!-- ── 영상 (Grok) ───────────────────────────────── -->
@@ -14609,6 +14610,28 @@ async function generateAllImages() {
   }
   const groupIds = proj.groups.map(g => g.id);
   await _runGroupImageGeneration(groupIds, '일괄');
+}
+
+// 📊 Flow 계정별 오늘 성공 이미지 장수 표시 — anti-detect-state.json(계정별 성공 카운트) 직접 읽기.
+//   하루 기준 = PC 로컬(한국시각) 자정. 성공 저장된 이미지만 카운트(실패/시도 제외).
+function showAccountImageCounts() {
+  try {
+    const fs = require('fs');
+    const os = require('os');
+    const path = require('path');
+    const p = path.join(os.homedir(), '.flow-app', 'anti-detect-state.json');
+    if (!fs.existsSync(p)) { alert('아직 기록이 없습니다 (이미지를 만든 적 없음).'); return; }
+    const st = JSON.parse(fs.readFileSync(p, 'utf-8'));
+    const profiles = (st && st.profiles && typeof st.profiles === 'object') ? st.profiles : {};
+    const entries = Object.entries(profiles).filter(([, n]) => Number.isFinite(n)).sort((a, b) => b[1] - a[1]);
+    const total = entries.reduce((s, [, n]) => s + (n || 0), 0);
+    const body = entries.length
+      ? entries.map(([id, n]) => `• ${id} : ${n}장`).join('\n')
+      : '(오늘 성공한 이미지 없음)';
+    alert(`📊 Flow 계정별 오늘 성공 이미지\n기준일 ${st.date || '?'} · 한국시각(PC) 자정에 0으로 초기화\n\n${body}\n\n합계 : ${total}장\n\n※ Genspark 는 단일 계정이라 여기 포함되지 않습니다.`);
+  } catch (e) {
+    alert('계정별 집계를 읽지 못했습니다: ' + e.message);
+  }
 }
 
 // 이미지가 비어있는 그룹만 선별해서 생성 (이미 채워진 그룹은 건너뜀)

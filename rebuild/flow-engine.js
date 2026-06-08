@@ -1192,6 +1192,8 @@ class FlowAutomator {
       fs.writeFileSync(finalPath, buffer);
       this.log(`[${num}] 저장 완료: ${path.basename(finalPath)} (${Math.round(buffer.length / 1024)}KB)`);
     }
+    // 계정별 '성공' 장수 +1 (계정당 하루 한도 + 표시용). 실패는 세지 않음.
+    try { if (this.antiDetect && this.antiDetect.registerGenerationSuccess) this.antiDetect.registerGenerationSuccess(); } catch (_) {}
   }
 
   // ─── v2.0: 기존 파일 건너뛰기 ───

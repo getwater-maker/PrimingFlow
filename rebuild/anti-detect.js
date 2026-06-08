@@ -85,9 +85,23 @@ class AntiDetect {
     }
   }
 
-  // 현재 프로필(계정)의 오늘 생성 횟수
+  // 현재 프로필(계정)의 오늘 성공 이미지 장수
   profileCount() {
     return (this.state.profiles && this.state.profiles[this.profileId]) || 0;
+  }
+
+  // 이미지 1장을 성공적으로 저장했을 때 호출 — 계정별 '성공' 장수 증가 (계정당 하루 한도 + 표시용).
+  // 실패/시도는 세지 않는다(사용자 정책: 성공한 것만 카운트).
+  registerGenerationSuccess() {
+    if (!this.state.profiles) this.state.profiles = {};
+    this.state.profiles[this.profileId] = (this.state.profiles[this.profileId] || 0) + 1;
+    this._persist();
+    return this.state.profiles[this.profileId];
+  }
+
+  // 계정별 오늘 성공 장수 맵 스냅샷 (표시용). { date, profiles:{id:count} }
+  getProfileCounts() {
+    return { date: this.state.date, profiles: { ...(this.state.profiles || {}) } };
   }
 
   _persist() {
@@ -151,10 +165,7 @@ class AntiDetect {
   // 반환: { cooldownMs, todayCount, sessionCount }
   registerGenerationStart() {
     this.sessionCount++;
-    this.state.todayCount++;
-    // 계정별 카운트도 증가 (계정당 하루 한도 판정용)
-    if (!this.state.profiles) this.state.profiles = {};
-    this.state.profiles[this.profileId] = (this.state.profiles[this.profileId] || 0) + 1;
+    this.state.todayCount++;   // 전체(시도) 카운터 — 기존 글로벌 경고용
     this._persist();
 
     let cooldownMs = 0;
