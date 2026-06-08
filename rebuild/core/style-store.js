@@ -36,7 +36,7 @@ const BUILT_IN_STYLES = [
   { id: 'minecraft',         name: '마인크래프트',        prompt: 'Minecraft game screenshot, voxel art, blocky 3D world, cubic characters, pixel textures, in-game capture' },
   { id: 'stickman',          name: '졸라맨 (스틱맨)',     prompt: 'simple stick figure drawing, black lines on white background, minimalist doodle, hand-drawn sketch style, funny stick characters' },
   { id: 'ghibli',            name: '지브리 (미야자키)',   prompt: 'Studio Ghibli anime style, soft watercolor backgrounds, warm lighting, detailed nature, Hayao Miyazaki inspired' },
-  { id: 'disney',            name: '디즈니/픽사',         prompt: 'Disney 3D animation style, Pixar-like rendering, expressive characters, vibrant colors, family friendly' },
+  { id: 'disney',            name: '디즈니/픽사',         prompt: 'A cute warm 3D-animated illustration with big expressive eyes and soft rounded features, Pixar/Disney-like warmth' },
   { id: 'chibi',             name: '치비 (귀여운)',       prompt: 'chibi anime style, cute super-deformed characters, big eyes, small body, kawaii, pastel colors' },
   { id: 'retro',             name: '레트로 80s',          prompt: 'retro 80s synthwave, neon colors, grid landscape, sunset, VHS aesthetic, vaporwave' },
   { id: 'sketch',            name: '연필 스케치',         prompt: 'pencil sketch drawing, graphite on paper, detailed cross-hatching, artistic hand-drawn' },
