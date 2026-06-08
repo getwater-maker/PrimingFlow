@@ -350,6 +350,7 @@ class FlowAutomator {
       preset:         antiDetectOpts.preset,
       dailyLimit:     antiDetectOpts.dailyLimit,
       onLimitReached: antiDetectOpts.onLimitReached,
+      profileId:      (config && config.profileId) || 'default',   // 계정별 하루 한도 카운팅
       logger:         (m) => this.log(m),
     });
     const limitCheck = this.antiDetect.checkDailyLimit();
@@ -365,6 +366,31 @@ class FlowAutomator {
       this.log(`[안티디텍션] 강도 "${this.antiDetect.preset}" · 오늘 ${limitCheck.todayCount}회 ${remain}`);
     } else {
       this.log(`[안티디텍션] 비활성화 (기존 동작 유지)`);
+    }
+
+    // ─── 계정당 하루 한도 (계정 차단 예방) ───
+    //   구글 Flow 는 한 계정을 하루에 과하게 쓰면 "비정상 활동" 으로 차단한다.
+    //   계정(profile)별 오늘 생성 횟수가 상한에 도달하면, 이 계정은 더 쓰지 않고
+    //   rate-exhausted 신호를 보내 renderer 가 다음 프로필로 폴백하게 한다(=계정 휴식).
+    //   0 이면 무제한. 값 변경: 아래 PER_PROFILE_DAILY_CAP.
+    const PER_PROFILE_DAILY_CAP = 45;
+    {
+      const _pid = (config && config.profileId) || 'default';
+      const _pc = (limitCheck && Number.isFinite(limitCheck.profileCount)) ? limitCheck.profileCount : 0;
+      if (PER_PROFILE_DAILY_CAP > 0 && _pc >= PER_PROFILE_DAILY_CAP) {
+        this.log(`🛑 계정 ${_pid} 오늘 ${_pc}회 — 계정당 하루 한도(${PER_PROFILE_DAILY_CAP}회) 도달. 이 계정은 휴식하고 다음 프로필로 넘어갑니다 (구글 차단 예방).`);
+        try {
+          this.send('flow-rate-exhausted', {
+            profileId: _pid,
+            completedNums: [],
+            remainingNums: paragraphs.map((_, j) => j + 1),
+            reason: 'daily-limit',
+          });
+        } catch (_) {}
+        this._rateExhaustedFlag = true;
+        this.send('done', { success: 0, total: paragraphs.length, outputDir, rateExhausted: true });
+        return;
+      }
     }
 
     const imgDir = path.join(outputDir, 'images');
@@ -1300,10 +1326,16 @@ class FlowAutomator {
     await inputLoc.waitFor({ state: 'visible', timeout: 10000 });
     let clicked = false;
     for (let attempt = 1; attempt <= 3; attempt++) {
-      try { await inputLoc.click({ timeout: 5000 }); clicked = true; break; }
+      try {
+        // 마지막 시도는 가로채는 팝업을 닫고 force 클릭으로 돌파
+        if (attempt === 3) { await this._dismissBlockingOverlay(true); await inputLoc.click({ timeout: 5000, force: true }); }
+        else await inputLoc.click({ timeout: 5000 });
+        clicked = true; break;
+      }
       catch (e) {
         if (attempt === 3) throw e;
         this.debug(`[Flow] 입력창 클릭 재시도 ${attempt}/3 — ${e.message.split('\n')[0]}`);
+        await this._dismissBlockingOverlay(attempt === 1);   // 가로채는 팝업이면 닫고 재시도
         await this.page.waitForTimeout(800);
       }
     }
@@ -1852,6 +1884,53 @@ class FlowAutomator {
         }
       }
     } catch {}
+    // 클릭을 가로채는 Radix 다이얼로그 오버레이도 함께 정리 (세션 시작·새로고침 직후 선제 제거)
+    try { await this._dismissBlockingOverlay(false); } catch {}
+  }
+
+  // ─── 클릭을 가로채는 떠 있는 팝업/오버레이 닫기 ───
+  //   Flow 가 봇 의심·한도·프로모션 등으로 Radix 다이얼로그를 띄우면 그 오버레이
+  //   (<div data-state="open" aria-hidden="true"> ...)가 pointer-events 를 가로채서
+  //   입력창/버튼 클릭이 "intercepts pointer events" 로 timeout 난다.
+  //   ① 정체를 로그로 남기고(진단) ② Escape·닫기버튼으로 닫고 ③ 끝내 안 닫히면 오버레이
+  //   pointer-events 를 무력화해 클릭이 통과하도록 한다. 반환: 가로채는 오버레이를 봤는지.
+  async _dismissBlockingOverlay(verbose = false) {
+    try {
+      const info = await this.page.evaluate(() => {
+        const sel = '[data-state="open"][aria-hidden="true"], [role="dialog"], [role="alertdialog"]';
+        const els = Array.from(document.querySelectorAll(sel));
+        if (!els.length) return null;
+        let best = '', bestLen = -1;
+        for (const el of els) {
+          const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
+          if (t.length > bestLen) { bestLen = t.length; best = t; }
+        }
+        return { count: els.length, text: best.slice(0, 160) };
+      }).catch(() => null);
+      if (!info) return false;
+      if (verbose) this.log(`[Flow] ⚠ 클릭 가로채는 팝업 감지 (${info.count}개): "${info.text}"`);
+
+      // 1) Escape 2회 (Radix 다이얼로그 기본 닫기)
+      for (let i = 0; i < 2; i++) { await this.page.keyboard.press('Escape').catch(() => {}); await this.page.waitForTimeout(250); }
+      // 2) 흔한 닫기/확인 버튼
+      for (const s of ['button[aria-label="Close"]', 'button[aria-label="닫기"]',
+                       'button:has-text("닫기")', 'button:has-text("확인")', 'button:has-text("Got it")',
+                       'button:has-text("Dismiss")', 'button:has-text("나중에")']) {
+        try {
+          const b = this.page.locator(s).first();
+          if (await b.count() && await b.isVisible()) { await b.click({ timeout: 1500 }).catch(() => {}); await this.page.waitForTimeout(300); }
+        } catch {}
+      }
+      // 3) 그래도 남은 오버레이는 pointer-events 무력화 (클릭 통과). 실제 차단이면 이후 단계에서 감지됨.
+      await this.page.evaluate(() => {
+        for (const el of document.querySelectorAll('[data-state="open"][aria-hidden="true"]')) {
+          try { el.style.pointerEvents = 'none'; } catch (_) {}
+        }
+      }).catch(() => {});
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   async _ensureMainPage() {
@@ -1980,12 +2059,15 @@ class FlowAutomator {
     let clicked = false;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        await inputLoc.click({ timeout: 5000 });
+        // 마지막 시도는 가로채는 팝업을 닫고 force 클릭으로 돌파
+        if (attempt === 3) { await this._dismissBlockingOverlay(true); await inputLoc.click({ timeout: 5000, force: true }); }
+        else await inputLoc.click({ timeout: 5000 });
         clicked = true;
         break;
       } catch (e) {
         if (attempt === 3) throw e;
         this.debug(`[Flow] 입력창 클릭 재시도 ${attempt}/3 — ${e.message.split('\n')[0]}`);
+        await this._dismissBlockingOverlay(attempt === 1);   // 가로채는 팝업이면 닫고 재시도
         await this.page.waitForTimeout(800);
       }
     }

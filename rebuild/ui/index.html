@@ -15590,13 +15590,25 @@ async function generateAll() {
     const _reason = _rateSkipped > 0
       ? `사용 한도 감지 (한도로 스킵 ${_rateSkipped}개)`
       : `이미지 누락 ${_imgMissing}/${groupCount} (${Math.round(_missingRatio * 100)}%)`;
+    // 실제 사용한 이미지 모델 이름 — 알림 문구를 모델에 맞게 (예전엔 Genspark 로 하드코딩돼 오해 유발).
+    let _modelLabel = '이미지 모델';
+    try {
+      const _mv = (document.getElementById('runpodImageModel') || {}).value || 'flow';
+      _modelLabel = _mv === 'genspark' ? 'Genspark'
+                  : _mv.startsWith('gemini') ? 'Nano Banana 2(Gemini)'
+                  : 'Flow';
+    } catch (_) {}
+    // 사유별 안내 — 한도면 "몇 시간 뒤 풀림", 단순 실패면 "재시도/로그 확인".
+    const _retryHint = _rateSkipped > 0
+      ? `${_modelLabel} 사용 한도로 일부가 스킵됐습니다 (보통 몇 시간 뒤 풀림).`
+      : `${_modelLabel} 이미지 생성이 ${_imgMissing}개 실패했습니다 (로그에서 ❌ 항목 확인).`;
     addLog(`⛔ ${_reason} — .vrew/.fcpxml 자동 빌드를 건너뜁니다 (반쪽 파일 방지).`, 'warn');
-    addLog(`   TTS ${ttsDone}/${sentenceCount} · 이미지 ${imgDone}/${groupCount} 는 보존됩니다. 한도가 풀린 뒤(보통 몇 시간) '자동제작'을 다시 누르면 빠진 이미지만 생성하고 .vrew 를 만듭니다.`, 'info');
+    addLog(`   TTS ${ttsDone}/${sentenceCount} · 이미지 ${imgDone}/${groupCount} 는 보존됩니다. ${_retryHint} '자동제작'을 다시 누르면 빠진 이미지만 생성하고 .vrew 를 만듭니다.`, 'info');
     _updateAutoStep('vrew', { status: `건너뜀 — ${_reason}`, fail: true });
     try { const _v = document.getElementById('progVrewTxt'); if (_v && proj === window._currentProject) { _v.textContent = '건너뜀'; _v.title = `건너뜀 — ${_reason}`; _v.style.color = 'var(--danger, #e53935)'; } } catch (_) {}
     try { _finishAutoProgress('⛔ 이미지 부족 — .vrew 빌드 보류'); } catch (_) {}
     try {
-      alert(`이미지가 ${imgDone}/${groupCount} 만 생성되어 .vrew 빌드를 보류했습니다.\n\n사유: ${_reason}\n\nGenspark 한도가 풀린 뒤(보통 몇 시간) '자동제작'을 다시 누르면, 이미 만든 이미지·TTS 는 재사용하고 빠진 이미지만 생성한 뒤 .vrew 를 만듭니다.`);
+      alert(`이미지가 ${imgDone}/${groupCount} 만 생성되어 .vrew 빌드를 보류했습니다.\n\n사유: ${_reason}\n\n${_retryHint}\n\n'자동제작'을 다시 누르면, 이미 만든 이미지·TTS 는 재사용하고 빠진 이미지만 생성한 뒤 .vrew 를 만듭니다.`);
     } catch (_) {}
     return;
   }

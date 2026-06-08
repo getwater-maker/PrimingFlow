@@ -53,6 +53,7 @@ class AntiDetect {
     this.enabled        = opts.enabled        !== false;          // 기본 ON
     this.dailyLimit     = Number.isFinite(opts.dailyLimit) ? opts.dailyLimit : 50; // 0 = 무제한
     this.onLimitReached = opts.onLimitReached === 'stop' ? 'stop' : 'warn';        // 기본 경고만
+    this.profileId      = (opts.profileId != null && String(opts.profileId)) || 'default'; // 계정별 카운팅 키
     this.logger         = typeof opts.logger === 'function' ? opts.logger : () => {};
 
     this.preset = PRESETS[opts.preset] ? opts.preset : '기본';
@@ -76,17 +77,24 @@ class AntiDetect {
 
     const today = todayKey();
     if (saved && saved.date === today && Number.isFinite(saved.todayCount)) {
-      this.state = { date: today, todayCount: saved.todayCount };
+      // profiles: 계정별 오늘 카운트 맵 (구버전 상태엔 없을 수 있음 → 빈 객체)
+      this.state = { date: today, todayCount: saved.todayCount, profiles: (saved.profiles && typeof saved.profiles === 'object') ? saved.profiles : {} };
     } else {
       // 자정 롤오버 또는 첫 실행
-      this.state = { date: today, todayCount: 0 };
+      this.state = { date: today, todayCount: 0, profiles: {} };
     }
+  }
+
+  // 현재 프로필(계정)의 오늘 생성 횟수
+  profileCount() {
+    return (this.state.profiles && this.state.profiles[this.profileId]) || 0;
   }
 
   _persist() {
     const data = JSON.stringify({
       date: this.state.date,
       todayCount: this.state.todayCount,
+      profiles: this.state.profiles || {},
       lastSavedAt: Date.now(),
     });
     try {
@@ -144,6 +152,9 @@ class AntiDetect {
   registerGenerationStart() {
     this.sessionCount++;
     this.state.todayCount++;
+    // 계정별 카운트도 증가 (계정당 하루 한도 판정용)
+    if (!this.state.profiles) this.state.profiles = {};
+    this.state.profiles[this.profileId] = (this.state.profiles[this.profileId] || 0) + 1;
     this._persist();
 
     let cooldownMs = 0;
@@ -166,6 +177,7 @@ class AntiDetect {
       remaining: limit > 0 ? Math.max(0, limit - this.state.todayCount) : Infinity,
       shouldStop: reached && this.onLimitReached === 'stop',
       todayCount: this.state.todayCount,
+      profileCount: this.profileCount(),   // 현재 계정의 오늘 횟수
       limit,
     };
   }
