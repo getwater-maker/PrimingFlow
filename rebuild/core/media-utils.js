@@ -172,6 +172,37 @@ async function convertToRefWav(inPath, outWavPath, opts = {}) {
   return outWavPath;
 }
 
+/**
+ * 긴 오디오를 segmentSec 초 단위 청크로 분할 (스트림 복사 — 재인코딩 없이 빠름).
+ * 긴 STT(7~8시간 등) 안정화용: 통째 업로드/타임아웃/메모리 문제를 청크로 회피.
+ * @param {string} inPath  입력 오디오 (mp3/m4a/wav 등)
+ * @param {string} outDir  청크 출력 폴더 (없으면 생성)
+ * @param {number} segmentSec  청크 길이(초) — 예: 900(15분)
+ * @param {string} [ext]  출력 확장자 (기본: 입력과 동일)
+ * @returns {Promise<string[]>}  생성된 청크 파일 경로(정렬됨)
+ */
+async function segmentAudio(inPath, outDir, segmentSec, ext) {
+  if (!inPath || !fs.existsSync(inPath)) throw new Error('입력 파일을 찾을 수 없습니다: ' + inPath);
+  fs.mkdirSync(outDir, { recursive: true });
+  const e = String(ext || path.extname(inPath) || '.mp3').replace(/^\.?/, '.');
+  const pattern = path.join(outDir, `chunk_%04d${e}`);
+  await _runFfmpeg([
+    '-y',
+    '-i', inPath,
+    '-f', 'segment',
+    '-segment_time', String(segmentSec),
+    '-reset_timestamps', '1',
+    '-c', 'copy',
+    pattern,
+  ]);
+  const files = fs.readdirSync(outDir)
+    .filter(f => /^chunk_\d+/.test(f))
+    .sort()
+    .map(f => path.join(outDir, f));
+  if (!files.length) throw new Error('오디오 분할 결과가 없습니다.');
+  return files;
+}
+
 module.exports = {
   getFfmpegPath,
   tmpFile,
@@ -179,4 +210,5 @@ module.exports = {
   getMediaDuration,
   extractAudioMp3,
   convertToRefWav,
+  segmentAudio,
 };

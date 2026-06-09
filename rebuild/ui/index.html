@@ -5667,6 +5667,7 @@ function _sttProgressStart(statusEl, btn, btnIdleText, btnBusyText) {
   const startedAt = Date.now();
   const frames = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
   let i = 0;
+  let note = '';   // 청크 진행 등 추가 표시 (긴 STT 청크 분할용)
   if (btn) { btn.disabled = true; btn.textContent = btnBusyText; }
   function fmt(sec) {
     const m = Math.floor(sec / 60), s = sec % 60;
@@ -5680,7 +5681,7 @@ function _sttProgressStart(statusEl, btn, btnIdleText, btnBusyText) {
     else if (sec < 90)   hint = 'Whisper 가 처음 호출되면 모델 로드에 1~5분 걸려요 — 정상입니다.';
     else if (sec < 240)  hint = '모델 로드 중 (보통 90~240초) — 끊지 말고 기다려 주세요.';
     else                 hint = '오래 걸리네요... GPU PC 가 켜져있는지, OmniVoice 가 9881 에서 응답하는지 확인.';
-    statusEl.textContent = `${frames[i++ % frames.length]} STT 변환 중 (경과 ${fmt(sec)}) — ${hint}`;
+    statusEl.textContent = `${frames[i++ % frames.length]} STT 변환 중 (경과 ${fmt(sec)})${note ? ' · ' + note : ''} — ${hint}`;
   }
   tick();
   const timer = setInterval(tick, 1000);
@@ -5690,6 +5691,7 @@ function _sttProgressStart(statusEl, btn, btnIdleText, btnBusyText) {
       if (btn) { btn.disabled = false; btn.textContent = btnIdleText; }
       if (typeof finalText === 'string') statusEl.textContent = finalText;
     },
+    setNote(t) { note = t || ''; },   // 청크 진행 표시용 (예: "청크 3/28")
     elapsedSec() { return Math.floor((Date.now() - startedAt) / 1000); }
   };
 }
@@ -5701,7 +5703,14 @@ async function v2t_runStt() {
   const progress = _sttProgressStart(statusEl, btn, '📝 STT 변환', '⏳ STT 변환 중...');
   try {
     const Asr = require('../tts/asr-client');
-    const text = await Asr.transcribe(_v2tState.mp3Path);
+    // 긴 파일(7~8시간 등) 안전: ffmpeg 로 15분 청크 분할 → 순차 전사 → 합치기.
+    // 짧은 파일은 transcribeLong 내부에서 단일 전사로 처리(분할 오버헤드 없음).
+    const text = await Asr.transcribeLong(_v2tState.mp3Path, {
+      chunkSec: 900,
+      onProgress: ({ done, total }) => {
+        if (total > 1) progress.setNote(done >= total ? `청크 ${total}/${total} 완료` : `청크 ${done + 1}/${total} 전사 중`);
+      },
+    });
     document.getElementById('v2tTextarea').value = text;
     document.getElementById('v2tSaveTxtBtn').disabled = false;
     document.getElementById('v2tCopyBtn').disabled = false;
