@@ -43,15 +43,19 @@ const GROK_SELECTORS = {
   promptInput:       'textarea[placeholder*="입력하여 상상"], textarea[placeholder*="imagine" i], textarea, form [contenteditable="true"]',
   // 이미지 업로드 — 페이지의 hidden input[type=file] 직접 접근
   fileInput:         'input[type="file"]',
-  // "비디오" 모드 칩 — div:nth-child(2) 안의 비디오 button (이미지 button 과 같은 컨테이너)
-  videoModeChip:     `${CHIPS_CONTAINER} > div:nth-child(2) button:has-text("비디오"), ${CHIPS_CONTAINER} > div:nth-child(2) button:has-text("Video")`,
-  // 비디오 전용 옵션 칩 — 비디오 모드 활성 시에만 등장
-  res480Chip:        `${CHIPS_CONTAINER} > div:nth-child(3) button:has-text("480p")`,
-  res720Chip:        `${CHIPS_CONTAINER} > div:nth-child(3) button:has-text("720p")`,
-  dur6sChip:         `${CHIPS_CONTAINER} > div:nth-child(4) button:has-text("6s")`,
-  dur10sChip:        `${CHIPS_CONTAINER} > div:nth-child(4) button:has-text("10s")`,
-  // 비율 dropdown 트리거 — div:nth-child(5) 의 button (radix 동적 ID 회피)
-  aspectChipTrigger: `${CHIPS_CONTAINER} > div:nth-child(5) button`,
+  // "비디오" 모드 칩 — chips 컨테이너 안에서 '텍스트'로 탐색 (위치 nth-child 의존 제거).
+  //   Grok UI 가 칩 그룹 순서를 자주 바꿔(2026-06: 토글이 child(1)로 이동) nth-child 가 깨짐.
+  //   컨테이너 스코프라 바깥의 "Video Game" 추천칩과 안 겹침.
+  videoModeChip:     `${CHIPS_CONTAINER} button:has-text("비디오"), ${CHIPS_CONTAINER} button:has-text("Video")`,
+  imageModeChip:     `${CHIPS_CONTAINER} button:has-text("이미지"), ${CHIPS_CONTAINER} button:has-text("Image")`,
+  // 비디오 전용 옵션 칩 — 비디오 모드 활성 시에만 등장. 위치 무관 텍스트 탐색.
+  res480Chip:        `${CHIPS_CONTAINER} button:has-text("480p")`,
+  res720Chip:        `${CHIPS_CONTAINER} button:has-text("720p")`,
+  dur6sChip:         `${CHIPS_CONTAINER} button:has-text("6s")`,
+  dur10sChip:        `${CHIPS_CONTAINER} button:has-text("10s")`,
+  // 비율 dropdown 트리거 — chips 컨테이너의 '마지막' 칩 그룹 button (항상 마지막 = 비율).
+  //   현재 값(16:9/9:16 등)이 텍스트라 has-text 로는 못 고정 → last-child 로 위치 무관 타게팅.
+  aspectChipTrigger: `${CHIPS_CONTAINER} > div:last-child button`,
   // 비율 메뉴 항목 — radix dropdown 펼친 후 그 안의 5번째 항목 = "16:9 Widescreen"
   // (순서: 2:3 Tall, 3:2 Wide, 1:1 Square, 9:16 Vertical, 16:9 Widescreen)
   aspectMenu16x9:    '[role="menu"] > div:nth-child(5), [role="menu"] [role="menuitem"]:nth-child(5), [data-radix-popper-content-wrapper] [role="menuitem"]:nth-child(5)',
