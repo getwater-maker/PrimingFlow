@@ -102,6 +102,51 @@ Start-ScheduledTask -TaskName "OmniVoice_Backend"
 1. **자막 sub-clip 분할 검증**: `splitLongSentenceAlgo(text, 20)` 자동 호출 추가됨 → 긴 문장이 Vrew에서 sub-clip으로 분할 표시되는지 확인 필요
 2. **vrew-builder.js의 dummy-tts.mp3 require**: 현재 미사용이지만 코드 상단에 변수만 남아있음 → 정리 가능
 
+## 2026-06 아키텍처 업데이트 (이미지·영상·안티디텍션·로컬 렌더)
+> v1.13.83~92에서 추가/변경된 핵심. 다음 작업 전에 반드시 숙지.
+
+### 이미지 생성 — 진입점 4개가 모두 같은 경로로 수렴
+- 버튼: **빈그룹 / 선택 / 범위** + **자동제작(generateAll)** → 전부 `_runRunPodImageGeneration()` (ui/index.html) 로 수렴.
+- 모델 분기(`#runpodImageModel`): **Flow**(브라우저 자동화, flow-engine.js via `start-generation` IPC) / **Nano Banana 2 = Gemini**(image/image-manager.js, API) / **Genspark**(genspark-engine.js, 브라우저).
+- 카운트 갱신: 이미지 1장 완료 시 `_setGroupImageThumbnail` → `_refreshProgPanel` (제작 진행률 🖼 N/M 실시간).
+
+### Genspark (genspark-engine.js)
+- 배치 6장(`batchSize`, load 에서 6 clamp). 설정값은 `~/.flow-app/genspark-config.json` (`imageSize` 기본 '1K', `ratio` '16:9'; ratio 는 프로젝트 aspect 로 override → 쇼츠 9:16).
+- **클릭은 절대좌표가 아니라 DOM 텍스트(`hasText`)** 로 "1K"/"16:9" 옵션을 찾아 누름. → 무엇을 누를지는 그 PC 의 config 값이 결정 (PC 마다 config 파일 별도).
+- `_applySettings` 가 **팝오버 안에서 바로 검증**하고 결과 반환(배치당 팝오버 1회). 1K/16:9 확인 안 되면 최대 3회 재적용, 끝내 실패 시 그 배치 생성 안 함(미스매치 차단).
+- "5시간 제한" 등 한도 메시지 감지 → 해당 배치 실패 처리. 휴먼 페이싱(첫 배치 후 긴 대기 + 점증 대기).
+
+### 영상 생성 — 엔진 2종, 공통 인터페이스
+- `grok-engine.js`(무료, X 로그인) · `flow-veo-engine.js`(유료 Veo). 공통 계약: `generateVideoFromImage({imagePath,prompt,outputPath,abortSignal})` + `_aspectRatio`.
+- 선택: `#videoEngineSelect` / localStorage `pf_video_engine` / `_getVideoEngine()`.
+- **Grok 720p 한도**: 빨간 계기판 = `svg.lucide-gauge` + 부모 `text-fg-danger` + `aria-label`("…720p…한도에 도달"). **이미지 첨부 후에만** 뜨므로 `_check720pLimit()` 를 **이미지 업로드 직후** 호출 → 한도면 480p 선제 전환(칩은 비활성 안 되니 칩-disable 감지로는 못 잡음). 생성 중 480p 강등 토스트 감지는 안전망.
+
+### Flow 안티디텍션 / 계정 보호 (flow-engine.js + anti-detect.js)
+- **계정당 하루 한도 `PER_PROFILE_DAILY_CAP=45` (성공 이미지 기준)**. anti-detect-state.json `profiles{프로필:성공수}` (날짜=PC 로컬 자정 기준). 도달 시 `flow-rate-exhausted` 신호로 다음 프로필 폴백(계정 휴식).
+- 성공 카운트는 `_saveImage` 성공 시 `antiDetect.registerGenerationSuccess()` (시도 아님). 글로벌 todayCount(시도) 경고는 별개 유지.
+- **클릭 가로채는 팝업 자동 닫기** `_dismissBlockingOverlay()` (Radix `[data-state=open][aria-hidden=true]` 오버레이 → Escape/닫기버튼/pointer-events 무력화 + force 클릭). 입력창 클릭 2곳 + `_dismissBanners`(세션 시작)에 적용 → 계정 멀쩡한데 팝업에 막혀 "차단"으로 오인되던 케이스 복구.
+- "비정상 활동 감지" → 즉시 폴백. 프로필 6개마다 적극적 순차 전환.
+- UI: **📊 계정별 오늘 이미지** 버튼(`showAccountImageCounts`) — anti-detect-state.json 읽어 계정별 성공 장수 표시.
+
+### 로컬 mp4 렌더 (Vrew 없이 완성본) — core/video-renderer.js
+- `buildVideoMp4({sentences,groups,outPath,opts})`: **ffmpeg-static** 사용. `opts.aspect` 로 16:9(1920×1080)/**9:16(1080×1920)** 지원. 컷별 스틸을 TTS 길이만큼 + **켄번스(zoompan)** + **ASS 자막 번인(한글: 번들 Pretendard + malgun 폴백)** + 오디오 concat→AAC + `-shortest +faststart`.
+- ffmpeg 경로/프로브: `core/media-utils.js` `getFfmpegPath()`(asar-unpacked 보정) `getMediaInfo()`. UI: `saveVideoMp4()` ↔ **📹 mp4 로 렌더** 버튼(이미 `aspect:_projectAspect()` 전달 → 쇼츠도 세로 mp4, 단 전체 1개 파일).
+- **쇼츠 편별(shortsNum) 분리 렌더는 미구현(설계만)** — buildVideoMp4 를 편별 N회 호출하는 래퍼 + provider seam 으로 확장 가능.
+
+### 내보내기(이미지 프롬프트 요청서) — `_buildPromptRequestText` (ui/index.html)
+- 맨 위: 스타일 + **사전설정(presetPrompt = 사용자 입력값, 코드 하드코딩 아님)** + 규칙들.
+- 규칙: **🕰 시대·배경 명시(필수)** — 대본 맥락에서 시대를 AI 가 스스로 판단해 모든 프롬프트에 일관 명시(사전설정 비워도 시대 규칙이 대체). + 🛡 안전필터 회피 + 🛡 유튜브 수익화 안전.
+
+### 스타일 — core/style-store.js
+- BUILT_IN_STYLES(코드 시드, 수정/삭제 불가) + 사용자 styles.json. **기본 이미지 스타일 = `disney`(디즈니/픽사)** (styleSelect·scriptCopyStyleSelect 폴백). disney 프롬프트 = "A cute warm 3D-animated illustration … Pixar/Disney-like warmth".
+
+### 프로젝트 저장/복원
+- **`.pflow`** (`~/.flow-app/projects/<대본명>.pflow`) = 무손실 복원(그룹·문장·이미지·TTS·프롬프트). 자동저장(변경 시 + 2분 주기) + "💾 저장됨" 클릭 즉시저장 + **📂 불러오기**(loadProjectFile). `.md` 재오픈 시 저장된 imagePrompt/videoPrompt 자동 복원.
+- `.vrew` 는 **내보내기 전용**(Vrew 편집용). 되돌려 작업목록 재구성은 손실 → 복원은 `.pflow` 가 정석.
+
+### 버전/배포
+- 버전은 **rebuild/package.json 한 곳**. `npm run dist` 가 GitHub publish 포함. 현재 v1.13.92. main process(flow-engine/anti-detect/genspark-engine/grok-engine/video-renderer 등) 변경은 **앱 완전 재시작** 필요(Ctrl+R 불가); ui/index.html 은 Ctrl+R 반영.
+
 ## 디버깅 팁
 - 로그에 `[Vrew] (4.0.1 호환)` 표시 보이면 새 코드 동작 중
 - `.vrew.debug.json` 파일이 옆에 자동 생성됨 → project.json 내용 확인 가능
