@@ -1278,16 +1278,25 @@ class FlowAutomator {
   }
 
   // Flow 설정 팝업의 role="tab" 가시성 확인 (팝업 열림 판별에 사용)
+  // role=tab 의 접근성 이름에 아이콘 ligature 텍스트가 섞임 (2026-06-10 openclaude 실측):
+  //   <i class="google-sym">crop_16_9</i> 에 aria-hidden 이 없어 이름이 "crop_16_9 16:9" 가 됨
+  //   → exact:true('16:9') 매칭 실패. exact 우선 시도 후 부분일치(substring) 폴백.
+  //   부분일치 충돌 없음 검증: '16:9'↔"crop_16_9 16:9"만, '9:16'↔"crop_9_16 9:16"만 매칭.
+  _tabLocator(name) {
+    return this.page.getByRole('tab', { name, exact: true }).or(
+           this.page.getByRole('tab', { name, exact: false })).first();
+  }
+
   async _isTabVisible(name) {
     try {
-      return await this.page.getByRole('tab', { name, exact: true }).first().isVisible({ timeout: 800 });
+      return await this._tabLocator(name).isVisible({ timeout: 800 });
     } catch (_) { return false; }
   }
 
   // Flow 설정 팝업의 role="tab" 클릭 (이미지/동영상·비율·매수 공통). 성공 시 true.
   async _clickTab(name) {
     try {
-      const tab = this.page.getByRole('tab', { name, exact: true }).first();
+      const tab = this._tabLocator(name);
       await tab.waitFor({ state: 'visible', timeout: 2500 });
       await tab.click({ timeout: 3000 });
       await this.page.waitForTimeout(150);
@@ -2125,13 +2134,27 @@ class FlowAutomator {
       const m = candidates.find(b => COUNT_RE.test((b.innerText || b.textContent || '').trim()))
              || candidates[0];
       if (m) {
-        m.click();
+        // ⚠ 여기서 m.click() 하면 안 됨 — JS 합성 클릭으로는 이 popup 이 절대 안 열림
+        //   (2026-06-10 openclaude 라이브 검증: 합성 click → 무반응, 실제 마우스 클릭 → role=tab popup 정상).
+        //   그래서 element 에 태그만 달고, 바깥에서 Playwright 실클릭으로 누른다.
+        m.setAttribute('data-pf-settings-chip', '1');
         return { ok: true, text: (m.innerText || '').trim().substring(0, 60).replace(/\n/g, ' | ') };
       }
       return { ok: false };
     });
-    if (result.ok) this.debug(`  [popup] 설정 button 클릭: "${result.text}"`);
-    else {
+    if (result.ok) {
+      try {
+        await this.page.click('[data-pf-settings-chip="1"]', { timeout: 5000 });   // 진짜 입력 클릭 (trusted event)
+        this.debug(`  [popup] 설정 button 클릭: "${result.text}"`);
+      } catch (e) {
+        this.debug(`  [popup] 설정 칩 실클릭 실패: ${String(e.message).split('\n')[0]}`);
+      } finally {
+        await this.page.evaluate(() => {
+          const el = document.querySelector('[data-pf-settings-chip]');
+          if (el) el.removeAttribute('data-pf-settings-chip');
+        }).catch(() => {});
+      }
+    } else {
       this.debug('  [popup] 설정 칩 못 찾음 — arrow 폴백');
       await this._clickArrowButton();
     }
