@@ -16,6 +16,12 @@ const {
   AuthManager
 } = require("./auth-manager");
 app.commandLine.appendSwitch("disable-gpu");
+// 창이 최소화/가려져도 자동제작(렌더러 타이머 기반 루프)이 멈추지 않게 —
+// 크로미움 백그라운드 스로틀링 전면 비활성 (webPreferences.backgroundThrottling 과 한 쌍).
+// 증상: 자동제작 중 PrimingFlow 창을 안 띄워두면 Genspark 첫 배치 후 멈춤 → 창 띄우면 재개.
+app.commandLine.appendSwitch("disable-background-timer-throttling");
+app.commandLine.appendSwitch("disable-renderer-backgrounding");
+app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
 let mainWindow;
 let automator = null;
 const authManager = new AuthManager();
@@ -154,7 +160,8 @@ app.whenReady().then(async () => {
     backgroundColor: "#0f0f1a",
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false
+      contextIsolation: false,
+      backgroundThrottling: false
     }
   });
   mainWindow.loadFile("ui/index.html");
