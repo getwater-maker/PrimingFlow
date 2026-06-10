@@ -634,6 +634,21 @@ class GrokEngine {
           }
         }
         if (dlBtn && dlEnabled && videoReady) {
+          // 1순위: video src 가 실제 https URL 이면 직접 다운로드 — 버튼 클릭 생략.
+          //   (실측: 다운로드 버튼 클릭은 매번 5초+ timeout 후 fallback 으로만 성공
+          //    → 클립당 5~6초 낭비 + 불필요한 클릭 변수. URL 직접이 더 빠르고 안정적)
+          if (videoUrl && videoUrl.startsWith('http')) {
+            try {
+              const res = await this.page.context().request.get(videoUrl);
+              const buf = await res.body();
+              fs.writeFileSync(outputPath, buf);
+              GrokStore.markUsed();
+              this.log(`[Grok] ✅ video URL 직접 다운로드 (버튼 생략): ${outputPath}`);
+              return { success: true, videoPath: outputPath, downgradedTo: _downgradeDetected ? '480p' : null };
+            } catch (eDirect) {
+              this.log(`[Grok] URL 직접 다운로드 실패 (${eDirect.message}) — 다운로드 버튼으로 폴백`);
+            }
+          }
           this.log('[Grok] 다운로드 버튼 클릭 (대기 90초)');
           try {
             const [download] = await Promise.all([

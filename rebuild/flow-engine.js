@@ -21,6 +21,10 @@ const fs = require('fs');
 const os = require('os');
 const { AntiDetect } = require('./anti-detect');
 
+// 계정(profile)당 하루 '성공 이미지' 상한 — 구글 Flow 봇 감지/차단 예방. 0 = 무제한.
+// run() 시작 시 + 생성 루프 중간(매 그룹)에 모두 검사해 작업 중 초과도 방지.
+const PER_PROFILE_DAILY_CAP = 45;
+
 const FLOW_URL = 'https://labs.google/fx/ko/tools/flow';
 const DEFAULT_PROFILE_DIR = path.join(os.homedir(), '.flow-app', 'profiles', 'default');
 
@@ -372,8 +376,7 @@ class FlowAutomator {
     //   구글 Flow 는 한 계정을 하루에 과하게 쓰면 "비정상 활동" 으로 차단한다.
     //   계정(profile)별 오늘 생성 횟수가 상한에 도달하면, 이 계정은 더 쓰지 않고
     //   rate-exhausted 신호를 보내 renderer 가 다음 프로필로 폴백하게 한다(=계정 휴식).
-    //   0 이면 무제한. 값 변경: 아래 PER_PROFILE_DAILY_CAP.
-    const PER_PROFILE_DAILY_CAP = 45;
+    //   0 이면 무제한. 값 변경: 모듈 상단 PER_PROFILE_DAILY_CAP.
     {
       const _pid = (config && config.profileId) || 'default';
       const _pc = (limitCheck && Number.isFinite(limitCheck.profileCount)) ? limitCheck.profileCount : 0;
@@ -694,6 +697,25 @@ class FlowAutomator {
       // 일시정지 체크
       await this._waitIfPaused();
       if (this._stopped) break;
+
+      // 계정당 하루 한도 — 작업 '중간'에도 검사 (run 시작 시에만 보면 세션 중 초과 가능).
+      //   성공 카운트는 _saveImage 에서 증가하므로 매 그룹 진입 시 최신값으로 재확인.
+      if (PER_PROFILE_DAILY_CAP > 0 && this.antiDetect &&
+          typeof this.antiDetect.profileCount === 'function' &&
+          this.antiDetect.profileCount() >= PER_PROFILE_DAILY_CAP) {
+        const _pid = this._currentProfileId || 'default';
+        const remainingNums = [];
+        for (let j = i; j < paragraphs.length; j++) remainingNums.push(j + 1);
+        this.log(`🛑 계정 ${_pid} 오늘 성공 ${this.antiDetect.profileCount()}장 — 작업 중 계정당 하루 한도(${PER_PROFILE_DAILY_CAP}장) 도달. 남은 ${remainingNums.length}개는 다음 프로필로 폴백 (구글 차단 예방).`);
+        this.send('flow-rate-exhausted', {
+          profileId: _pid,
+          completedNums: this._completedNums ? this._completedNums.slice() : [],
+          remainingNums,
+          reason: 'daily-limit',
+        });
+        this._rateExhaustedFlag = true;
+        break;
+      }
 
       this.progress(i + 1, paragraphs.length, `${num}번 단락 처리 중...`);
       this.log(`\n[${num}/${paragraphs.length}] ${para.substring(0, 40)}...`);
