@@ -436,6 +436,54 @@ class GensparkEngine {
     return out;
   }
 
+  /** 배치 미완료(Failure 타일 등) 시 결과 카드 DOM 구조를 로그로 덤프 — 진단용.
+   *  목적: "부분 저장(성공분만 올바른 그룹에)" 개선을 위해 Failure 타일의 정확한 마크업 수집.
+   *  실패 상황을 일부러 재현하기 어려우므로, 자연 발생 시 자동으로 로그에 남긴다. */
+  async _dumpResultCards() {
+    try {
+      const info = await this.page.evaluate(() => {
+        const out = { failures: [], cards: [] };
+        // 1) "Failure" 텍스트 요소와 그 부모 체인 (3단계)
+        const fe = [...document.querySelectorAll('*')].filter(el =>
+          el.children.length === 0 && /^failure$/i.test((el.textContent || '').trim()));
+        for (const el of fe.slice(0, 4)) {
+          const chain = [];
+          let p = el;
+          for (let i = 0; i < 4 && p; i++) {
+            chain.push(`${p.tagName}.${String(p.className || '').split(/\s+/).slice(0, 2).join('.')}`);
+            p = p.parentElement;
+          }
+          out.failures.push(chain.join(' < '));
+        }
+        // 2) 결과 이미지의 그리드 컨테이너 추정 → 카드들을 순서대로 (img 유무 + 텍스트)
+        const imgs = [...document.querySelectorAll('img[src*="/api/files/s/"]')];
+        if (imgs.length) {
+          let grid = imgs[imgs.length - 1].parentElement;
+          for (let i = 0; i < 6 && grid; i++) {
+            const kids = [...grid.children];
+            if (kids.length >= 2 && kids.filter(k => k.querySelector && (k.querySelector('img[src*="/api/files/s/"]') || /failure/i.test(k.textContent || ''))).length >= 2) break;
+            grid = grid.parentElement;
+          }
+          if (grid) {
+            out.gridClass = String(grid.className || '').slice(0, 60);
+            out.cards = [...grid.children].slice(-12).map((k, idx) => ({
+              i: idx,
+              cls: String(k.className || '').split(/\s+/).slice(0, 2).join('.'),
+              img: !!(k.querySelector && k.querySelector('img[src*="/api/files/s/"]')),
+              txt: (k.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 24),
+            }));
+          }
+        }
+        return out;
+      });
+      if (info.failures.length) this.log(`[Genspark] [DUMP Failure타일] ${info.failures.join(' || ')}`);
+      if (info.cards.length) this.log(`[Genspark] [DUMP 결과카드] grid=${info.gridClass || '?'} cards=${JSON.stringify(info.cards)}`);
+      if (!info.failures.length && !info.cards.length) this.log('[Genspark] [DUMP] Failure 타일/결과 그리드 미검출');
+    } catch (e) {
+      this.log(`[Genspark] [DUMP] 결과카드 덤프 실패(무시): ${e.message}`);
+    }
+  }
+
   /** 사용 한도/차단/플랜 관련 안내 메시지 감지 — 발견 시 텍스트 반환, 없으면 null.
    *  (예: "5시간 제한에 근접했습니다.", "limit reached", "더 이상 ..." 등) */
   async _detectLimitMessage() {
@@ -552,6 +600,8 @@ class GensparkEngine {
 
       if (newSrcs.length < N) {
         // 개수 불일치 → 순서 매핑 신뢰 불가. 안전하게 전체 실패 처리(오매칭 방지 — 재시도 권장).
+        // 진단: Failure 타일/결과 카드 구조를 로그에 남김 → "성공분만 부분 저장" 개선의 근거 수집.
+        await this._dumpResultCards();
         if (limitMsg) {
           return fail(`Genspark 사용 한도/제한으로 보임: "${limitMsg}" — 잠시 후(보통 몇 시간) 다시 시도하세요.`);
         }
