@@ -5072,7 +5072,7 @@ function addLog(msg, type = '', opts) {
 }
 
 // ─── 프로젝트 출력 폴더 통합 헬퍼 ─────────────────────
-// 모든 출력 (이미지 / TTS / 비디오 / 자막 / .vrew) 이 같은 "MMDD_<대본이름>" 폴더 하위에 저장.
+// 모든 출력 (이미지 / TTS / 비디오 / 자막 / .vrew) 이 같은 "<대본이름>" 폴더 하위에 저장.
 // 첫 호출 시 결정 후 proj.outputDir 에 캐시 — 한 프로젝트 안에서는 항상 동일.
 //
 // 폴더명 우선순위 — 대본 파일명(가장 식별 명확) > 프리셋 이름 > 'project'.
@@ -5108,9 +5108,9 @@ function _getProjectOutputDir(projOrId) {
     || safe(window._scriptFileName)
     || safe(activePreset && activePreset.name)
     || 'project';
-  const today = new Date();
-  const mmdd = `${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
-  const folderName = `${mmdd}_${nameLabel}`;
+  // 폴더명 = 대본파일명 그대로 (날짜 prefix 제거 — 사용자 요청 2026-06-11).
+  // 같은 대본을 다른 날 다시 작업해도 같은 폴더를 재사용 → 이미지/TTS 재활용에도 유리.
+  const folderName = nameLabel;
 
   const path = require('path');
   const fs = require('fs');
