@@ -13501,12 +13501,12 @@ async function _convertGroupVideoBody(projectId, groupId, opts = {}) {
     //          > (빈 값이면 grok-engine 내부에서 store 기본값 "natural slow motion, cinematic feel")
     const motion = (opts.motion || g.videoPrompt || g.videoMotionPrompt || '').trim();
 
-    // 비디오도 통합 폴더의 videos/ 하위 (이미지·TTS·.vrew 와 같은 부모 폴더)
+    // 비디오도 통합 media/ 하위 — 이미지와 같은 폴더 (사용자 요청 2026-06-12: images/videos → media 통합)
     const path = require('path');
     const os = require('os');
     const projectDir = _getProjectOutputDir(proj);
     const baseDir = projectDir
-      ? path.join(projectDir, 'videos')
+      ? path.join(projectDir, 'media')
       : path.join(os.tmpdir(), 'primingflow_videos');
     fs.mkdirSync(baseDir, { recursive: true });
     const outPath = path.join(baseDir, `${String(g.num).padStart(3, '0')}_${groupId}.mp4`);
@@ -14910,7 +14910,7 @@ async function _runRunPodImageGeneration(groupIds, label, modelOverride) {
     }
   } catch {}
 
-  const imagesDir = path.join(baseOutDir, 'images');
+  const imagesDir = path.join(baseOutDir, 'media');   // 이미지·비디오 통합 media/ 폴더
   fs.mkdirSync(imagesDir, { recursive: true });
 
   const targets = groupIds.map(id => proj.groups.find(g => g.id === id)).filter(Boolean);
@@ -15045,7 +15045,7 @@ async function _runGensparkImageGeneration(groupIds, label) {
     alert('출력 폴더를 먼저 선택하세요 (또는 채널을 등록하세요)');
     return;
   }
-  const imagesDir = path.join(baseOutDir, 'images');
+  const imagesDir = path.join(baseOutDir, 'media');   // 이미지·비디오 통합 media/ 폴더
   fs.mkdirSync(imagesDir, { recursive: true });
 
   const targets = groupIds.map(id => proj.groups.find(g => g.id === id)).filter(Boolean);
@@ -15418,8 +15418,8 @@ async function generateAll() {
   const safe = (s) => String(s || '').replace(/[\\/:*?"<>|]/g, '').trim();
   // 첨부한 대본 파일명을 .vrew 파일명으로 사용 (없으면 폴더명 그대로)
   proj.vrewFileName = safe(window._scriptFileName) || path.basename(vrewDir);
-  // 이미지/TTS 도 같은 폴더 하위로
-  proj.imageOutputDir = path.join(vrewDir, 'images');
+  // 이미지(+비디오 통합 media)/TTS 도 같은 폴더 하위로
+  proj.imageOutputDir = path.join(vrewDir, 'media');
   proj.ttsOutputDir = path.join(vrewDir, 'tts');
   fs.mkdirSync(proj.imageOutputDir, { recursive: true });
   fs.mkdirSync(proj.ttsOutputDir, { recursive: true });
@@ -15837,7 +15837,7 @@ async function _runGroupImageGenerationBody(projectId, groupIds, label, channel)
       return;
     }
     const path = require('path');
-    finalDir = path.join(projectDir, 'images');
+    finalDir = path.join(projectDir, 'media');   // 이미지·비디오 통합 media/ 폴더
     proj.imageOutputDir = finalDir;
     addLog(`이미지 ${label} — ${targetGroups.length}개 그룹 → 새 폴더: ${finalDir}`, 'info');
   }
@@ -16786,13 +16786,20 @@ function _renameToGroupPrefix(imgDir, sourcePaddedNum, groupNum) {
   }
 }
 
-// _resolveImgDir — _lastGenOutputDir 이 이미 'images' 폴더이면 그대로 사용,
-// 아니면 그 안의 'images' 하위 폴더 사용. (옛 코드 호환 — generateAll 등 다른 흐름 보호)
+// _resolveImgDir — outDir 이 이미 media/images 폴더이면 그대로 사용.
+// 신규 표준은 'media'(이미지·비디오 통합). 구버전 프로젝트의 'images' 폴더만 있으면
+// 그쪽을 사용 (하위호환 — 옛 폴더에 이어서 작업해도 매핑이 깨지지 않게).
 function _resolveImgDir(outDir) {
   const path = require('path');
+  const fs = require('fs');
   if (!outDir) return null;
-  if (/[\\/]images$/i.test(outDir)) return outDir;
-  return path.join(outDir, 'images');
+  if (/[\\/](media|images)$/i.test(outDir)) return outDir;
+  const mediaDir = path.join(outDir, 'media');
+  const imagesDir = path.join(outDir, 'images');
+  try {
+    if (!fs.existsSync(mediaDir) && fs.existsSync(imagesDir)) return imagesDir;   // 구버전 폴더 호환
+  } catch (_) {}
+  return mediaDir;
 }
 
 ipcRenderer.on('image-done', (_, payload) => {

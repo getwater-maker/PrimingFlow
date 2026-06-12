@@ -330,7 +330,7 @@ class FlowAutomator {
     // ─── vrewOnly 분기 — 이미지 생성 스킵, .vrew 만 만든다 (8단계) ───
     // UI 의 "💾 .vrew 저장" 버튼이 호출. paragraphs + imgDir 만 있으면 됨.
     if (config.vrewOnly) {
-      const imgDir = config.imgDir || path.join(config.outputDir, 'images');
+      const imgDir = config.imgDir || path.join(config.outputDir, 'media');   // 이미지·비디오 통합 media/
       const subDir = path.join(config.outputDir, 'subtitles');
       fs.mkdirSync(subDir, { recursive: true });
       this.log(`[Vrew Only] 이미지 폴더: ${imgDir}, ${paragraphs.length}개 클립`);
@@ -396,7 +396,13 @@ class FlowAutomator {
       }
     }
 
-    const imgDir = path.join(outputDir, 'images');
+    // 이미지·비디오 통합 media/ (신규 표준, 2026-06-12). 구버전 프로젝트는 images/ 만
+    // 있을 수 있어 — media 가 없고 images 가 있으면 그쪽 사용 (하위호환: skip/rename 일관).
+    let imgDir = path.join(outputDir, 'media');
+    try {
+      const _legacyImgDir = path.join(outputDir, 'images');
+      if (!fs.existsSync(imgDir) && fs.existsSync(_legacyImgDir)) imgDir = _legacyImgDir;
+    } catch (_) {}
     const subDir = path.join(outputDir, 'subtitles');
     fs.mkdirSync(imgDir, { recursive: true });
     fs.mkdirSync(subDir, { recursive: true });
