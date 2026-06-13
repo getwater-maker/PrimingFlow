@@ -274,27 +274,45 @@ class GrokEngine {
     }
 
     fs.mkdirSync(this.profileDir, { recursive: true });
-    // 잠금 파일 제거 (이전 비정상 종료 흔적)
-    try {
-      for (const lock of ['SingletonLock', 'SingletonCookie', 'SingletonSocket']) {
-        const p = path.join(this.profileDir, lock);
-        if (fs.existsSync(p)) fs.unlinkSync(p);
-      }
-    } catch {}
 
-    this.log('[Grok] 브라우저 시작 (Grok Imagine)...');
-    this.context = await chromium.launchPersistentContext(this.profileDir, {
-      headless: false,
-      viewport: null,                                // 시스템 화면 크기 그대로 (축소 방지)
-      args: [
-        '--start-maximized',                         // 전체 화면으로 시작
-        '--disable-blink-features=AutomationControlled',
-      ],
-      ignoreDefaultArgs: ['--enable-automation'],
-      acceptDownloads: true,
-      permissions: ['clipboard-read', 'clipboard-write'],
-    });
-    this.page = this.context.pages()[0] || await this.context.newPage();
+    // 브라우저 실행 — chrome 가 가끔 시작 직후 크래시("Target page... has been closed",
+    //   exitCode 비정상)하면서 "작업 크롬창이 떴다가 바로 사라짐" → 영상 변환 전멸.
+    //   락 제거 + 최대 3회 재시도(좀비 chrome 정리 시간 확보)로 방지. (Genspark 와 동일 정책)
+    let _launchErr = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        for (const lock of ['SingletonLock', 'SingletonCookie', 'SingletonSocket']) {
+          const p = path.join(this.profileDir, lock);
+          try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch {}
+        }
+        this.log(attempt === 1
+          ? '[Grok] 브라우저 시작 (Grok Imagine)...'
+          : `[Grok] 브라우저 재시작 (시도 ${attempt}/3)...`);
+        this.context = await chromium.launchPersistentContext(this.profileDir, {
+          headless: false,
+          viewport: null,                                // 시스템 화면 크기 그대로 (축소 방지)
+          args: [
+            '--start-maximized',                         // 전체 화면으로 시작
+            '--disable-blink-features=AutomationControlled',
+          ],
+          ignoreDefaultArgs: ['--enable-automation'],
+          acceptDownloads: true,
+          permissions: ['clipboard-read', 'clipboard-write'],
+        });
+        this.page = this.context.pages()[0] || await this.context.newPage();
+        _launchErr = null;
+        break;
+      } catch (e) {
+        _launchErr = e;
+        this.log(`[Grok] ⚠️ 브라우저 시작 실패 (시도 ${attempt}/3): ${String(e.message).split('\n')[0]}`);
+        try { await this.context?.close(); } catch {}
+        this.context = null; this.page = null;
+        if (attempt < 3) await new Promise(r => setTimeout(r, 2500));
+      }
+    }
+    if (_launchErr || !this.context) {
+      throw new Error(`Grok 브라우저를 시작하지 못했습니다 (3회 시도). 남아있는 자동화 크롬 창이 있으면 닫고 다시 시도하세요. 원인: ${_launchErr ? String(_launchErr.message).split('\n')[0] : 'unknown'}`);
+    }
     await this.page.addInitScript(() => {
       Object.defineProperty(navigator, 'webdriver', { get: () => false });
     });
