@@ -194,7 +194,7 @@ class GensparkEngine {
         this.log(attempt === 1
           ? '[Genspark] 브라우저 시작 (Genspark AI 이미지)...'
           : `[Genspark] 브라우저 재시작 (시도 ${attempt}/3)...`);
-        this.context = await chromium.launchPersistentContext(this.profileDir, {
+        const _baseOpts = {
           headless: false,
           viewport: null,
           args: [
@@ -204,7 +204,15 @@ class GensparkEngine {
           ignoreDefaultArgs: ['--enable-automation'],
           acceptDownloads: true,
           permissions: ['clipboard-read', 'clipboard-write'],
-        });
+        };
+        // 정식 Chrome 우선 (Flow 와 동일) — 내장 Chromium 이 일부 PC 에서 시작 직후 크래시 대응.
+        try {
+          this.context = await chromium.launchPersistentContext(this.profileDir, { ..._baseOpts, channel: 'chrome' });
+          this.log('[Genspark] 브라우저 엔진: Chrome (정식)');
+        } catch (eChrome) {
+          this.log(`[Genspark] ⚠ 정식 Chrome 실행 실패 (${String(eChrome.message).split('\n')[0].slice(0, 80)}) — 내장 Chromium 폴백`);
+          this.context = await chromium.launchPersistentContext(this.profileDir, _baseOpts);
+        }
         this.page = this.context.pages()[0] || await this.context.newPage();
         _launchErr = null;
         break;

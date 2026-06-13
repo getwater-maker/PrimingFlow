@@ -278,6 +278,17 @@ class GrokEngine {
     // 브라우저 실행 — chrome 가 가끔 시작 직후 크래시("Target page... has been closed",
     //   exitCode 비정상)하면서 "작업 크롬창이 떴다가 바로 사라짐" → 영상 변환 전멸.
     //   락 제거 + 최대 3회 재시도(좀비 chrome 정리 시간 확보)로 방지. (Genspark 와 동일 정책)
+    const _baseOpts = {
+      headless: false,
+      viewport: null,                                // 시스템 화면 크기 그대로 (축소 방지)
+      args: [
+        '--start-maximized',                         // 전체 화면으로 시작
+        '--disable-blink-features=AutomationControlled',
+      ],
+      ignoreDefaultArgs: ['--enable-automation'],
+      acceptDownloads: true,
+      permissions: ['clipboard-read', 'clipboard-write'],
+    };
     let _launchErr = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
@@ -288,17 +299,15 @@ class GrokEngine {
         this.log(attempt === 1
           ? '[Grok] 브라우저 시작 (Grok Imagine)...'
           : `[Grok] 브라우저 재시작 (시도 ${attempt}/3)...`);
-        this.context = await chromium.launchPersistentContext(this.profileDir, {
-          headless: false,
-          viewport: null,                                // 시스템 화면 크기 그대로 (축소 방지)
-          args: [
-            '--start-maximized',                         // 전체 화면으로 시작
-            '--disable-blink-features=AutomationControlled',
-          ],
-          ignoreDefaultArgs: ['--enable-automation'],
-          acceptDownloads: true,
-          permissions: ['clipboard-read', 'clipboard-write'],
-        });
+        // 정식 Chrome 우선 (Flow 와 동일) — 내장 Chromium 이 일부 PC 에서 시작 직후
+        //   크래시("Target page... has been closed")하는 사례 대응. Chrome 없으면 Chromium 폴백.
+        try {
+          this.context = await chromium.launchPersistentContext(this.profileDir, { ..._baseOpts, channel: 'chrome' });
+          this.log('[Grok] 브라우저 엔진: Chrome (정식)');
+        } catch (eChrome) {
+          this.log(`[Grok] ⚠ 정식 Chrome 실행 실패 (${String(eChrome.message).split('\n')[0].slice(0, 80)}) — 내장 Chromium 폴백`);
+          this.context = await chromium.launchPersistentContext(this.profileDir, _baseOpts);
+        }
         this.page = this.context.pages()[0] || await this.context.newPage();
         _launchErr = null;
         break;
