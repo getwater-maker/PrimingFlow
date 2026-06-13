@@ -5600,7 +5600,7 @@ function _v2tDetectKind(file) {
       try {
         audio.src = require('url').pathToFileURL(filePath).href;
       } catch (_) {
-        audio.src = 'file:///' + encodeURI(filePath.replace(/\\/g, '/'));
+        audio.src = _fileUrl(filePath);
       }
       audio.load();
       document.getElementById('v2tAudioWrap').style.display = '';
@@ -5645,7 +5645,7 @@ async function v2t_extract() {
     try {
       audio.src = require('url').pathToFileURL(out).href;
     } catch (_) {
-      audio.src = 'file:///' + encodeURI(out.replace(/\\/g, '/'));
+      audio.src = _fileUrl(out);
     }
     audio.load();
     document.getElementById('v2tAudioWrap').style.display = '';
@@ -5979,7 +5979,7 @@ async function r2r_load() {
   try {
     let wsUrl;
     try { wsUrl = require('url').pathToFileURL(_r2rState.sourcePath).href; }
-    catch (_) { wsUrl = 'file:///' + encodeURI(_r2rState.sourcePath.replace(/\\/g, '/')); }
+    catch (_) { wsUrl = _fileUrl(_r2rState.sourcePath); }
     await ws.load(wsUrl);
   } catch (e) {
     document.getElementById('r2rSaveStatus').textContent = '❌ 오디오 로드 실패: ' + e.message;
@@ -6135,7 +6135,7 @@ function loadGallery(targetPath) {
   const hasProject = proj && proj.groups && proj.groups.length > 0;
   for (const file of images) {
     const fullPath = pathm.join(galleryCurrentPath, file);
-    const imgUrl = 'file:///' + encodeURI(fullPath.replace(/\\/g, '/'));
+    const imgUrl = _fileUrl(fullPath);
     const item = document.createElement('div');
     item.className = 'gallery-item';
     item.style.cssText = 'cursor:pointer; position:relative;';
@@ -6183,7 +6183,7 @@ function loadGallery(targetPath) {
     const fullPath = pathm.join(galleryCurrentPath, file);
     let fileSize = 0;
     try { fileSize = fss.statSync(fullPath).size; } catch {}
-    const vidUrl = 'file:///' + encodeURI(fullPath.replace(/\\/g, '/'));
+    const vidUrl = _fileUrl(fullPath);
     const item = document.createElement('div');
     item.className = 'gallery-item';
     item.style.cssText = 'cursor:pointer; position:relative;';
@@ -8215,7 +8215,7 @@ function renderTaskList(project) {
     // 휴지통 버튼 HTML (이미지/비디오 좌상단 — 클릭 시 즉시 제거)
     const TRASH_STYLE = 'position:absolute; top:4px; left:4px; width:24px; height:24px; padding:0; background:rgba(0,0,0,0.55); color:#fff; border:none; border-radius:4px; font-size:13px; cursor:pointer; z-index:5; line-height:1; display:flex; align-items:center; justify-content:center;';
     if (g.videoPath && g.videoStatus === 'done') {
-      const vUrl = 'file:///' + encodeURI(g.videoPath.replace(/\\/g, '/'));
+      const vUrl = _fileUrl(g.videoPath);
       img.innerHTML =
         `<video class="group-video" src="${vUrl}" muted playsinline preload="metadata" style="width:100%; height:100%; object-fit:cover; border-radius:6px;"></video>` +
         `<div class="group-video-overlay" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.25); border-radius:6px; pointer-events:none; transition:opacity 0.2s;">` +
@@ -8252,14 +8252,14 @@ function renderTaskList(project) {
         }
       }, 50);
     } else if (g.videoStatus === 'generating') {
-      const url = g.imagePath ? (typeof _fileUrlForImage === 'function' ? _fileUrlForImage(g.imagePath) : 'file:///' + encodeURI(g.imagePath.replace(/\\/g, '/'))) : '';
+      const url = g.imagePath ? _fileUrlForImage(g.imagePath) : '';
       img.innerHTML = (url ? `<img src="${url}" alt="그룹 ${g.num}" style="width:100%; height:100%; object-fit:cover; border-radius:6px; opacity:0.5;">` : '') +
         `<div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(240,180,60,0.4); border-radius:6px; color:#fff; font-size:12px; font-weight:600; text-align:center; padding:6px;">⏳<br>비디오 생성중</div>`;
       img.style.position = 'relative';
       img.classList.add('has-image');
     } else if (g.imageStatus === 'generating') {
       // 이미지 생성 중 — 파란 오버레이 + 스피너 (재생성이면 기존 이미지 흐리게)
-      const url = g.imagePath ? ((typeof _fileUrlForImage === 'function') ? _fileUrlForImage(g.imagePath) : 'file:///' + encodeURI(g.imagePath.replace(/\\/g, '/'))) : '';
+      const url = g.imagePath ? _fileUrlForImage(g.imagePath) : '';
       img.innerHTML = (url ? `<img src="${url}" alt="" style="width:100%; height:100%; object-fit:cover; border-radius:6px; opacity:0.35;">` : '') +
         `<div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(60,120,200,0.32); border-radius:6px; color:#fff; font-size:12px; font-weight:600; text-align:center; gap:8px;"><span class="pf-img-spin"></span>이미지 생성중</div>`;
       img.style.position = 'relative';
@@ -8273,7 +8273,7 @@ function renderTaskList(project) {
       img.title = '클릭하여 이미지(jpg/png/webp) 또는 동영상 파일 첨부';
       img.onclick = (e) => { e.stopPropagation(); attachGroupMedia(g.id); };
     } else if (g.imagePath) {
-      const url = (typeof _fileUrlForImage === 'function') ? _fileUrlForImage(g.imagePath) : 'file:///' + encodeURI(g.imagePath.replace(/\\/g, '/'));
+      const url = _fileUrlForImage(g.imagePath);
       img.innerHTML =
         `<img src="${url}" alt="그룹 ${g.num}" style="width:100%; height:100%; object-fit:cover; border-radius:6px;">` +
         `<button class="group-media-trash" type="button" title="이미지 제거" style="${TRASH_STYLE}">🗑</button>`;
@@ -12722,7 +12722,7 @@ async function cancelAutoGeneration() {
 // Chromium 의 file:// 캐싱 회피용. mtimeMs 를 hash fragment 로 붙여 파일이 갱신되면
 // URL 이 자동으로 달라지게 함 (서버에 안 보내지는 fragment 라 부작용 X).
 function _makeAudioUrl(filePath) {
-  const url = 'file:///' + encodeURI(String(filePath || '').replace(/\\/g, '/'));
+  const url = _fileUrl(filePath);
   try {
     const fs = require('fs');
     const m = Math.floor(fs.statSync(filePath).mtimeMs);
@@ -16675,9 +16675,17 @@ function _findProjectByGroupId(groupId) {
 // file:// 이미지 URL 빌더 — 재생성 시 같은 파일명을 덮어쓰면 Chromium 이 캐시된 옛 이미지를
 // 보여주는 문제를 회피. mtimeMs 를 hash fragment 로 붙여 파일이 갱신되면 URL 이 자동으로
 // 달라지게 함 (서버에 안 보내지는 fragment 라 부작용 X — 동일 audio URL 빌더와 같은 패턴).
+// 로컬 절대경로 → file:// URL. ⚠ encodeURI 는 '#' '?' 를 인코딩하지 않아,
+// 폴더명에 '#'(예: "### 역사쇼츠") 가 있으면 브라우저가 그 뒤를 fragment 로 보고
+// 경로를 잘라 ERR_FILE_NOT_FOUND 가 난다 → '#'→%23, '?'→%3F 로 추가 escape.
+function _fileUrl(absPath) {
+  if (!absPath) return '';
+  return 'file:///' + encodeURI(String(absPath).replace(/\\/g, '/')).replace(/#/g, '%23').replace(/\?/g, '%3F');
+}
+
 function _fileUrlForImage(absPath) {
   if (!absPath) return '';
-  const encoded = 'file:///' + encodeURI(absPath.replace(/\\/g, '/'));
+  const encoded = _fileUrl(absPath);
   try {
     const fs = require('fs');
     const st = fs.statSync(absPath);
